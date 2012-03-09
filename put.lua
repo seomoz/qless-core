@@ -93,4 +93,8 @@ else
     redis.call('zadd', 'ql:q:' .. queue .. '-work', priority, id)
 end
 
+-- Lastly, we're going to make sure that this item is in the
+-- set of known queues
+redis.call('zadd', 'ql:queues', now, queue)
+
 return id

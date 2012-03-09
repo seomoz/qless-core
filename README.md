@@ -158,6 +158,24 @@ the minute resolution for the first hour, the 15-minute resolution for the first
 day, the hour resolution for the first 3 days, and then at the day resolution
 from there on out. The `histogram` key is a list of those values.
 
+Queues(0, now)
+--------------
+
+Return all the queues we know about, with how many jobs are scheduled, waiting,
+and running in that queue. The response is JSON:
+
+	[
+		{
+			'name': 'testing',
+			'stalled': 2,
+			'waiting': 5,
+			'running': 5,
+			'scheduled': 10
+		}, {
+			...
+		}
+	]
+
 ConsistencyCheck(0, [resolve])
 ------------------------------
 __Unimplemented__ This is designed to look at the current state of the redis 
@@ -246,7 +264,8 @@ A queue is a priority queue and consists of three parts:
 When looking for a unit of work, the client should first choose from the 
 next expired lock. If none are expired, then we should next make sure that
 any jobs that should now be considered eligible (the scheduled time is in
-the past) are then inserted into the work queue.
+the past) are then inserted into the work queue. A sorted set of all the 
+known queues is maintained at `ql:queues`
 
 Locking
 =======
