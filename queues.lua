@@ -7,6 +7,7 @@
 -- 	[
 -- 		{
 -- 			'name': 'testing',
+--          'stalled': 2,
 -- 			'waiting': 5,
 -- 			'running': 5,
 -- 			'scheduled': 10
@@ -28,7 +29,7 @@ for index, qname in ipairs(queuenames) do
 	local stalled = redis.call('zcount', 'ql:q:' .. qname .. '-locks', 0, now)
 	table.insert(response, {
 		name      = qname,
-		waiting   = redis.call('zcard', 'ql:q:' .. qname .. '-wait'),
+		waiting   = redis.call('zcard', 'ql:q:' .. qname .. '-work'),
 		stalled   = stalled,
 		running   = redis.call('zcard', 'ql:q:' .. qname .. '-locks') - stalled,
 		scheduled = redis.call('zcard', 'ql:q:' .. qname .. '-scheduled')
