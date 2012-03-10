@@ -23,6 +23,10 @@
 -- 	}
 --
 
+if #KEYS ~= 0 then
+	error('Track(): No keys expected. Got ' .. #KEYS)
+end
+
 if ARGV[1] ~= nil then
 	local jid = assert(ARGV[2]          , 'Track(): Arg "jid" missing')
 	local now = assert(tonumber(ARGV[3]), 'Track(): Arg "now" missing')
