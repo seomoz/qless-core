@@ -180,8 +180,8 @@ Workers(0, now)
 ---------------
 Returns a list of all the workers that we know of.
 
-Track(0, ['track' or 'untrack', jid, now])
-------------------------------------------
+Track(0) | Track(0, 'track', jid, now, tag, ...) | Track(0, 'untrack', jid, now)
+--------------------------------------------------------------------------------
 If no arguments are provided, it returns details of all currently-tracked jobs.
 If the first argument is 'track', then it will start tracking the job associated
 with that id, and 'untrack' stops tracking it. In this context, tracking is

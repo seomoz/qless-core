@@ -1,4 +1,6 @@
--- Track(0, ['track' or 'untrack', jid, now])
+-- Track(0)
+-- Track(0, 'track', jid, now, tag, ...)
+-- Track(0, 'untrack', jid, now)
 -- ------------------------------------------
 -- If no arguments are provided, it returns details of all currently-tracked jobs.
 -- If the first argument is 'track', then it will start tracking the job associated
@@ -31,6 +33,13 @@ if ARGV[1] ~= nil then
 	local jid = assert(ARGV[2]          , 'Track(): Arg "jid" missing')
 	local now = assert(tonumber(ARGV[3]), 'Track(): Arg "now" missing')
 	if string.lower(ARGV[1]) == 'track' then
+		if #ARGV > 3 then
+			local tags = cjson.decode(redis.call('hget', 'ql:j:' .. jid, 'tags'))
+			for i=4,#ARGV do
+				table.insert(tags, ARGV[i])
+			end
+			redis.call('hset', 'ql:j:' .. jid, 'tags', cjson.encode(tags))
+		end
 		return redis.call('zadd', 'ql:tracked', now, jid)
 	elseif string.lower(ARGV[1]) == 'untrack' then
 		return redis.call('zrem', 'ql:tracked', jid)
