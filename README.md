@@ -176,6 +176,35 @@ and running in that queue. The response is JSON:
 		}
 	]
 
+Workers(0, now)
+---------------
+Returns a list of all the workers that we know of.
+
+Track(0, ['track' or 'untrack', jid, now])
+------------------------------------------
+If no arguments are provided, it returns details of all currently-tracked jobs.
+If the first argument is 'track', then it will start tracking the job associated
+with that id, and 'untrack' stops tracking it. In this context, tracking is
+nothing more than saving the job to a list of jobs that are considered special.
+__Returns__ JSON:
+
+	{
+		'jobs': [
+			{
+				'id': ...,
+				# All the other details you'd get from 'get'
+			}, {
+				...
+			}
+		], 'expired': [
+			# These are all the jids that are completed and whose data expired
+			'deadbeef',
+			...,
+			...,
+		]
+	}
+
+
 ConsistencyCheck(0, [resolve])
 ------------------------------
 __Unimplemented__ This is designed to look at the current state of the redis 
@@ -321,6 +350,13 @@ the other summary values:
 	and fails repeatedly, this is incremented twice.
 - `failed`   -- This is how many are currently failed
 - `retries`  -- This is how many jobs we've had to retry
+
+Tracking
+========
+
+Jobs can be tracked, which just means that they are accessible and displayable.
+This can be useful if you just want to keep tabs on the progress of jobs through
+the pipeline. All the currently-tracked jobs are stored in a sorted set, `ql:tracked`.
 
 Failures
 ========
