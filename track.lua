@@ -54,8 +54,8 @@ else
 	local jids = redis.call('zrange', 'ql:tracked', 0, -1)
 	for index, jid in ipairs(jids) do
 		local r = redis.call(
-		    'hmget', 'ql:j:' .. jid, 'id', 'priority', 'data', 'tags',
-			'worker', 'expires', 'state', 'queue', 'history', 'failure')
+		    'hmget', 'ql:j:' .. jid, 'id', 'priority', 'data', 'tags', 'worker',
+			'expires', 'state', 'queue', 'history', 'failure', 'retries', 'remaining')
 		
 		if r[1] then
 			table.insert(response.jobs, {
@@ -67,7 +67,10 @@ else
 			    expires   = tonumber(r[6]) or 0,
 			    state     = r[7],
 			    queue     = r[8],
-			    history   = cjson.decode(r[9])
+			    history   = cjson.decode(r[9]),
+				failure   = cjson.decode(r[10] or '{}'),
+				retries   = tonumber(r[11]),
+				remaining = tonumber(r[12])
 			})
 		else
 			table.insert(response.expired, jid)

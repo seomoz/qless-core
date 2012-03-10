@@ -1,3 +1,5 @@
+-- Put(1, queue, id, data, now, [priority, [tags, [delay, [retries]]]])
+-- --------------------------------------------------------------------
 -- This script takes the name of the queue and then the 
 -- info about the work item, and makes sure that it's 
 -- enqueued.
@@ -18,6 +20,7 @@
 --    4) [priority]
 --    5) [tags]
 --    6) [delay]
+--    7) [retries]
 
 if #KEYS ~= 1 then
 	if #KEYS < 1 then
@@ -32,9 +35,16 @@ local id       = assert(ARGV[1]               , 'Put(): Arg "id" missing')
 local data     = assert(cjson.decode(ARGV[2]) , 'Put(): Arg "data" missing')
 local now      = assert(tonumber(ARGV[3])     , 'Put(): Arg "now" missing')
 local delay    = assert(tonumber(ARGV[6] or 0), 'Put(): Arg "delay" not a number')
+local retries  = assert(tonumber(ARGV[7] or 5), 'Put(): Arg "retries" not a number')
 
 -- Let's see what the old priority, history and tags were
-local history, priority, tags, oldqueue, state, failure = unpack(redis.call('hmget', 'ql:j:' .. id, 'history', 'priority', 'tags', 'queue', 'state', 'failure'))
+local history, priority, tags, oldqueue, state, failure, _retries = unpack(redis.call('hmget', 'ql:j:' .. id, 'history', 'priority', 'tags', 'queue', 'state', 'failure', 'retries'))
+
+-- If no retries are provided, then we should use
+-- whatever the job previously had
+if ARGV[7] == nil then
+	retries = _retries or 5
+end
 
 -- Update the history to include this new change
 local history = cjson.decode(history or '{}')
@@ -74,15 +84,17 @@ end
 
 -- First, let's save its data
 redis.call('hmset', 'ql:j:' .. id,
-    'id'      , id,
-    'data'    , cjson.encode(data),
-    'priority', priority,
-    'tags'    , cjson.encode(tags),
-    'state'   , 'waiting',
-    'worker'  , '',
-	'expires' , 0,
-    'queue'   , queue,
-    'history' , cjson.encode(history))
+    'id'       , id,
+    'data'     , cjson.encode(data),
+    'priority' , priority,
+    'tags'     , cjson.encode(tags),
+    'state'    , 'waiting',
+    'worker'   , '',
+	'expires'  , 0,
+    'queue'    , queue,
+	'retries'  , retries,
+	'remaining', retries,
+    'history'  , cjson.encode(history))
 
 -- Now, if a delay was provided, and if it's in the future,
 -- then we'll have to schedule it. Otherwise, we're just

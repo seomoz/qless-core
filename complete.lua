@@ -31,7 +31,7 @@ if data then
 end
 
 -- First things first, we should see if the worker still owns this job
-local lastworker, history, state, priority = unpack(redis.call('hmget', 'ql:j:' .. id, 'worker', 'history', 'state', 'priority'))
+local lastworker, history, state, priority, retries = unpack(redis.call('hmget', 'ql:j:' .. id, 'worker', 'history', 'state', 'priority', 'retries'))
 if (lastworker ~= worker) or (state ~= 'running') then
 	return false
 end
@@ -99,7 +99,7 @@ if nextq then
 	})
 	
 	redis.call('hmset', 'ql:j:' .. id, 'state', 'waiting', 'worker', '',
-		'queue', nextq, 'expires', 0, 'history', cjson.encode(history))
+		'queue', nextq, 'expires', 0, 'history', cjson.encode(history), 'remaining', tonumber(retries))
 	
 	if delay > 0 then
 	    redis.call('zadd', 'ql:q:' .. nextq .. '-scheduled', now + delay, id)
@@ -109,7 +109,7 @@ if nextq then
 	return 'waiting'
 else
 	redis.call('hmset', 'ql:j:' .. id, 'state', 'complete', 'worker', '',
-		'queue', '', 'expires', 0, 'history', cjson.encode(history))
+		'queue', '', 'expires', 0, 'history', cjson.encode(history), 'remaining', tonumber(retries))
 	
 	-- Do the completion dance
 	local count, time = unpack(redis.call('hmget', 'ql:config', 'jobs-history-count', 'jobs-history'))

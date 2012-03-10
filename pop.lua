@@ -36,7 +36,38 @@ local keys = {}
 -- Iterate through all the expired locks and add them to the list
 -- of keys that we'll return
 for index, id in ipairs(redis.call('zrangebyscore', key .. '-locks', 0, now, 'LIMIT', 0, count)) do
-    table.insert(keys, id)
+	-- For each of these, decrement their retries. If any of them
+	-- have exhausted their retries, then we should mark them as
+	-- failed.
+	if redis.call('hincrby', 'ql:j:' .. id, 'remaining', -1) < 0 then
+		-- Now remove the instance from the schedule, and work queues for the queue it's in
+		redis.call('zrem', 'ql:q:' .. queue .. '-work', id)
+		redis.call('zrem', 'ql:q:' .. queue .. '-locks', id)
+		redis.call('zrem', 'ql:q:' .. queue .. '-scheduled', id)
+		
+		local t = 'failed-retries-' .. queue
+		-- First things first, we should get the history
+		local history = redis.call('hget', 'ql:j:' .. id, 'history')
+		
+		-- Now, take the element of the history for which our provided worker is the worker, and update 'failed'
+		history = cjson.decode(history or '[]')
+		history[#history]['failed'] = now
+		
+		redis.call('hmset', 'ql:j:' .. id, 'state', 'failed', 'worker', '',
+			'expires', '', 'history', cjson.encode(history), 'failure', cjson.encode({
+				['type']    = t,
+				['message'] = 'Job exhuasted retries in queue "' .. queue .. '"',
+				['when']    = now,
+				['worker']  = history[#history]['worker']
+			}))
+		
+		-- Add this type of failure to the list of failures
+		redis.call('sadd', 'ql:failures', t)
+		-- And add this particular instance to the failed types
+		redis.call('lpush', 'ql:f:' .. t, id)		
+	else
+	    table.insert(keys, id)
+	end
 end
 
 -- If we got any expired locks, then we should increment the
@@ -136,17 +167,19 @@ for index, id in ipairs(keys) do
         'state', 'running', 'history', cjson.encode(history))
     
     redis.call('zadd', key .. '-locks', expires, id)
-    local r = redis.call('hmget', 'ql:j:' .. id, 'id', 'priority', 'data', 'tags', 'expires', 'worker', 'state', 'queue', 'expires')
+    local r = redis.call('hmget', 'ql:j:' .. id, 'id', 'priority', 'data', 'tags',
+		'expires', 'worker', 'state', 'queue', 'retries', 'remaining')
     table.insert(response, cjson.encode({
-        id       = r[1],
-        priority = tonumber(r[2]),
-        data     = cjson.decode(r[3]),
-        tags     = cjson.decode(r[4]),
-        expires  = tonumber(r[5]),
-        worker   = r[6],
-        state    = r[7],
-        queue    = r[8],
-		expires  = r[9]
+        id        = r[1],
+        priority  = tonumber(r[2]),
+        data      = cjson.decode(r[3]),
+        tags      = cjson.decode(r[4]),
+        expires   = tonumber(r[5]),
+        worker    = r[6],
+        state     = r[7],
+        queue     = r[8],
+		retries   = tonumber(r[9]),
+		remaining = tonumber(r[10])
     }))
 end
 

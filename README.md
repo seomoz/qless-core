@@ -38,8 +38,8 @@ Renew the heartbeat, if possible, and optionally update the job's user data.
 __Returns__: a JSON blob with `False` if the job was not renewed, or the
 updated expiration time
 
-Put(1, queue, id, data, now, [priority, [tags, [delay]]])
----------------------------------------------------------
+Put(1, queue, id, data, now, [priority, [tags, [delay, [retries]]]])
+--------------------------------------------------------------------
 Either create a new job in the provided queue with the provided attributes,
 or move that job into that queue. If the job is being serviced by a worker,
 subsequent attempts by that worker to either `heartbeat` or `complete` the
@@ -50,6 +50,9 @@ later, and positive if it's less important. The `tags` argument should be
 a JSON array of the tags associated with the instance and the `delay`
 argument should be in how many seconds the instance should be considered 
 actionable.
+
+The `retries` argument describes the maximum number of retries that should
+be permitted for a job before it is considered automatically failed.
 
 __Returns__: The id of the put job, or raises an error on failure
 
@@ -247,6 +250,11 @@ Jobs are stored in a key `ql:j:<id>`, and have several important keys:
 		
 		# The queue that it's associated with. 'null' if complete
 		'queue'     : 'example',
+		
+		# The maximum number of retries this job is allowed per queue
+		'retries'   : 3,
+		# The number of retries remaining
+		'remaining' : 3,
 		
 		# A list of all the stages that this node has gone through, and
 		# when it was put in that queue, given to a worker, which worker,

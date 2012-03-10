@@ -72,7 +72,7 @@ if data then
 	redis.call('hset', 'ql:j:' .. id, 'data', cjson.encode(data))
 end
 
-redis.call('hmset', 'ql:j:' .. id, 'state', 'failed', 'worker', '', 'queue', '',
+redis.call('hmset', 'ql:j:' .. id, 'state', 'failed', 'worker', '',
 	'expires', '', 'history', cjson.encode(history), 'failure', cjson.encode({
 		['type']    = t,
 		['message'] = message,
