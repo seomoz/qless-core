@@ -33,6 +33,10 @@ local message = assert(ARGV[4]          , 'Fail(): Arg "message" missing')
 local now     = assert(tonumber(ARGV[5]), 'Fail(): Arg "now" missing or malformed: ' .. (ARGV[5] or 'nil'))
 local data    = ARGV[6]
 
+-- The bin is midnight of the provided day
+-- 24 * 60 * 60 = 86400
+local bin = now - (now % 86400)
+
 if data then
 	data = cjson.decode(data)
 end
@@ -61,6 +65,11 @@ else
 		}
 	}
 end
+
+-- Increment the number of failures for that queue for the
+-- given day.
+redis.call('hincrby', 'ql:s:stats:' .. bin .. ':' .. queue, 'failures', 1)
+redis.call('hincrby', 'ql:s:stats:' .. bin .. ':' .. queue, 'failed'  , 1)
 
 -- Now remove the instance from the schedule, and work queues for the queue it's in
 redis.call('zrem', 'ql:q:' .. queue .. '-work', id)

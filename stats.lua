@@ -82,7 +82,11 @@ mkstats = function(name, bin, queue)
 	return results
 end
 
+local retries, failed, failures = unpack(redis.call('hmget', 'ql:s:stats:' .. bin .. ':' .. queue, 'retries', 'failed', 'failures'))
 return cjson.encode({
-	wait = mkstats('wait', bin, queue),
-	run  = mkstats('run' , bin, queue)
+	retries  = tonumber(retries  or 0),
+	failed   = tonumber(failed   or 0),
+	failures = tonumber(failures or 0),
+	wait     = mkstats('wait', bin, queue),
+	run      = mkstats('run' , bin, queue)
 })

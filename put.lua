@@ -80,6 +80,12 @@ if state == 'failed' then
 	if redis.call('llen', 'ql:f:' .. failure.type) == 0 then
 		redis.call('srem', 'ql:failures', failure.type)
 	end
+	-- The bin is midnight of the provided day
+	-- 24 * 60 * 60 = 86400
+	local bin = failure.when - (failure.when % 86400)
+	-- We also need to decrement the stats about the queue on
+	-- the day that this failure actually happened.
+	redis.call('hincrby', 'ql:s:stats:' .. bin .. ':' .. queue, 'failed'  , -1)
 end
 
 -- First, let's save its data

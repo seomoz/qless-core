@@ -49,7 +49,11 @@ The `priority` argument should be negative to be run sooner rather than
 later, and positive if it's less important. The `tags` argument should be
 a JSON array of the tags associated with the instance and the `delay`
 argument should be in how many seconds the instance should be considered 
-actionable.
+actionable. __WARNING__ Internally, we use a Redis sorted set to store the
+jobs that are currently awaiting execution. I have unit tests in place
+to test that jobs are popped in the order they are inserted, if equal in
+priority, but I've found no documentation that Redis uses a stable sorting
+algorithm.
 
 The `retries` argument describes the maximum number of retries that should
 be permitted for a job before it is considered automatically failed.
