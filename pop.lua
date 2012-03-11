@@ -33,6 +33,9 @@ local bin = now - (now % 86400)
 -- These are the ids that we're going to return
 local keys = {}
 
+-- Make sure we this worker to the list of seen workers
+redis.call('zadd', 'ql:workers', now, worker)
+
 -- Iterate through all the expired locks and add them to the list
 -- of keys that we'll return
 for index, id in ipairs(redis.call('zrangebyscore', key .. '-locks', 0, now, 'LIMIT', 0, count)) do
@@ -68,6 +71,10 @@ for index, id in ipairs(redis.call('zrangebyscore', key .. '-locks', 0, now, 'LI
 	else
 	    table.insert(keys, id)
 	end
+	
+	-- Remove this job from the jobs that the worker that was running it has
+	local worker = redis.call('hget', 'ql:j:' .. id, 'worker')
+	redis.call('zrem', 'ql:w:' .. worker .. ':jobs', id)
 end
 
 -- If we got any expired locks, then we should increment the
@@ -162,6 +169,10 @@ for index, id in ipairs(keys) do
 	redis.call('hmset', 'ql:s:wait:' .. bin .. ':' .. queue, 'total', count, 'mean', mean, 'vk', vk)
 	----------------------------------------------------------
     
+	-- Add this job to the list of jobs handled by this worker
+	redis.call('zadd', 'ql:w:' .. worker .. ':jobs', expires, id)
+	
+	-- Update the jobs data, and add its locks, and return the job
     redis.call(
         'hmset', 'ql:j:' .. id, 'worker', worker, 'expires', expires,
         'state', 'running', 'history', cjson.encode(history))

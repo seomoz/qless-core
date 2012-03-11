@@ -12,7 +12,12 @@ if #KEYS > 0 then error('Cancel(): No Keys should be provided') end
 local id     = assert(ARGV[1], 'Cancel(): Arg "id" missing.')
 
 -- Find any stage it's associated with and remove its from that stage
-local state, queue, failure = unpack(redis.call('hmget', 'ql:j:' .. id, 'state', 'queue', 'failure'))
+local state, queue, failure, worker = unpack(redis.call('hmget', 'ql:j:' .. id, 'state', 'queue', 'failure', 'worker'))
+
+-- Remove this job from whatever worker has it, if any
+if worker then
+	redis.call('zrem', 'ql:w:' .. worker .. ':jobs', id)
+end
 
 if state == 'complete' then
 	return False

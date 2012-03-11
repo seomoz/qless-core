@@ -32,6 +32,10 @@ else
         redis.call('hmset', 'ql:j:' .. id, 'expires', expiration, 'worker', worker)
     end
 	
+	-- Update hwen this job was last updated on that worker
+	-- Add this job to the list of jobs handled by this worker
+	redis.call('zadd', 'ql:w:' .. worker .. ':jobs', expiration, id)
+	
     -- And now we should just update the locks
     local queue = redis.call('hget', 'ql:j:' .. id, 'queue')
     redis.call('zadd', 'ql:q:'.. queue, expiration, id)

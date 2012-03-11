@@ -49,6 +49,9 @@ if state == 'complete' then
 	return false
 end
 
+-- Remove this job from the jobs that the worker that was running it has
+redis.call('zrem', 'ql:w:' .. worker .. ':jobs', id)
+
 -- Now, take the element of the history for which our provided worker is the worker, and update 'failed'
 history = cjson.decode(history or '[]')
 if #history > 0 then

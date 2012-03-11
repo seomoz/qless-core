@@ -38,7 +38,7 @@ local delay    = assert(tonumber(ARGV[6] or 0), 'Put(): Arg "delay" not a number
 local retries  = assert(tonumber(ARGV[7] or 5), 'Put(): Arg "retries" not a number')
 
 -- Let's see what the old priority, history and tags were
-local history, priority, tags, oldqueue, state, failure, _retries = unpack(redis.call('hmget', 'ql:j:' .. id, 'history', 'priority', 'tags', 'queue', 'state', 'failure', 'retries'))
+local history, priority, tags, oldqueue, state, failure, _retries, worker = unpack(redis.call('hmget', 'ql:j:' .. id, 'history', 'priority', 'tags', 'queue', 'state', 'failure', 'retries', 'worker'))
 
 -- If no retries are provided, then we should use
 -- whatever the job previously had
@@ -64,6 +64,12 @@ if oldqueue then
 	redis.call('zrem', 'ql:q:' .. oldqueue .. '-work', id)
 	redis.call('zrem', 'ql:q:' .. oldqueue .. '-locks', id)
 	redis.call('zrem', 'ql:q:' .. oldqueue .. '-scheduled', id)
+end
+
+-- If this had previously been given out to a worker,
+-- make sure to remove it from that worker's jobs
+if worker then
+	redis.call('zrem', 'ql:w:' .. worker .. ':jobs', id)
 end
 
 -- If the job was previously in the 'completed' state, then we should remove

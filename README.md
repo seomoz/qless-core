@@ -211,6 +211,35 @@ __Returns__ JSON:
 		]
 	}
 
+Workers(0, now, [worker])
+-------------------------
+Provide data about all the workers, or if a specific worker is provided, then
+which jobs that worker is responsible for. If no worker is provided, expect a
+response of the form:
+
+	[
+		# This is sorted by the recency of activity from that worker
+		{
+			'name'   : 'hostname1-pid1',
+			'jobs'   : 20,
+			'stalled': 0
+		}, {
+			...
+		}
+	]
+
+If a worker id is provided, then expect a response of the form:
+
+	{
+		'jobs': [
+			jid1,
+			jid2,
+			...
+		], 'stalled': [
+			jid1,
+			...
+		]
+	}
 
 ConsistencyCheck(0, [resolve])
 ------------------------------
@@ -388,6 +417,19 @@ instance ids that encountered such a failure. For example, we might have:
 	==================
 	deadbeef
 	...
+
+Worker Data
+===========
+
+We'll keep a sorted set of workers sorted by the last time they had any activity.
+We'll store this set at `ql:workers`.
+
+In addition to this list, we'll keep a set of the jids that a worker currently
+has locks for at `ql:w:<worker>:jobs`. This should be sorted by the time when
+we last saw a heartbeat (or pop) for that worker from that job.
+
+__TBD__ We will likely store data about each worker. Perhaps this, too, can
+be kept by day.
 
 Job Data Deletion
 =================
