@@ -7,7 +7,7 @@
 -- 	[
 -- 		{
 -- 			'name': 'testing',
---          'stalled': 2,
+-- 			'stalled': 2,
 -- 			'waiting': 5,
 -- 			'running': 5,
 -- 			'scheduled': 10

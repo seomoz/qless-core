@@ -248,9 +248,6 @@ instance and report any inconsistencies found in the keys supporting `qless`.
 If `resolve` is passed in as anything other than `nil`, then it will also 
 attempt to resolve these inconsistencies.
 
-
-
-
 Job Structure
 =============
 

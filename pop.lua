@@ -79,7 +79,7 @@ end
 
 -- If we got any expired locks, then we should increment the
 -- number of retries for this stage for this bin
-redis.call('hincrby', 'ql:s:stats:' .. bin .. ':' .. key, 'retries', #keys)
+redis.call('hincrby', 'ql:s:stats:' .. bin .. ':' .. queue, 'retries', #keys)
 
 -- Now we've checked __all__ the locks for this queue the could
 -- have expired, and are no more than the number requested. If
