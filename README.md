@@ -165,11 +165,12 @@ the minute resolution for the first hour, the 15-minute resolution for the first
 day, the hour resolution for the first 3 days, and then at the day resolution
 from there on out. The `histogram` key is a list of those values.
 
-Queues(0, now)
---------------
+Queues(0, now, [queue])
+-----------------------
 
 Return all the queues we know about, with how many jobs are scheduled, waiting,
-and running in that queue. The response is JSON:
+and running in that queue. If a queue name is provided, then only the appropriate
+response hash should be returned. The response is JSON:
 
 	[
 		{
