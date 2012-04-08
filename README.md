@@ -184,6 +184,17 @@ response hash should be returned. The response is JSON:
 		}
 	]
 
+Jobs(0, ('stalled' | 'running' | 'scheduled'), now, queue)
+----------------------------------------------------------
+Return all the job ids currently considered to be in the provided state
+in a particular queue. The response is a list of job ids:
+
+	[
+		jid1, 
+		jid2,
+		...
+	]
+
 Workers(0, now)
 ---------------
 Returns a list of all the workers that we know of.
