@@ -11,8 +11,18 @@
 
 if #KEYS > 0 then error('GetConfig(): No Keys should be provided') end
 
+local defaults = {
+	['stats-history']      = 30,
+	['histogram-history']  = 7,
+	['jobs-history-count'] = 50000,
+	['jobs-history']       = 604800
+}
+
 if ARGV[1] then
-	return redis.call('hget', 'ql:config', ARGV[1])
+	return redis.call('hget', 'ql:config', ARGV[1]) or defaults[ARGV[1]]
 else
-	return redis.call('hgetall', 'ql:config')
+	-- Inspired by redis-lua https://github.com/nrk/redis-lua/blob/version-2.0/src/redis.lua
+	local reply = redis.call('hgetall', 'ql:config')
+    for i = 1, #reply, 2 do defaults[reply[i]] = reply[i + 1] end
+	return cjson.encode(defaults)
 end
