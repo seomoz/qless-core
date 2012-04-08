@@ -9,7 +9,6 @@
 --    1) worker name
 --    2) the number of items to return
 --    3) the current time
---    4) the heartbeat time
 
 if #KEYS ~= 1 then
 	if #KEYS < 1 then
@@ -24,7 +23,11 @@ local key     = 'ql:q:' .. queue
 local worker  = assert(ARGV[1]           , 'Pop(): Arg "worker" missing')
 local count   = assert(tonumber(ARGV[2]) , 'Pop(): Arg "count" missing')
 local now     = assert(tonumber(ARGV[3]) , 'Pop(): Arg "now" missing')
-local expires = assert(tonumber(ARGV[4]) , 'Pop(): Arg "expires" missing')
+
+-- We should find the heartbeat interval for this queue
+-- heartbeat
+local _hb, _qhb = unpack(redis.call('hmget', 'ql:config', 'heartbeat', 'heartbeat-' .. queue))
+local expires = now + tonumber(_qhb or _hb or 60)
 
 -- The bin is midnight of the provided day
 -- 24 * 60 * 60 = 86400

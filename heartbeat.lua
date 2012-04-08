@@ -5,15 +5,22 @@
 -- Args:
 --    1) ID
 --    2) worker
---    3) heartbeat time
+--    3) now
 --    4) [data]
 
 if #KEYS > 0 then error('Heartbeat(): No Keys should be provided') end
 
-local id         = assert(ARGV[1]          , 'Heartbeat(): Arg "id" missing')
-local worker     = assert(ARGV[2]          , 'Heartbeat(): Arg "worker" missing')
-local expiration = assert(tonumber(ARGV[3]), 'Heartbeat(): Arg "expiration" missing')
-local data       = ARGV[4]
+local id     = assert(ARGV[1]          , 'Heartbeat(): Arg "id" missing')
+local worker = assert(ARGV[2]          , 'Heartbeat(): Arg "worker" missing')
+local now    = assert(tonumber(ARGV[3]), 'Heartbeat(): Arg "now" missing')
+local data   = ARGV[4]
+
+-- We should find the heartbeat interval for this queue
+-- heartbeat. First, though, we need to find the queue
+-- this particular job is in
+local queue     = redis.call('hget', 'ql:j:' .. id, 'queue') or ''
+local _hb, _qhb = unpack(redis.call('hmget', 'ql:config', 'heartbeat', 'heartbeat-' .. queue))
+local expires   = now + tonumber(_qhb or _hb or 60)
 
 if data then
 	data = cjson.decode(data)
@@ -27,17 +34,17 @@ else
     if data then
         -- I don't know if this is wise, but I'm decoding and encoding
         -- the user data to hopefully ensure its sanity
-        redis.call('hmset', 'ql:j:' .. id, 'expires', expiration, 'worker', worker, 'data', cjson.encode(data))
+        redis.call('hmset', 'ql:j:' .. id, 'expires', expires, 'worker', worker, 'data', cjson.encode(data))
     else
-        redis.call('hmset', 'ql:j:' .. id, 'expires', expiration, 'worker', worker)
+        redis.call('hmset', 'ql:j:' .. id, 'expires', expires, 'worker', worker)
     end
 	
 	-- Update hwen this job was last updated on that worker
 	-- Add this job to the list of jobs handled by this worker
-	redis.call('zadd', 'ql:w:' .. worker .. ':jobs', expiration, id)
+	redis.call('zadd', 'ql:w:' .. worker .. ':jobs', expires, id)
 	
     -- And now we should just update the locks
     local queue = redis.call('hget', 'ql:j:' .. id, 'queue')
-    redis.call('zadd', 'ql:q:'.. queue, expiration, id)
-    return expiration
+    redis.call('zadd', 'ql:q:'.. queue, expires, id)
+    return expires
 end

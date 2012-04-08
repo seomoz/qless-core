@@ -32,8 +32,8 @@ GetConfig(0, [option])
 Get the current configuration value for that option, or if option is omitted,
 then get all the configuration values. __Returns__: The value of the option
 
-Heartbeat(0, id, worker, expiration, [data])
--------------------------------------------
+Heartbeat(0, id, worker, now, [data])
+-------------------------------------
 Renew the heartbeat, if possible, and optionally update the job's user data.
 __Returns__: a JSON blob with `False` if the job was not renewed, or the
 updated expiration time
@@ -65,8 +65,8 @@ Get(0, id)
 Get the data associated with a job. __Returns__: JSON blob describing the
 job.
 
-Pop(1, queue, worker, count, now, expiration)
----------------------------------------------
+Pop(1, queue, worker, count, now)
+---------------------------------
 Passing in the queue from which to pull items, the current time, when the locks
 for these returned items should expire, and the number of items to be popped
 off.
@@ -321,7 +321,7 @@ The configuration should go in the key `ql:config`, and here are some of the
 configuration options that `qless` is meant to support:
 
 1. `heartbeat` (60) --
-	The default heartbeat in seconds for implicitly-created queues
+	The default heartbeat in seconds for queues
 1. `stats-history` (30) --
 	The number of days to store summary stats
 1. `histogram-history` (7) --
@@ -330,6 +330,8 @@ configuration options that `qless` is meant to support:
 	How many jobs to keep data for after they're completed
 1. `jobs-history` (7 * 24 * 60 * 60) --
 	How many seconds to keep jobs after they're completed
+1. `heartbeat-<queue name>` --
+	The heartbeat interval (in seconds) for a particular queue
 
 Queues
 ======
