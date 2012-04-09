@@ -26,8 +26,8 @@ if data then
 	data = cjson.decode(data)
 end
 
--- First, let's see if the worker still owns this job
-if redis.call('hget', 'ql:j:' .. id, 'worker') ~= worker then
+-- First, let's see if the worker still owns this job, and there is a worker
+if redis.call('hget', 'ql:j:' .. id, 'worker') ~= worker or #worker == 0 then
     return false
 else
     -- Otherwise, optionally update the user data, and the heartbeat
