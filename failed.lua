@@ -1,7 +1,7 @@
 -- Failed(0, [group, [start, [limit]]])
 -- ------------------------------------
--- If no type is provided, this returns a JSON blob of the counts of the various
--- types of failures known. If a type is provided, it will report up to `limit`
+-- If no group is provided, this returns a JSON blob of the counts of the various
+-- groups of failures known. If a group is provided, it will report up to `limit`
 -- from `start` of the jobs affected by that issue. __Returns__ a JSON blob.
 -- 
 -- 	# If no group, then...
@@ -11,7 +11,7 @@
 -- 		...
 -- 	}
 -- 	
--- 	# If a type is provided, then...
+-- 	# If a group is provided, then...
 -- 	{
 --      'total': 20,
 -- 		'jobs': [
@@ -38,7 +38,7 @@ local start = assert(tonumber(ARGV[2] or  0), 'Failed(): Arg "start" is not a nu
 local limit = assert(tonumber(ARGV[3] or 25), 'Failed(): Arg "limit" is not a number: ' .. (ARGV[3] or 'nil'))
 
 if group then
-	-- If a type was provided, then we should do paginated lookup into that
+	-- If a group was provided, then we should do paginated lookup into that
 	local response = {
 		total = redis.call('llen', 'ql:f:' .. group),
 		jobs  = {}
@@ -46,28 +46,28 @@ if group then
 	local jids = redis.call('lrange', 'ql:f:' .. group, start, limit)
 	for index, jid in ipairs(jids) do
 		local job = redis.call(
-		    'hmget', 'ql:j:' .. jid, 'jid', 'priority', 'data', 'tags', 'worker', 'expires',
-			'state', 'queue', 'history', 'retries', 'remaining', 'failure', 'type')
+		    'hmget', 'ql:j:' .. jid, 'jid', 'klass', 'state', 'queue', 'worker', 'priority',
+			'expires', 'retries', 'remaining', 'data', 'tags', 'history', 'failure')
 		
 		table.insert(response.jobs, {
 		    jid       = job[1],
-		    priority  = tonumber(job[2]),
-		    data      = cjson.decode(job[3]) or {},
-		    tags      = cjson.decode(job[4]) or {},
-		    worker    = job[5] or '',
-		    expires   = tonumber(job[6]) or 0,
-		    state     = job[7],
-		    queue     = job[8],
-		    history   = cjson.decode(job[9]),
-			retries   = tonumber(job[10]),
-			remaining = tonumber(job[11]),
-			failure   = cjson.decode(job[12] or '{}'),
-			type      = job[13]
+			klass     = job[2],
+		    state     = job[3],
+		    queue     = job[4],
+			worker    = job[5] or '',
+			priority  = tonumber(job[6]),
+			expires   = tonumber(job[7]) or 0,
+			retries   = tonumber(job[8]),
+			remaining = tonumber(job[9]),
+			data      = cjson.decode(job[10]),
+			tags      = cjson.decode(job[11]),
+		    history   = cjson.decode(job[12]),
+			failure   = cjson.decode(job[13] or '{}'),
 		})
 	end
 	return cjson.encode(response)
 else
-	-- Otherwise, we should just list all the known failure types we have
+	-- Otherwise, we should just list all the known failure groups we have
 	local response = {}
 	local groups = redis.call('smembers', 'ql:failures')
 	for index, group in ipairs(groups) do

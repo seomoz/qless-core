@@ -51,7 +51,7 @@ for index, jid in ipairs(redis.call('zrangebyscore', key .. '-locks', 0, now, 'L
 		redis.call('zrem', 'ql:q:' .. queue .. '-locks', jid)
 		redis.call('zrem', 'ql:q:' .. queue .. '-scheduled', jid)
 		
-		local t = 'failed-retries-' .. queue
+		local group = 'failed-retries-' .. queue
 		-- First things first, we should get the history
 		local history = redis.call('hget', 'ql:j:' .. jid, 'history')
 		
@@ -61,16 +61,16 @@ for index, jid in ipairs(redis.call('zrangebyscore', key .. '-locks', 0, now, 'L
 		
 		redis.call('hmset', 'ql:j:' .. jid, 'state', 'failed', 'worker', '',
 			'expires', '', 'history', cjson.encode(history), 'failure', cjson.encode({
-				['type']    = t,
+				['group']   = group,
 				['message'] = 'Job exhuasted retries in queue "' .. queue .. '"',
 				['when']    = now,
 				['worker']  = history[#history]['worker']
 			}))
 		
 		-- Add this type of failure to the list of failures
-		redis.call('sadd', 'ql:failures', t)
+		redis.call('sadd', 'ql:failures', group)
 		-- And add this particular instance to the failed types
-		redis.call('lpush', 'ql:f:' .. t, jid)		
+		redis.call('lpush', 'ql:f:' .. group, jid)		
 	else
 	    table.insert(keys, jid)
 	end
@@ -181,21 +181,25 @@ for index, jid in ipairs(keys) do
         'state', 'running', 'history', cjson.encode(history))
     
     redis.call('zadd', key .. '-locks', expires, jid)
-    local r = redis.call('hmget', 'ql:j:' .. jid, 'jid', 'priority', 'data', 'tags',
-		'expires', 'worker', 'state', 'queue', 'retries', 'remaining', 'type')
-    table.insert(response, cjson.encode({
-        jid       = r[1],
-        priority  = tonumber(r[2]),
-        data      = cjson.decode(r[3]),
-        tags      = cjson.decode(r[4]),
-        expires   = tonumber(r[5]),
-        worker    = r[6],
-        state     = r[7],
-        queue     = r[8],
-		retries   = tonumber(r[9]),
-		remaining = tonumber(r[10]),
-		type      = r[11]
-    }))
+	local job = redis.call(
+	    'hmget', 'ql:j:' .. jid, 'jid', 'klass', 'state', 'queue', 'worker', 'priority',
+		'expires', 'retries', 'remaining', 'data', 'tags', 'history', 'failure')
+		
+	table.insert(response, cjson.encode({
+	    jid       = job[1],
+		klass     = job[2],
+	    state     = job[3],
+	    queue     = job[4],
+		worker    = job[5] or '',
+		priority  = tonumber(job[6]),
+		expires   = tonumber(job[7]) or 0,
+		retries   = tonumber(job[8]),
+		remaining = tonumber(job[9]),
+		data      = cjson.decode(job[10]),
+		tags      = cjson.decode(job[11]),
+	    history   = cjson.decode(job[12]),
+		failure   = cjson.decode(job[13] or '{}'),
+	}))
 end
 
 if #keys > 0 then

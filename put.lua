@@ -1,5 +1,5 @@
--- Put(1, queue, jid, data, now, [priority, [tags, [delay, [retries]]]])
--- ---------------------------------------------------------------------
+-- Put(1, queue, jid, klass, data, now, [priority, [tags, [delay, [retries]]]])
+-- ----------------------------------------------------------------------------
 -- This script takes the name of the queue and then the 
 -- info about the work item, and makes sure that it's 
 -- enqueued.
@@ -15,7 +15,7 @@
 --    1) queue name
 -- Args:
 --    1) jid
---    2) type
+--    2) klass
 --    3) data
 --    4) now
 --    5) [priority]
@@ -33,7 +33,7 @@ end
 
 local queue    = assert(KEYS[1]               , 'Put(): Key "queue" missing')
 local jid      = assert(ARGV[1]               , 'Put(): Arg "jid" missing')
-local t        = assert(ARGV[2]               , 'Put(): Arg "type" missing')
+local klass    = assert(ARGV[2]               , 'Put(): Arg "klass" missing')
 local data     = assert(cjson.decode(ARGV[3]) , 'Put(): Arg "data" missing')
 local now      = assert(tonumber(ARGV[4])     , 'Put(): Arg "now" missing')
 local delay    = assert(tonumber(ARGV[7] or 0), 'Put(): Arg "delay" not a number')
@@ -99,7 +99,7 @@ end
 -- First, let's save its data
 redis.call('hmset', 'ql:j:' .. jid,
     'jid'      , jid,
-	'type'     , t,
+	'klass'    , klass,
     'data'     , cjson.encode(data),
     'priority' , priority,
     'tags'     , cjson.encode(tags),

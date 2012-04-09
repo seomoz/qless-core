@@ -467,10 +467,12 @@ the same variable names have the same meaning.
 
 1. Parameter sanitization should be performed as early as possible. This includes
 	making use of `assert` and `error` based on the number and type of arguments.
-2. Job ids should be referred to as `jid`, both internally and in the clients.
-3. Job types should be described everywhere with `group`. I'm not terribly thrilled
+1. Job ids should be referred to as `jid`, both internally and in the clients.
+1. Failure types should be described with `group`. I'm not terribly thrilled
 	with the term, but I thought it was better than 'kind.' After spending
 	some time with a Thesaurus, I didn't find anything that appealed to me more
+1. Job types should be described as `klass` (nod to Resque), because both 'type'
+	and 'class' are commonly used in languages.
 
 
 

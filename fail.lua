@@ -1,7 +1,7 @@
--- Fail(0, jid, worker, type, message, now, [data])
--- ------------------------------------------------
--- Mark the particular job as failed, with the provided type, and a more specific
--- message. By `type`, we mean some phrase that might be one of several categorical
+-- Fail(0, jid, worker, group, message, now, [data])
+-- -------------------------------------------------
+-- Mark the particular job as failed, with the provided group, and a more specific
+-- message. By `group`, we mean some phrase that might be one of several categorical
 -- modes of failure. The `message` is something more job-specific, like perhaps
 -- a traceback.
 -- 
@@ -9,7 +9,7 @@
 -- failed in a transient way. This method __should__ be used to note that a job has
 -- something really wrong with it that must be remedied.
 -- 
--- The motivation behind the `type` is so that similar errors can be grouped together.
+-- The motivation behind the `group` is so that similar errors can be grouped together.
 -- Optionally, updated data can be provided for the job. A job in any state can be
 -- marked as failed. If it has been given to a worker as a job, then its subsequent
 -- requests to heartbeat or complete that job will fail. Failed jobs are kept until
@@ -92,9 +92,9 @@ redis.call('hmset', 'ql:j:' .. jid, 'state', 'failed', 'worker', '',
 		['worker']  = worker
 	}))
 
--- Add this type of failure to the list of failures
+-- Add this group of failure to the list of failures
 redis.call('sadd', 'ql:failures', group)
--- And add this particular instance to the failed types
+-- And add this particular instance to the failed groups
 redis.call('lpush', 'ql:f:' .. group, jid)
 
 -- Here is where we'd intcrement stats about the particular stage

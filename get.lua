@@ -9,26 +9,26 @@ if #KEYS > 0 then error('Get(): No Keys should be provided') end
 local jid = assert(ARGV[1], 'Get(): Arg "jid" missing')
 
 -- Let's get all the data we can
-local r = redis.call(
-    'hmget', 'ql:j:' .. jid, 'jid', 'priority', 'data', 'tags', 'worker', 'expires',
-	'state', 'queue', 'history', 'failure', 'retries', 'remaining', 'type')
+local job = redis.call(
+    'hmget', 'ql:j:' .. jid, 'jid', 'klass', 'state', 'queue', 'worker', 'priority',
+	'expires', 'retries', 'remaining', 'data', 'tags', 'history', 'failure')
 
-if not r[1] then
-	return False
+if not job[1] then
+	return false
 end
-
+		
 return cjson.encode({
-    jid       = r[1],
-    priority  = tonumber(r[2]),
-    data      = cjson.decode(r[3]) or {},
-    tags      = cjson.decode(r[4]) or {},
-    worker    = r[5] or '',
-    expires   = tonumber(r[6]) or 0,
-    state     = r[7],
-    queue     = r[8],
-    history   = cjson.decode(r[9]),
-	failure   = cjson.decode(r[10] or '{}'),
-	retries   = tonumber(r[11]),
-	remaining = tonumber(r[12]),
-	type      = r[13]
+    jid       = job[1],
+	klass     = job[2],
+    state     = job[3],
+    queue     = job[4],
+	worker    = job[5] or '',
+	priority  = tonumber(job[6]),
+	expires   = tonumber(job[7]) or 0,
+	retries   = tonumber(job[8]),
+	remaining = tonumber(job[9]),
+	data      = cjson.decode(job[10]),
+	tags      = cjson.decode(job[11]),
+    history   = cjson.decode(job[12]),
+	failure   = cjson.decode(job[13] or '{}'),
 })

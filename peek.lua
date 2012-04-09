@@ -73,22 +73,25 @@ end
 
 local response = {}
 for index, jid in ipairs(keys) do
-    local r = redis.call('hmget', 'ql:j:' .. jid, 'jid', 'priority', 'data', 'tags',
-		'expires', 'worker', 'state', 'queue', 'retries', 'remaining', 'history', 'type')
-    table.insert(response, cjson.encode({
-        jid       = r[1],
-        priority  = tonumber(r[2]),
-        data      = cjson.decode(r[3]),
-        tags      = cjson.decode(r[4]),
-        expires   = tonumber(r[5] or 0),
-        worker    = r[6],
-        state     = r[7],
-        queue     = r[8],
-        retries   = tonumber(r[9]),
-        remaining = tonumber(r[10]),
-		history   = cjson.decode(r[11]),
-		type      = r[12]
-    }))	
+	local job = redis.call(
+	    'hmget', 'ql:j:' .. jid, 'jid', 'klass', 'state', 'queue', 'worker', 'priority',
+		'expires', 'retries', 'remaining', 'data', 'tags', 'history', 'failure')
+	
+	table.insert(response, cjson.encode({
+	    jid       = job[1],
+		klass     = job[2],
+	    state     = job[3],
+	    queue     = job[4],
+		worker    = job[5] or '',
+		priority  = tonumber(job[6]),
+		expires   = tonumber(job[7]) or 0,
+		retries   = tonumber(job[8]),
+		remaining = tonumber(job[9]),
+		data      = cjson.decode(job[10]),
+		tags      = cjson.decode(job[11]),
+	    history   = cjson.decode(job[12]),
+		failure   = cjson.decode(job[13] or '{}'),
+	}))
 end
 
 return response
