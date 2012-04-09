@@ -121,7 +121,10 @@ else
 end
 
 -- Lastly, we're going to make sure that this item is in the
--- set of known queues
-redis.call('zadd', 'ql:queues', now, queue)
+-- set of known queues. We should keep this sorted by the 
+-- order in which we saw each of these queues
+if redis.call('zscore', 'ql:queues', queue) == false then
+	redis.call('zadd', 'ql:queues', now, queue)
+end
 
 return id

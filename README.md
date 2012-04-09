@@ -351,7 +351,9 @@ When looking for a unit of work, the client should first choose from the
 next expired lock. If none are expired, then we should next make sure that
 any jobs that should now be considered eligible (the scheduled time is in
 the past) are then inserted into the work queue. A sorted set of all the 
-known queues is maintained at `ql:queues`
+known queues is maintained at `ql:queues`. Currently we're keeping it 
+sorted based on the time when we first saw the queue, but that's a little
+bit at odd with only keeping queues around while they're being used.
 
 Locking
 =======

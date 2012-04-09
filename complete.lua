@@ -109,6 +109,12 @@ if nextq then
 	else
 	    redis.call('zadd', 'ql:q:' .. nextq .. '-work', priority, id)
 	end
+	
+	-- Lastly, we're going to make sure that this item is in the
+	-- set of known queues
+	if redis.call('zscore', 'ql:queues', nextq) == false then
+		redis.call('zadd', 'ql:queues', now, nextq)
+	end
 	return 'waiting'
 else
 	redis.call('hmset', 'ql:j:' .. id, 'state', 'complete', 'worker', '',
