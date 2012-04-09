@@ -182,7 +182,7 @@ for index, id in ipairs(keys) do
     
     redis.call('zadd', key .. '-locks', expires, id)
     local r = redis.call('hmget', 'ql:j:' .. id, 'id', 'priority', 'data', 'tags',
-		'expires', 'worker', 'state', 'queue', 'retries', 'remaining')
+		'expires', 'worker', 'state', 'queue', 'retries', 'remaining', 'type')
     table.insert(response, cjson.encode({
         id        = r[1],
         priority  = tonumber(r[2]),
@@ -193,7 +193,8 @@ for index, id in ipairs(keys) do
         state     = r[7],
         queue     = r[8],
 		retries   = tonumber(r[9]),
-		remaining = tonumber(r[10])
+		remaining = tonumber(r[10]),
+		type      = r[11]
     }))
 end
 

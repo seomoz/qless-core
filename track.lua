@@ -55,7 +55,7 @@ else
 	for index, jid in ipairs(jids) do
 		local r = redis.call(
 		    'hmget', 'ql:j:' .. jid, 'id', 'priority', 'data', 'tags', 'worker',
-			'expires', 'state', 'queue', 'history', 'failure', 'retries', 'remaining')
+			'expires', 'state', 'queue', 'history', 'failure', 'retries', 'remaining', 'type')
 		
 		if r[1] then
 			table.insert(response.jobs, {
@@ -70,7 +70,8 @@ else
 			    history   = cjson.decode(r[9]),
 				failure   = cjson.decode(r[10] or '{}'),
 				retries   = tonumber(r[11]),
-				remaining = tonumber(r[12])
+				remaining = tonumber(r[12]),
+				type      = r[13]
 			})
 		else
 			table.insert(response.expired, jid)

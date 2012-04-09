@@ -38,8 +38,8 @@ Renew the heartbeat, if possible, and optionally update the job's user data.
 __Returns__: a JSON blob with `False` if the job was not renewed, or the
 updated expiration time
 
-Put(1, queue, id, data, now, [priority, [tags, [delay, [retries]]]])
---------------------------------------------------------------------
+Put(1, queue, id, type, data, now, [priority, [tags, [delay, [retries]]]])
+--------------------------------------------------------------------------
 Either create a new job in the provided queue with the provided attributes,
 or move that job into that queue. If the job is being serviced by a worker,
 subsequent attempts by that worker to either `heartbeat` or `complete` the
@@ -269,6 +269,11 @@ Jobs are stored in a key `ql:j:<id>`, and have several important keys:
 		# This is the same id as identifies it in the key. It should be
 		# a hex value of a uuid
 		'id'        : 'deadbeef...',
+		
+		# This is a 'type' identifier. Clients may choose to ignore it,
+		# or use it as a language-specific identifier for determining
+		# what code to run. For instance, it might be 'foo.bar.FooJob'
+		'type'      : '...',
 		
 		# This is the priority of the job -- lower means more priority.
 		# The default is 0
