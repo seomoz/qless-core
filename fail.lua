@@ -1,5 +1,5 @@
--- Fail(0, id, worker, type, message, now, [data])
--- ---------------------------------------
+-- Fail(0, jid, worker, type, message, now, [data])
+-- ------------------------------------------------
 -- Mark the particular job as failed, with the provided type, and a more specific
 -- message. By `type`, we mean some phrase that might be one of several categorical
 -- modes of failure. The `message` is something more job-specific, like perhaps
@@ -17,7 +17,7 @@
 -- or `False` on failure.
 --
 -- Args:
---    1) job id
+--    1) jid
 --    2) worker
 --    3) failure type
 --    4) message
@@ -26,7 +26,7 @@
 
 if #KEYS > 0 then error('Fail(): No Keys should be provided') end
 
-local id      = assert(ARGV[1]          , 'Fail(): Arg "id" missing')
+local jid     = assert(ARGV[1]          , 'Fail(): Arg "jid" missing')
 local worker  = assert(ARGV[2]          , 'Fail(): Arg "worker" missing')
 local t       = assert(ARGV[3]          , 'Fail(): Arg "type" missing')
 local message = assert(ARGV[4]          , 'Fail(): Arg "message" missing')
@@ -42,7 +42,7 @@ if data then
 end
 
 -- First things first, we should get the history
-local history, queue, state = unpack(redis.call('hmget', 'ql:j:' .. id, 'history', 'queue', 'state'))
+local history, queue, state = unpack(redis.call('hmget', 'ql:j:' .. jid, 'history', 'queue', 'state'))
 
 -- If the job has been completed, we cannot fail it
 if state == 'complete' then
@@ -50,7 +50,7 @@ if state == 'complete' then
 end
 
 -- Remove this job from the jobs that the worker that was running it has
-redis.call('zrem', 'ql:w:' .. worker .. ':jobs', id)
+redis.call('zrem', 'ql:w:' .. worker .. ':jobs', jid)
 
 -- Now, take the element of the history for which our provided worker is the worker, and update 'failed'
 history = cjson.decode(history or '[]')
@@ -75,16 +75,16 @@ redis.call('hincrby', 'ql:s:stats:' .. bin .. ':' .. queue, 'failures', 1)
 redis.call('hincrby', 'ql:s:stats:' .. bin .. ':' .. queue, 'failed'  , 1)
 
 -- Now remove the instance from the schedule, and work queues for the queue it's in
-redis.call('zrem', 'ql:q:' .. queue .. '-work', id)
-redis.call('zrem', 'ql:q:' .. queue .. '-locks', id)
-redis.call('zrem', 'ql:q:' .. queue .. '-scheduled', id)
+redis.call('zrem', 'ql:q:' .. queue .. '-work', jid)
+redis.call('zrem', 'ql:q:' .. queue .. '-locks', jid)
+redis.call('zrem', 'ql:q:' .. queue .. '-scheduled', jid)
 
 -- The reason that this appears here is that the above will fail if the job doesn't exist
 if data then
-	redis.call('hset', 'ql:j:' .. id, 'data', cjson.encode(data))
+	redis.call('hset', 'ql:j:' .. jid, 'data', cjson.encode(data))
 end
 
-redis.call('hmset', 'ql:j:' .. id, 'state', 'failed', 'worker', '',
+redis.call('hmset', 'ql:j:' .. jid, 'state', 'failed', 'worker', '',
 	'expires', '', 'history', cjson.encode(history), 'failure', cjson.encode({
 		['type']    = t,
 		['message'] = message,
@@ -95,9 +95,9 @@ redis.call('hmset', 'ql:j:' .. id, 'state', 'failed', 'worker', '',
 -- Add this type of failure to the list of failures
 redis.call('sadd', 'ql:failures', t)
 -- And add this particular instance to the failed types
-redis.call('lpush', 'ql:f:' .. t, id)
+redis.call('lpush', 'ql:f:' .. t, jid)
 
 -- Here is where we'd intcrement stats about the particular stage
 -- and possibly the workers
 
-return id
+return jid

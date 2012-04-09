@@ -17,7 +17,7 @@
 -- 		'jobs': [
 -- 			{
 -- 				# All the normal keys for a job
--- 				'id': ...,
+-- 				'jid': ...,
 -- 				'data': ...
 -- 				# The message for this particular instance
 -- 				'message': ...,
@@ -46,11 +46,11 @@ if t then
 	local jids = redis.call('lrange', 'ql:f:' .. t, start, limit)
 	for index, jid in ipairs(jids) do
 		local job = redis.call(
-		    'hmget', 'ql:j:' .. jid, 'id', 'priority', 'data', 'tags', 'worker', 'expires',
+		    'hmget', 'ql:j:' .. jid, 'jid', 'priority', 'data', 'tags', 'worker', 'expires',
 			'state', 'queue', 'history', 'retries', 'remaining', 'failure', 'type')
 		
 		table.insert(response.jobs, {
-		    id        = job[1],
+		    jid       = job[1],
 		    priority  = tonumber(job[2]),
 		    data      = cjson.decode(job[3]) or {},
 		    tags      = cjson.decode(job[4]) or {},

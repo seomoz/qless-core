@@ -41,25 +41,25 @@ redis.call('zadd', 'ql:workers', now, worker)
 
 -- Iterate through all the expired locks and add them to the list
 -- of keys that we'll return
-for index, id in ipairs(redis.call('zrangebyscore', key .. '-locks', 0, now, 'LIMIT', 0, count)) do
+for index, jid in ipairs(redis.call('zrangebyscore', key .. '-locks', 0, now, 'LIMIT', 0, count)) do
 	-- For each of these, decrement their retries. If any of them
 	-- have exhausted their retries, then we should mark them as
 	-- failed.
-	if redis.call('hincrby', 'ql:j:' .. id, 'remaining', -1) < 0 then
+	if redis.call('hincrby', 'ql:j:' .. jid, 'remaining', -1) < 0 then
 		-- Now remove the instance from the schedule, and work queues for the queue it's in
-		redis.call('zrem', 'ql:q:' .. queue .. '-work', id)
-		redis.call('zrem', 'ql:q:' .. queue .. '-locks', id)
-		redis.call('zrem', 'ql:q:' .. queue .. '-scheduled', id)
+		redis.call('zrem', 'ql:q:' .. queue .. '-work', jid)
+		redis.call('zrem', 'ql:q:' .. queue .. '-locks', jid)
+		redis.call('zrem', 'ql:q:' .. queue .. '-scheduled', jid)
 		
 		local t = 'failed-retries-' .. queue
 		-- First things first, we should get the history
-		local history = redis.call('hget', 'ql:j:' .. id, 'history')
+		local history = redis.call('hget', 'ql:j:' .. jid, 'history')
 		
 		-- Now, take the element of the history for which our provided worker is the worker, and update 'failed'
 		history = cjson.decode(history or '[]')
 		history[#history]['failed'] = now
 		
-		redis.call('hmset', 'ql:j:' .. id, 'state', 'failed', 'worker', '',
+		redis.call('hmset', 'ql:j:' .. jid, 'state', 'failed', 'worker', '',
 			'expires', '', 'history', cjson.encode(history), 'failure', cjson.encode({
 				['type']    = t,
 				['message'] = 'Job exhuasted retries in queue "' .. queue .. '"',
@@ -70,14 +70,14 @@ for index, id in ipairs(redis.call('zrangebyscore', key .. '-locks', 0, now, 'LI
 		-- Add this type of failure to the list of failures
 		redis.call('sadd', 'ql:failures', t)
 		-- And add this particular instance to the failed types
-		redis.call('lpush', 'ql:f:' .. t, id)		
+		redis.call('lpush', 'ql:f:' .. t, jid)		
 	else
-	    table.insert(keys, id)
+	    table.insert(keys, jid)
 	end
 	
 	-- Remove this job from the jobs that the worker that was running it has
-	local worker = redis.call('hget', 'ql:j:' .. id, 'worker')
-	redis.call('zrem', 'ql:w:' .. worker .. ':jobs', id)
+	local worker = redis.call('hget', 'ql:j:' .. jid, 'worker')
+	redis.call('zrem', 'ql:w:' .. worker .. ':jobs', jid)
 end
 
 -- If we got any expired locks, then we should increment the
@@ -95,13 +95,13 @@ if #keys < count then
     -- insert into the work queue
     local zadd = {}
     local r = redis.call('zrangebyscore', key .. '-scheduled', 0, now, 'LIMIT', 0, (count - #keys))
-    for index, id in ipairs(r) do
+    for index, jid in ipairs(r) do
         -- With these in hand, we'll have to go out and find the 
         -- priorities of these jobs, and then we'll insert them
         -- into the work queue and then when that's complete, we'll
         -- remove them from the scheduled queue
-        table.insert(zadd, tonumber(redis.call('hget', 'ql:j:' .. id, 'priority') or 0))
-        table.insert(zadd, id)
+        table.insert(zadd, tonumber(redis.call('hget', 'ql:j:' .. jid, 'priority') or 0))
+        table.insert(zadd, jid)
     end
     
     -- Now add these to the work list, and then remove them
@@ -113,8 +113,8 @@ if #keys < count then
     
     -- And now we should get up to the maximum number of requested
     -- work items from the work queue.
-    for index, id in ipairs(redis.call('zrange', key .. '-work', 0, (count - #keys) - 1)) do
-        table.insert(keys, id)
+    for index, jid in ipairs(redis.call('zrange', key .. '-work', 0, (count - #keys) - 1)) do
+        table.insert(keys, jid)
     end
 end
 
@@ -128,9 +128,9 @@ end
 local response = {}
 local state
 local history
-for index, id in ipairs(keys) do
+for index, jid in ipairs(keys) do
     -- First, we should get the state and history of the item
-    state, history = unpack(redis.call('hmget', 'ql:j:' .. id, 'state', 'history'))
+    state, history = unpack(redis.call('hmget', 'ql:j:' .. jid, 'state', 'history'))
 	
     history = cjson.decode(history or '{}')
     history[#history]['worker'] = worker
@@ -173,18 +173,18 @@ for index, id in ipairs(keys) do
 	----------------------------------------------------------
     
 	-- Add this job to the list of jobs handled by this worker
-	redis.call('zadd', 'ql:w:' .. worker .. ':jobs', expires, id)
+	redis.call('zadd', 'ql:w:' .. worker .. ':jobs', expires, jid)
 	
 	-- Update the jobs data, and add its locks, and return the job
     redis.call(
-        'hmset', 'ql:j:' .. id, 'worker', worker, 'expires', expires,
+        'hmset', 'ql:j:' .. jid, 'worker', worker, 'expires', expires,
         'state', 'running', 'history', cjson.encode(history))
     
-    redis.call('zadd', key .. '-locks', expires, id)
-    local r = redis.call('hmget', 'ql:j:' .. id, 'id', 'priority', 'data', 'tags',
+    redis.call('zadd', key .. '-locks', expires, jid)
+    local r = redis.call('hmget', 'ql:j:' .. jid, 'jid', 'priority', 'data', 'tags',
 		'expires', 'worker', 'state', 'queue', 'retries', 'remaining', 'type')
     table.insert(response, cjson.encode({
-        id        = r[1],
+        jid       = r[1],
         priority  = tonumber(r[2]),
         data      = cjson.decode(r[3]),
         tags      = cjson.decode(r[4]),

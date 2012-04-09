@@ -26,8 +26,8 @@ local keys = {}
 
 -- Iterate through all the expired locks and add them to the list
 -- of keys that we'll return
-for index, id in ipairs(redis.call('zrangebyscore', key .. '-locks', 0, now, 'LIMIT', 0, count)) do
-    table.insert(keys, id)
+for index, jid in ipairs(redis.call('zrangebyscore', key .. '-locks', 0, now, 'LIMIT', 0, count)) do
+    table.insert(keys, jid)
 end
 
 -- Now we've checked __all__ the locks for this queue the could
@@ -41,13 +41,13 @@ if #keys < count then
     -- insert into the work queue
     local zadd = {}
     local r = redis.call('zrangebyscore', key .. '-scheduled', 0, now, 'LIMIT', 0, (count - #keys))
-    for index, id in ipairs(r) do
+    for index, jid in ipairs(r) do
         -- With these in hand, we'll have to go out and find the 
         -- priorities of these jobs, and then we'll insert them
         -- into the work queue and then when that's complete, we'll
         -- remove them from the scheduled queue
-        table.insert(zadd, tonumber(redis.call('hget', 'ql:j:' .. id, 'priority') or 0))
-        table.insert(zadd, id)
+        table.insert(zadd, tonumber(redis.call('hget', 'ql:j:' .. jid, 'priority') or 0))
+        table.insert(zadd, jid)
     end
     
 	if #zadd > 0 then
@@ -59,8 +59,8 @@ if #keys < count then
     
     -- And now we should get up to the maximum number of requested
     -- work items from the work queue.
-    for index, id in ipairs(redis.call('zrange', key .. '-work', 0, (count - #keys) - 1)) do
-        table.insert(keys, id)
+    for index, jid in ipairs(redis.call('zrange', key .. '-work', 0, (count - #keys) - 1)) do
+        table.insert(keys, jid)
     end
 end
 
@@ -72,11 +72,11 @@ end
 -- finally return a list of json blobs
 
 local response = {}
-for index, id in ipairs(keys) do
-    local r = redis.call('hmget', 'ql:j:' .. id, 'id', 'priority', 'data', 'tags',
+for index, jid in ipairs(keys) do
+    local r = redis.call('hmget', 'ql:j:' .. jid, 'jid', 'priority', 'data', 'tags',
 		'expires', 'worker', 'state', 'queue', 'retries', 'remaining', 'history', 'type')
     table.insert(response, cjson.encode({
-        id        = r[1],
+        jid       = r[1],
         priority  = tonumber(r[2]),
         data      = cjson.decode(r[3]),
         tags      = cjson.decode(r[4]),

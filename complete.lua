@@ -1,10 +1,10 @@
--- Complete(0, id, worker, queue, now, [data, [next, [delay]]])
+-- Complete(0, jid, worker, queue, now, [data, [next, [delay]]])
 -- ------------------------------------------------------------
 -- Complete a job and optionally put it in another queue, either scheduled or to
 -- be considered waiting immediately.
 --
 -- Args:
---    1) id
+--    1) jid
 --    2) worker
 --    3) queue
 --    4) now
@@ -14,7 +14,7 @@
 
 if #KEYS > 0 then error('Complete(): No Keys should be provided') end
 
-local id     = assert(ARGV[1]          , 'Complete(): Arg "id" missing.')
+local jid    = assert(ARGV[1]          , 'Complete(): Arg "jid" missing.')
 local worker = assert(ARGV[2]          , 'Complete(): Arg "worker" missing.')
 local queue  = assert(ARGV[3]          , 'Complete(): Arg "queue" missing.')
 local now    = assert(tonumber(ARGV[4]), 'Complete(): Arg "now" not a number or missing: ' .. (ARGV[4] or 'nil'))
@@ -31,7 +31,7 @@ if data then
 end
 
 -- First things first, we should see if the worker still owns this job
-local lastworker, history, state, priority, retries = unpack(redis.call('hmget', 'ql:j:' .. id, 'worker', 'history', 'state', 'priority', 'retries'))
+local lastworker, history, state, priority, retries = unpack(redis.call('hmget', 'ql:j:' .. jid, 'worker', 'history', 'state', 'priority', 'retries'))
 if (lastworker ~= worker) or (state ~= 'running') then
 	return false
 end
@@ -47,13 +47,13 @@ history = cjson.decode(history)
 history[#history]['done'] = now
 
 if data then
-	redis.call('hset', 'ql:j:' .. id, 'data', cjson.encode(data))
+	redis.call('hset', 'ql:j:' .. jid, 'data', cjson.encode(data))
 end
 
 -- Remove the job from the previous queue
-redis.call('zrem', 'ql:q:' .. queue .. '-work', id)
-redis.call('zrem', 'ql:q:' .. queue .. '-locks', id)
-redis.call('zrem', 'ql:q:' .. queue .. '-scheduled', id)
+redis.call('zrem', 'ql:q:' .. queue .. '-work', jid)
+redis.call('zrem', 'ql:q:' .. queue .. '-locks', jid)
+redis.call('zrem', 'ql:q:' .. queue .. '-scheduled', jid)
 
 ----------------------------------------------------------
 -- This is the massive stats update that we have to do
@@ -92,7 +92,7 @@ redis.call('hmset', 'ql:s:run:' .. bin .. ':' .. queue, 'total', count, 'mean', 
 ----------------------------------------------------------
 
 -- Remove this job from the jobs that the worker that was running it has
-redis.call('zrem', 'ql:w:' .. worker .. ':jobs', id)
+redis.call('zrem', 'ql:w:' .. worker .. ':jobs', jid)
 
 if nextq then
 	-- Enqueue the job
@@ -101,13 +101,13 @@ if nextq then
 		put   = now
 	})
 	
-	redis.call('hmset', 'ql:j:' .. id, 'state', 'waiting', 'worker', '',
+	redis.call('hmset', 'ql:j:' .. jid, 'state', 'waiting', 'worker', '',
 		'queue', nextq, 'expires', 0, 'history', cjson.encode(history), 'remaining', tonumber(retries))
 	
 	if delay > 0 then
-	    redis.call('zadd', 'ql:q:' .. nextq .. '-scheduled', now + delay, id)
+	    redis.call('zadd', 'ql:q:' .. nextq .. '-scheduled', now + delay, jid)
 	else
-	    redis.call('zadd', 'ql:q:' .. nextq .. '-work', priority, id)
+	    redis.call('zadd', 'ql:q:' .. nextq .. '-work', priority, jid)
 	end
 	
 	-- Lastly, we're going to make sure that this item is in the
@@ -117,7 +117,7 @@ if nextq then
 	end
 	return 'waiting'
 else
-	redis.call('hmset', 'ql:j:' .. id, 'state', 'complete', 'worker', '',
+	redis.call('hmset', 'ql:j:' .. jid, 'state', 'complete', 'worker', '',
 		'queue', '', 'expires', 0, 'history', cjson.encode(history), 'remaining', tonumber(retries))
 	
 	-- Do the completion dance
@@ -128,13 +128,13 @@ else
 	time  = tonumber(time ) or (7 * 24 * 60 * 60)
 	
 	-- Schedule this job for destructination eventually
-	redis.call('zadd', 'ql:completed', now, id)
+	redis.call('zadd', 'ql:completed', now, jid)
 	
 	-- Now look at the expired job data. First, based on the current time
 	local jids = redis.call('zrangebyscore', 'ql:completed', 0, now - time)
 	-- Any jobs that need to be expired... delete
-	for index, value in ipairs(jids) do
-		redis.call('del', 'ql:j:' .. value)
+	for index, jid in ipairs(jids) do
+		redis.call('del', 'ql:j:' .. jid)
 	end
 	-- And now remove those from the queued-for-cleanup queue
 	redis.call('zremrangebyscore', 'ql:completed', 0, now - time)

@@ -11,7 +11,7 @@
 -- 	{
 -- 		'jobs': [
 -- 			{
--- 				'id': ...,
+-- 				'jid': ...,
 -- 				# All the other details you'd get from 'get'
 -- 			}, {
 -- 				...
@@ -54,12 +54,12 @@ else
 	local jids = redis.call('zrange', 'ql:tracked', 0, -1)
 	for index, jid in ipairs(jids) do
 		local r = redis.call(
-		    'hmget', 'ql:j:' .. jid, 'id', 'priority', 'data', 'tags', 'worker',
+		    'hmget', 'ql:j:' .. jid, 'jid', 'priority', 'data', 'tags', 'worker',
 			'expires', 'state', 'queue', 'history', 'failure', 'retries', 'remaining', 'type')
 		
 		if r[1] then
 			table.insert(response.jobs, {
-			    id        = r[1],
+			    jid       = r[1],
 			    priority  = tonumber(r[2]),
 			    data      = cjson.decode(r[3]) or {},
 			    tags      = cjson.decode(r[4]) or {},

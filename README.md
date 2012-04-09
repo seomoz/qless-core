@@ -125,7 +125,7 @@ from `start` of the jobs affected by that issue. __Returns__ a JSON blob.
 		'jobs': [
 			{
 				# All the normal keys for a job
-				'id': ...,
+				'jid': ...,
 				'data': ...
 				# The message for this particular instance
 				'message': ...,
@@ -210,7 +210,7 @@ __Returns__ JSON:
 	{
 		'jobs': [
 			{
-				'id': ...,
+				'jid': ...,
 				# All the other details you'd get from 'get'
 			}, {
 				...
@@ -268,7 +268,7 @@ Jobs are stored in a key `ql:j:<id>`, and have several important keys:
 	{
 		# This is the same id as identifies it in the key. It should be
 		# a hex value of a uuid
-		'id'        : 'deadbeef...',
+		'jid'       : 'deadbeef...',
 		
 		# This is a 'type' identifier. Clients may choose to ignore it,
 		# or use it as a language-specific identifier for determining
@@ -458,6 +458,16 @@ maximum age for retained jobs. To accomplish this, we'll use a sorted list to
 keep track of which items should be expired. This list should be stored in the
 key `ql:completed`
 
+Internal Style Guide
+====================
+
+These aren't meant to be stringent, but just to keep myself sane so that when
+moving between different chunks of code that it's all formatted similarly, and
+the same variable names have the same meaning.
+
+1. Parameter sanitization should be performed as early as possible. This includes
+	making use of `assert` and `error` based on the number and type of arguments.
+2. Job ids should be referred to as `jid`, both internally and in the clients.
 
 
 
