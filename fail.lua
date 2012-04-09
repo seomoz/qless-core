@@ -19,7 +19,7 @@
 -- Args:
 --    1) jid
 --    2) worker
---    3) failure type
+--    3) group
 --    4) message
 --    5) the current time
 --    6) [data]
@@ -28,7 +28,7 @@ if #KEYS > 0 then error('Fail(): No Keys should be provided') end
 
 local jid     = assert(ARGV[1]          , 'Fail(): Arg "jid" missing')
 local worker  = assert(ARGV[2]          , 'Fail(): Arg "worker" missing')
-local t       = assert(ARGV[3]          , 'Fail(): Arg "type" missing')
+local group   = assert(ARGV[3]          , 'Fail(): Arg "group" missing')
 local message = assert(ARGV[4]          , 'Fail(): Arg "message" missing')
 local now     = assert(tonumber(ARGV[5]), 'Fail(): Arg "now" missing or malformed: ' .. (ARGV[5] or 'nil'))
 local data    = ARGV[6]
@@ -86,16 +86,16 @@ end
 
 redis.call('hmset', 'ql:j:' .. jid, 'state', 'failed', 'worker', '',
 	'expires', '', 'history', cjson.encode(history), 'failure', cjson.encode({
-		['type']    = t,
+		['group']   = group,
 		['message'] = message,
 		['when']    = now,
 		['worker']  = worker
 	}))
 
 -- Add this type of failure to the list of failures
-redis.call('sadd', 'ql:failures', t)
+redis.call('sadd', 'ql:failures', group)
 -- And add this particular instance to the failed types
-redis.call('lpush', 'ql:f:' .. t, jid)
+redis.call('lpush', 'ql:f:' .. group, jid)
 
 -- Here is where we'd intcrement stats about the particular stage
 -- and possibly the workers

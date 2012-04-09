@@ -84,9 +84,9 @@ end
 if state == 'failed' then
 	failure = cjson.decode(failure)
 	-- We need to make this remove it from the failed queues
-	redis.call('lrem', 'ql:f:' .. failure.type, 0, jid)
-	if redis.call('llen', 'ql:f:' .. failure.type) == 0 then
-		redis.call('srem', 'ql:failures', failure.type)
+	redis.call('lrem', 'ql:f:' .. failure.group, 0, jid)
+	if redis.call('llen', 'ql:f:' .. failure.group) == 0 then
+		redis.call('srem', 'ql:failures', failure.group)
 	end
 	-- The bin is midnight of the provided day
 	-- 24 * 60 * 60 = 86400

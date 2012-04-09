@@ -32,9 +32,9 @@ else
 	if state == 'failed' then
 		failure = cjson.decode(failure)
 		-- We need to make this remove it from the failed queues
-		redis.call('lrem', 'ql:f:' .. failure.type, 0, jid)
-		if redis.call('llen', 'ql:f:' .. failure.type) == 0 then
-			redis.call('srem', 'ql:failures', failure.type)
+		redis.call('lrem', 'ql:f:' .. failure.group, 0, jid)
+		if redis.call('llen', 'ql:f:' .. failure.group) == 0 then
+			redis.call('srem', 'ql:failures', failure.group)
 		end
 	end
 	
