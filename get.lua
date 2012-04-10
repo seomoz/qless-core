@@ -23,6 +23,7 @@ return cjson.encode({
     state     = job[3],
     queue     = job[4],
 	worker    = job[5] or '',
+	tracked   = redis.call('zscore', 'ql:tracked', jid) ~= false,
 	priority  = tonumber(job[6]),
 	expires   = tonumber(job[7]) or 0,
 	retries   = tonumber(job[8]),
