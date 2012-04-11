@@ -21,8 +21,8 @@ end
 local queue   = assert(KEYS[1]           , 'Pop(): Key "queue" missing')
 local key     = 'ql:q:' .. queue
 local worker  = assert(ARGV[1]           , 'Pop(): Arg "worker" missing')
-local count   = assert(tonumber(ARGV[2]) , 'Pop(): Arg "count" missing')
-local now     = assert(tonumber(ARGV[3]) , 'Pop(): Arg "now" missing')
+local count   = assert(tonumber(ARGV[2]) , 'Pop(): Arg "count" missing or not a number: ' .. (ARGV[2] or 'nil'))
+local now     = assert(tonumber(ARGV[3]) , 'Pop(): Arg "now" missing or not a number: '   .. (ARGV[3] or 'nil'))
 
 -- We should find the heartbeat interval for this queue
 -- heartbeat

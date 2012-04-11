@@ -37,7 +37,7 @@
 if #KEYS > 0 then error('Stats(): No Keys should be provided') end
 
 local queue = assert(ARGV[1]          , 'Stats(): Arg "queue" missing')
-local time  = assert(tonumber(ARGV[2]), 'Stats(): Arg "time" missing')
+local time  = assert(tonumber(ARGV[2]), 'Stats(): Arg "time" missing or not a number: ' .. (ARGV[2] or 'nil'))
 
 -- The bin is midnight of the provided day
 -- 24 * 60 * 60 = 86400

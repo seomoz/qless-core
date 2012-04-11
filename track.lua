@@ -31,7 +31,7 @@ end
 
 if ARGV[1] ~= nil then
 	local jid = assert(ARGV[2]          , 'Track(): Arg "jid" missing')
-	local now = assert(tonumber(ARGV[3]), 'Track(): Arg "now" missing')
+	local now = assert(tonumber(ARGV[3]), 'Track(): Arg "now" missing or not a number: ' .. (ARGV[3] or 'nil'))
 	if string.lower(ARGV[1]) == 'track' then
 		if #ARGV > 3 then
 			local tags = cjson.decode(redis.call('hget', 'ql:j:' .. jid, 'tags'))

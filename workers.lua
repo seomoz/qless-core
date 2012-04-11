@@ -32,7 +32,7 @@ if #KEYS > 0 then
 	error('Workers(): No key arguments expected')
 end
 
-local now = assert(tonumber(ARGV[1]), 'Workers(): Arg "now" missing')
+local now = assert(tonumber(ARGV[1]), 'Workers(): Arg "now" missing or not a number: ' .. (ARGV[1] or 'nil'))
 
 if #ARGV == 1 then
 	local response = {}

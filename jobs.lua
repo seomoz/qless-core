@@ -14,9 +14,9 @@ if #KEYS > 0 then
 	error('Jobs(): Got '.. #KEYS .. ' expected 0 KEYS arguments')
 end
 
-local t     = assert(ARGV[1]          , 'Jobs(): Missing "type" argument')
-local now   = assert(tonumber(ARGV[2]), 'Jobs(): Missing "now" argument')
-local queue = assert(ARGV[3]          , 'Jobs(): Missing "queue" argument')
+local t     = assert(ARGV[1]          , 'Jobs(): Arg "type" missing')
+local now   = assert(tonumber(ARGV[2]), 'Jobs(): Arg "now" missing or not a number: ' .. (ARGV[2] or 'nil'))
+local queue = assert(ARGV[3]          , 'Jobs(): Arg "queue" missing')
 
 if t == 'running' then
 	return redis.call('zrangebyscore', 'ql:q:' .. queue .. '-locks', now, 133389432700)

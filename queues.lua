@@ -21,7 +21,7 @@ if #KEYS > 0 then
 	error('Queues(): Got '.. #KEYS .. ' expected 0 KEYS arguments')
 end
 
-local now   = assert(tonumber(ARGV[1]), 'Queues(): Missing "now" argument')
+local now   = assert(tonumber(ARGV[1]), 'Queues(): Arg "now" missing or not a number: ' .. (ARGV[1] or 'nil'))
 local queue = ARGV[2]
 
 local response = {}

@@ -34,10 +34,10 @@ end
 local queue    = assert(KEYS[1]               , 'Put(): Key "queue" missing')
 local jid      = assert(ARGV[1]               , 'Put(): Arg "jid" missing')
 local klass    = assert(ARGV[2]               , 'Put(): Arg "klass" missing')
-local data     = assert(cjson.decode(ARGV[3]) , 'Put(): Arg "data" missing')
-local now      = assert(tonumber(ARGV[4])     , 'Put(): Arg "now" missing')
-local delay    = assert(tonumber(ARGV[7] or 0), 'Put(): Arg "delay" not a number')
-local retries  = assert(tonumber(ARGV[8] or 5), 'Put(): Arg "retries" not a number')
+local data     = assert(cjson.decode(ARGV[3]) , 'Put(): Arg "data" missing or not JSON: '    .. (ARGV[3] or 'nil'))
+local now      = assert(tonumber(ARGV[4])     , 'Put(): Arg "now" missing or not a number: ' .. (ARGV[4] or 'nil'))
+local delay    = assert(tonumber(ARGV[7] or 0), 'Put(): Arg "delay" not a number: '          .. (ARGV[7] or 'nil'))
+local retries  = assert(tonumber(ARGV[8] or 5), 'Put(): Arg "retries" not a number: '        .. (ARGV[8]))
 
 -- Let's see what the old priority, history and tags were
 local history, priority, tags, oldqueue, state, failure, _retries, worker = unpack(redis.call('hmget', 'ql:j:' .. jid, 'history', 'priority', 'tags', 'queue', 'state', 'failure', 'retries', 'worker'))
