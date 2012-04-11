@@ -34,10 +34,10 @@ end
 local queue    = assert(KEYS[1]               , 'Put(): Key "queue" missing')
 local jid      = assert(ARGV[1]               , 'Put(): Arg "jid" missing')
 local klass    = assert(ARGV[2]               , 'Put(): Arg "klass" missing')
-local data     = assert(cjson.decode(ARGV[3]) , 'Put(): Arg "data" missing or not JSON: '    .. (ARGV[3] or 'nil'))
-local now      = assert(tonumber(ARGV[4])     , 'Put(): Arg "now" missing or not a number: ' .. (ARGV[4] or 'nil'))
-local delay    = assert(tonumber(ARGV[7] or 0), 'Put(): Arg "delay" not a number: '          .. (ARGV[7] or 'nil'))
-local retries  = assert(tonumber(ARGV[8] or 5), 'Put(): Arg "retries" not a number: '        .. (ARGV[8]))
+local data     = assert(cjson.decode(ARGV[3]) , 'Put(): Arg "data" missing or not JSON: '    .. tostring(ARGV[3]))
+local now      = assert(tonumber(ARGV[4])     , 'Put(): Arg "now" missing or not a number: ' .. tostring(ARGV[4]))
+local delay    = assert(tonumber(ARGV[7] or 0), 'Put(): Arg "delay" not a number: '          .. tostring(ARGV[7]))
+local retries  = assert(tonumber(ARGV[8] or 5), 'Put(): Arg "retries" not a number: '        .. tostring(ARGV[8]))
 
 -- Let's see what the old priority, history and tags were
 local history, priority, tags, oldqueue, state, failure, _retries, worker = unpack(redis.call('hmget', 'ql:j:' .. jid, 'history', 'priority', 'tags', 'queue', 'state', 'failure', 'retries', 'worker'))
@@ -117,7 +117,7 @@ redis.call('hmset', 'ql:j:' .. jid,
 if delay > 0 then
     redis.call('zadd', 'ql:q:' .. queue .. '-scheduled', now + delay, jid)
 else
-    redis.call('zadd', 'ql:q:' .. queue .. '-work', priority, jid)
+    redis.call('zadd', 'ql:q:' .. queue .. '-work', priority * 1000000 - (now % 1000000), jid)
 end
 
 -- Lastly, we're going to make sure that this item is in the
