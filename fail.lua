@@ -57,14 +57,14 @@ history = cjson.decode(history or '[]')
 if #history > 0 then
 	for i=#history,1,-1 do
 		if history[i]['worker'] == worker then
-			history[i]['failed'] = now
+			history[i]['failed'] = math.floor(now)
 		end
 	end
 else
 	history = {
 		{
 			worker = worker,
-			failed = now
+			failed = math.floor(now)
 		}
 	}
 end
@@ -88,7 +88,7 @@ redis.call('hmset', 'ql:j:' .. jid, 'state', 'failed', 'worker', '',
 	'expires', '', 'history', cjson.encode(history), 'failure', cjson.encode({
 		['group']   = group,
 		['message'] = message,
-		['when']    = now,
+		['when']    = math.floor(now),
 		['worker']  = worker
 	}))
 

@@ -134,13 +134,13 @@ for index, jid in ipairs(keys) do
 	
     history = cjson.decode(history or '{}')
     history[#history]['worker'] = worker
-    history[#history]['popped'] = now
+    history[#history]['popped'] = math.floor(now)
 	
 	----------------------------------------------------------
 	-- This is the massive stats update that we have to do
 	----------------------------------------------------------
 	-- This is how long we've been waiting to get popped
-	local waiting = now - history[#history]['put']
+	local waiting = math.floor(now) - history[#history]['put']
 	-- Now we'll go through the apparently long and arduous process of update
 	local count, mean, vk = unpack(redis.call('hmget', 'ql:s:wait:' .. bin .. ':' .. queue, 'total', 'mean', 'vk'))
 	count = count or 0

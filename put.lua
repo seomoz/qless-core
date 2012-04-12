@@ -52,7 +52,7 @@ end
 local history = cjson.decode(history or '{}')
 table.insert(history, {
 	q     = queue,
-	put   = now
+	put   = math.floor(now)
 })
 
 -- And make sure that the tags are either what was provided or the existing
@@ -117,7 +117,7 @@ redis.call('hmset', 'ql:j:' .. jid,
 if delay > 0 then
     redis.call('zadd', 'ql:q:' .. queue .. '-scheduled', now + delay, jid)
 else
-    redis.call('zadd', 'ql:q:' .. queue .. '-work', priority * 1000000 - (now % 1000000), jid)
+    redis.call('zadd', 'ql:q:' .. queue .. '-work', priority + (now / 10000000000), jid)
 end
 
 -- Lastly, we're going to make sure that this item is in the

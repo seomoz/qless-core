@@ -458,6 +458,23 @@ maximum age for retained jobs. To accomplish this, we'll use a sorted list to
 keep track of which items should be expired. This list should be stored in the
 key `ql:completed`
 
+Notes About Implementing Bindings
+=================================
+
+There are a few nuanced aspects of implementing bindings for your particular
+language that are worth bringing up.
+
+Timestamps and Job Insertion
+----------------------------
+
+Jobs with identical priorities are popped in the order they were inserted. The
+caveat is that it's only true to the precision of the timestamps your bindings
+provide. For example, if you provide timestamps to the second granularity, then
+jobs with the same priority inserted in the same second can be popped in any
+order. Timestamps at the thousandths of a second granularity will maintain this
+property better. While for most applications it's likely not important, it is
+something to be aware of when writing language bindings.
+
 Internal Style Guide
 ====================
 

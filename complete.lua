@@ -44,7 +44,7 @@ end
 
 -- Unpack the history, and update it
 history = cjson.decode(history)
-history[#history]['done'] = now
+history[#history]['done'] = math.floor(now)
 
 if data then
 	redis.call('hset', 'ql:j:' .. jid, 'data', cjson.encode(data))
@@ -59,7 +59,7 @@ redis.call('zrem', 'ql:q:' .. queue .. '-scheduled', jid)
 -- This is the massive stats update that we have to do
 ----------------------------------------------------------
 -- This is how long we've been waiting to get popped
-local waiting = now - history[#history]['popped']
+local waiting = math.floor(now) - history[#history]['popped']
 -- Now we'll go through the apparently long and arduous process of update
 local count, mean, vk = unpack(redis.call('hmget', 'ql:s:run:' .. bin .. ':' .. queue, 'total', 'mean', 'vk'))
 count = count or 0
@@ -98,7 +98,7 @@ if nextq then
 	-- Enqueue the job
 	table.insert(history, {
 		q     = nextq,
-		put   = now
+		put   = math.floor(now)
 	})
 	
 	redis.call('hmset', 'ql:j:' .. jid, 'state', 'waiting', 'worker', '',
