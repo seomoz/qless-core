@@ -45,7 +45,7 @@ end
 local history, queue, state = unpack(redis.call('hmget', 'ql:j:' .. jid, 'history', 'queue', 'state'))
 
 -- If the job has been completed, we cannot fail it
-if state == 'complete' then
+if state ~= 'running' then
 	return false
 end
 

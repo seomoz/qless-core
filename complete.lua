@@ -1,37 +1,56 @@
--- Complete(0, jid, worker, queue, now, [data, [next, [delay]]])
--- ------------------------------------------------------------
+-- Complete(0, jid, worker, queue, now, data, [next, q, [(delay, d) | (depends, '["jid1","jid2",...]')])
+-- -----------------------------------------------------------------------------------------------------
 -- Complete a job and optionally put it in another queue, either scheduled or to
--- be considered waiting immediately.
+-- be considered waiting immediately. It can also optionally accept other jids
+-- on which this job will be considered dependent before it's considered valid.
 --
 -- Args:
 --    1) jid
 --    2) worker
 --    3) queue
 --    4) now
---    5) [data]
---    6) [next]
---    7) [delay]
+--    5) data
+--    *) [next, q, [delay, d]], [depends, '...']
 
 if #KEYS > 0 then error('Complete(): No Keys should be provided') end
 
-local jid    = assert(ARGV[1]          , 'Complete(): Arg "jid" missing.')
-local worker = assert(ARGV[2]          , 'Complete(): Arg "worker" missing.')
-local queue  = assert(ARGV[3]          , 'Complete(): Arg "queue" missing.')
-local now    = assert(tonumber(ARGV[4]), 'Complete(): Arg "now" not a number or missing: ' .. (ARGV[4] or 'nil'))
-local data   = ARGV[5]
-local nextq  = ARGV[6]
-local delay  = assert(tonumber(ARGV[7] or 0), 'Complete(): Arg "delay" not a number: ' .. (ARGV[7] or 'nil'))
+local jid    = assert(ARGV[1]               , 'Complete(): Arg "jid" missing.')
+local worker = assert(ARGV[2]               , 'Complete(): Arg "worker" missing.')
+local queue  = assert(ARGV[3]               , 'Complete(): Arg "queue" missing.')
+local now    = assert(tonumber(ARGV[4])     , 'Complete(): Arg "now" not a number or missing: ' .. tostring(ARGV[4]))
+local data   = assert(cjson.decode(ARGV[5]) , 'Complete(): Arg "data" missing or not JSON: '    .. tostring(ARGV[5]))
+
+-- Read in all the optional parameters
+local options = {}
+for i = 6, #ARGV, 2 do options[ARGV[i]] = ARGV[i + 1] end
+
+-- Sanity check on optional args
+local nextq   = options['next']
+local delay   = assert(tonumber(options['delay'] or 0))
+local depends = assert(cjson.decode(options['depends'] or '[]'), 'Complete(): Arg "depends" not JSON: ' .. tostring(options['depends']))
+
+-- Delay and depends are not allowed together
+if delay > 0 and #depends > 0 then
+	error('Complete(): "delay" and "depends" are not allowed to be used together')
+end
+
+-- Depends doesn't make sense without nextq
+if options['delay'] and nextq == nil then
+	error('Complete(): "delay" cannot be used without a "next".')
+end
+
+-- Depends doesn't make sense without nextq
+if options['depends'] and nextq == nil then
+	error('Complete(): "depends" cannot be used without a "next".')
+end
 
 -- The bin is midnight of the provided day
 -- 24 * 60 * 60 = 86400
 local bin = now - (now % 86400)
 
-if data then
-	data = cjson.decode(data)
-end
-
 -- First things first, we should see if the worker still owns this job
-local lastworker, history, state, priority, retries = unpack(redis.call('hmget', 'ql:j:' .. jid, 'worker', 'history', 'state', 'priority', 'retries'))
+local lastworker, history, state, priority, retries = unpack(redis.call('hmget', 'ql:j:' .. jid, 'worker', 'history', 'state', 'priority', 'retries', 'dependents'))
+
 if (lastworker ~= worker) or (state ~= 'running') then
 	return false
 end
@@ -101,21 +120,39 @@ if nextq then
 		put   = math.floor(now)
 	})
 	
+	-- We're going to make sure that this queue is in the
+	-- set of known queues
+	if redis.call('zscore', 'ql:queues', nextq) == false then
+		redis.call('zadd', 'ql:queues', now, nextq)
+	end
+	
 	redis.call('hmset', 'ql:j:' .. jid, 'state', 'waiting', 'worker', '',
 		'queue', nextq, 'expires', 0, 'history', cjson.encode(history), 'remaining', tonumber(retries))
 	
 	if delay > 0 then
 	    redis.call('zadd', 'ql:q:' .. nextq .. '-scheduled', now + delay, jid)
+		return 'scheduled'
 	else
-	    redis.call('zadd', 'ql:q:' .. nextq .. '-work', priority, jid)
+		-- These are the jids we legitimately have to wait on
+		local count = 0
+		for i, j in ipairs(depends) do
+			-- Make sure it's something other than 'nil' or complete.
+			local state = redis.call('hget', 'ql:j:' .. j, 'state')
+			if (state and state ~= 'complete') then
+				count = count + 1
+				redis.call('sadd', 'ql:j:' .. j .. '-dependents'  , jid)
+				redis.call('sadd', 'ql:j:' .. jid .. '-dependencies', j)
+			end
+		end
+		if count > 0 then
+			redis.call('zadd', 'ql:q:' .. nextq .. '-depends', now, jid)
+			redis.call('hset', 'ql:j:' .. jid, 'state', 'depends')
+			return 'depends'
+		else
+			redis.call('zadd', 'ql:q:' .. nextq .. '-work', priority + (now / 10000000000), jid)
+			return 'waiting'
+		end
 	end
-	
-	-- Lastly, we're going to make sure that this item is in the
-	-- set of known queues
-	if redis.call('zscore', 'ql:queues', nextq) == false then
-		redis.call('zadd', 'ql:queues', now, nextq)
-	end
-	return 'waiting'
 else
 	redis.call('hmset', 'ql:j:' .. jid, 'state', 'complete', 'worker', '',
 		'queue', '', 'expires', 0, 'history', cjson.encode(history), 'remaining', tonumber(retries))
@@ -145,5 +182,23 @@ else
 		redis.call('del', 'ql:j:' .. jid)
 	end
 	redis.call('zremrangebyrank', 'ql:completed', 0, (-1-count))
+	
+	-- Alright, if this has any dependents, then we should go ahead
+	-- and unstick those guys.
+	for i, j in ipairs(redis.call('smembers', 'ql:j:' .. jid .. '-dependents')) do
+		redis.call('srem', 'ql:j:' .. j .. '-dependencies', jid)
+		if redis.call('scard', 'ql:j:' .. j .. '-dependencies') == 0 then
+			local q, p = unpack(redis.call('hmget', 'ql:j:' .. j, 'queue', 'priority'))
+			if q then
+				redis.call('zrem', 'ql:q:' .. q .. '-depends', j)
+				redis.call('zadd', 'ql:q:' .. q .. '-work', p, j)
+				redis.call('hset', 'ql:j:' .. j, 'state', 'waiting')
+			end
+		end
+	end
+	
+	-- Delete our dependents key
+	redis.call('del', 'ql:j:' .. jid .. '-dependents')
+	
 	return 'complete'
 end

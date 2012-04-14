@@ -49,7 +49,6 @@ if group then
 		    'hmget', 'ql:j:' .. jid, 'jid', 'klass', 'state', 'queue', 'worker', 'priority',
 			'expires', 'retries', 'remaining', 'data', 'tags', 'history', 'failure')
 		
-		redis.call('echo', redis.call('zscore', 'ql:tracked', jid))
 		table.insert(response.jobs, {
 		    jid       = job[1],
 			klass     = job[2],

@@ -1,5 +1,5 @@
--- Put(1, queue, jid, klass, data, now, [priority, [tags, [delay, [retries]]]])
--- ----------------------------------------------------------------------------
+-- Put(1, queue, jid, klass, data, now, delay, [priority, p], [tags, t], [retries, r], [depends, '[...]'])
+-- -------------------------------------------------------------------------------------------------------
 -- This script takes the name of the queue and then the 
 -- info about the work item, and makes sure that it's 
 -- enqueued.
@@ -18,10 +18,8 @@
 --    2) klass
 --    3) data
 --    4) now
---    5) [priority]
---    6) [tags]
---    7) [delay]
---    8) [retries]
+--    5) delay
+--    *) [priority, p], [tags, t], [retries, r], [depends, '[...]']
 
 if #KEYS ~= 1 then
 	if #KEYS < 1 then
@@ -36,16 +34,24 @@ local jid      = assert(ARGV[1]               , 'Put(): Arg "jid" missing')
 local klass    = assert(ARGV[2]               , 'Put(): Arg "klass" missing')
 local data     = assert(cjson.decode(ARGV[3]) , 'Put(): Arg "data" missing or not JSON: '    .. tostring(ARGV[3]))
 local now      = assert(tonumber(ARGV[4])     , 'Put(): Arg "now" missing or not a number: ' .. tostring(ARGV[4]))
-local delay    = assert(tonumber(ARGV[7] or 0), 'Put(): Arg "delay" not a number: '          .. tostring(ARGV[7]))
-local retries  = assert(tonumber(ARGV[8] or 5), 'Put(): Arg "retries" not a number: '        .. tostring(ARGV[8]))
+local delay    = assert(tonumber(ARGV[5])     , 'Put(): Arg "delay" not a number: '          .. tostring(ARGV[5]))
+
+-- Read in all the optional parameters
+local options = {}
+for i = 6, #ARGV, 2 do options[ARGV[i]] = ARGV[i + 1] end
 
 -- Let's see what the old priority, history and tags were
 local history, priority, tags, oldqueue, state, failure, _retries, worker = unpack(redis.call('hmget', 'ql:j:' .. jid, 'history', 'priority', 'tags', 'queue', 'state', 'failure', 'retries', 'worker'))
 
--- If no retries are provided, then we should use
--- whatever the job previously had
-if ARGV[8] == nil then
-	retries = _retries or 5
+-- Sanity check on optional args
+retries  = assert(tonumber(options['retries']  or _retries or 5), 'Put(): Arg "retries" not a number: ' .. tostring(options['retries']))
+tags     = assert(cjson.decode(options['tags'] or tags or '[]' ), 'Put(): Arg "tags" not JSON'          .. tostring(options['tags']))
+priority = assert(tonumber(options['priority'] or priority or 0), 'Put(): Arg "priority" not a number'  .. tostring(options['priority']))
+local depends = assert(cjson.decode(options['depends'] or '[]') , 'Put(): Arg "depends" not JSON: '     .. tostring(options['depends']))
+
+-- Delay and depends are not allowed together
+if delay > 0 and #depends > 0 then
+	error('Put(): "delay" and "depends" are not allowed to be used together')
 end
 
 -- Update the history to include this new change
@@ -54,12 +60,6 @@ table.insert(history, {
 	q     = queue,
 	put   = math.floor(now)
 })
-
--- And make sure that the tags are either what was provided or the existing
-tags     = assert(cjson.decode(ARGV[6] or tags or '[]'), 'Put(): Arg "tags" not JSON')
-
--- And make sure that the priority is ok
-priority = assert(tonumber(ARGV[5] or priority or 0), 'Put(): Arg "priority" not a number')
 
 -- If this item was previously in another queue, then we should remove it from there
 if oldqueue then
@@ -111,13 +111,28 @@ redis.call('hmset', 'ql:j:' .. jid,
 	'remaining', retries,
     'history'  , cjson.encode(history))
 
+-- These are the jids we legitimately have to wait on
+for i, j in ipairs(depends) do
+	-- Make sure it's something other than 'nil' or complete.
+	local state = redis.call('hget', 'ql:j:' .. j, 'state')
+	if (state and state ~= 'complete') then
+		redis.call('sadd', 'ql:j:' .. j .. '-dependents'  , jid)
+		redis.call('sadd', 'ql:j:' .. jid .. '-dependencies', j)
+	end
+end
+
 -- Now, if a delay was provided, and if it's in the future,
 -- then we'll have to schedule it. Otherwise, we're just
 -- going to add it to the work queue.
 if delay > 0 then
     redis.call('zadd', 'ql:q:' .. queue .. '-scheduled', now + delay, jid)
 else
-    redis.call('zadd', 'ql:q:' .. queue .. '-work', priority + (now / 10000000000), jid)
+	if redis.call('scard', 'ql:j:' .. jid .. '-dependencies') > 0 then
+		redis.call('zadd', 'ql:q:' .. queue .. '-depends', now, jid)
+		redis.call('hset', 'ql:j:' .. jid, 'state', 'depends')
+	else
+		redis.call('zadd', 'ql:q:' .. queue .. '-work', priority + (now / 10000000000), jid)
+	end
 end
 
 -- Lastly, we're going to make sure that this item is in the
