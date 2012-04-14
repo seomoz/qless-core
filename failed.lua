@@ -50,20 +50,25 @@ if group then
 			'expires', 'retries', 'remaining', 'data', 'tags', 'history', 'failure')
 		
 		table.insert(response.jobs, {
-		    jid       = job[1],
-			klass     = job[2],
-		    state     = job[3],
-		    queue     = job[4],
-			worker    = job[5] or '',
-			tracked   = redis.call('zscore', 'ql:tracked', jid) ~= false,
-			priority  = tonumber(job[6]),
-			expires   = tonumber(job[7]) or 0,
-			retries   = tonumber(job[8]),
-			remaining = tonumber(job[9]),
-			data      = cjson.decode(job[10]),
-			tags      = cjson.decode(job[11]),
-		    history   = cjson.decode(job[12]),
-			failure   = cjson.decode(job[13] or '{}'),
+		    jid          = job[1],
+			klass        = job[2],
+		    state        = job[3],
+		    queue        = job[4],
+			worker       = job[5] or '',
+			tracked      = redis.call('zscore', 'ql:tracked', jid) ~= false,
+			priority     = tonumber(job[6]),
+			expires      = tonumber(job[7]) or 0,
+			retries      = tonumber(job[8]),
+			remaining    = tonumber(job[9]),
+			data         = cjson.decode(job[10]),
+			tags         = cjson.decode(job[11]),
+		    history      = cjson.decode(job[12]),
+			failure      = cjson.decode(job[13] or '{}'),
+			dependents   = redis.call('smembers', 'ql:j:' .. jid .. '-dependents'),
+			-- A job in the failed state can not have dependencies
+			-- because it has been popped off of a queue, which 
+			-- means all of its dependencies have been satisfied
+			dependencies = {}
 		})
 	end
 	return cjson.encode(response)
