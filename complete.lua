@@ -126,7 +126,7 @@ if nextq then
 		redis.call('zadd', 'ql:queues', now, nextq)
 	end
 	
-	redis.call('hmset', 'ql:j:' .. jid, 'state', 'waiting', 'worker', '',
+	redis.call('hmset', 'ql:j:' .. jid, 'state', 'waiting', 'worker', '', 'failure', '{}',
 		'queue', nextq, 'expires', 0, 'history', cjson.encode(history), 'remaining', tonumber(retries))
 	
 	if delay > 0 then
@@ -154,7 +154,7 @@ if nextq then
 		end
 	end
 else
-	redis.call('hmset', 'ql:j:' .. jid, 'state', 'complete', 'worker', '',
+	redis.call('hmset', 'ql:j:' .. jid, 'state', 'complete', 'worker', '', 'failure', '{}',
 		'queue', '', 'expires', 0, 'history', cjson.encode(history), 'remaining', tonumber(retries))
 	
 	-- Do the completion dance
