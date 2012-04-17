@@ -51,7 +51,7 @@ local histokeys = {
 	'd1','d2','d3','d4','d5','d6'
 }
 
-mkstats = function(name, bin, queue)
+local mkstats = function(name, bin, queue)
 	-- The results we'll be sending back
 	local results = {}
 	
