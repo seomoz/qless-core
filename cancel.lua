@@ -14,19 +14,29 @@ local jid    = assert(ARGV[1], 'Cancel(): Arg "jid" missing.')
 -- Find any stage it's associated with and remove its from that stage
 local state, queue, failure, worker = unpack(redis.call('hmget', 'ql:j:' .. jid, 'state', 'queue', 'failure', 'worker'))
 
--- Remove this job from whatever worker has it, if any
-if worker then
-	redis.call('zrem', 'ql:w:' .. worker .. ':jobs', jid)
-end
-
 if state == 'complete' then
 	return False
 else
+	-- If this job has dependents, then we should probably fail
+	if redis.call('zcard', 'ql:j:' .. jid .. '-dependents') > 0 then
+		error('Cancel(): ' .. jid .. ' has un-canceled jobs that depend on it')
+	end
+	
+	-- Remove this job from whatever worker has it, if any
+	if worker then
+		redis.call('zrem', 'ql:w:' .. worker .. ':jobs', jid)
+	end
+	
+	-- Remove it from that queue
 	if queue then
 		redis.call('zrem', 'ql:q:' .. queue .. '-work', jid)
 		redis.call('zrem', 'ql:q:' .. queue .. '-locks', jid)
 		redis.call('zrem', 'ql:q:' .. queue .. '-scheduled', jid)
+		redis.call('zrem', 'ql:q:' .. queue .. '-depends', jid)
 	end
+	
+	-- Delete any notion of dependencies it has
+	redis.call('del', 'ql:j:' .. jid .. '-dependencies')
 	
 	-- If we're in the failed state, remove all of our data
 	if state == 'failed' then
