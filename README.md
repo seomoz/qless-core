@@ -67,9 +67,11 @@ job.
 
 Pop(1, queue, worker, count, now)
 ---------------------------------
-Passing in the queue from which to pull items, the current time, when the locks
-for these returned items should expire, and the number of items to be popped
-off.
+Accepts the queue off of which to pull items, the worker requesting the jobs,
+the number of jobs, and the current time. The queue-specific heartbeat time
+`GetConfig('heartbeat-queue')` will be used, or the default heartbeat time
+`GetConfig('heartbeat')` if it's unavailble, to determine when the lock(s) on the
+job(s) will expire.
 
 Peek(1, queue, count, now)
 --------------------------
@@ -474,6 +476,13 @@ jobs with the same priority inserted in the same second can be popped in any
 order. Timestamps at the thousandths of a second granularity will maintain this
 property better. While for most applications it's likely not important, it is
 something to be aware of when writing language bindings.
+
+Filesystem Access
+-----------------
+
+It's intended to be a common usecase that bindings provide a worker script or 
+binary that runs several worker subprocesses. These should run with their 
+working directory as a sandbox.
 
 Internal Style Guide
 ====================
