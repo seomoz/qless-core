@@ -48,6 +48,12 @@ else
 		end
 	end
 	
+	-- Remove it as a job that's tagged with this particular tag
+	local tags = cjson.decode(redis.call('hget', 'ql:j:' .. jid, 'tags') or '{}')
+	for i, tag in ipairs(tags) do
+		redis.call('zrem', 'ql:t:' .. tag, jid)
+	end
+	
 	-- Just go ahead and delete our data
 	redis.call('del', 'ql:j:' .. jid)
 end

@@ -80,6 +80,11 @@ if state == 'complete' then
 	redis.call('zrem', 'ql:completed', jid)
 end
 
+-- Add this job to the list of jobs tagged with whatever tags were supplied
+for i, tag in ipairs(tags) do
+	redis.call('zadd', 'ql:t:' .. tag, now, jid)
+end
+
 -- If we're in the failed state, remove all of our data
 if state == 'failed' then
 	failure = cjson.decode(failure)
