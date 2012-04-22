@@ -48,6 +48,7 @@ elseif ARGV[2] == 'off' then
 	else
 		for i=3,#ARGV do
 			local j = ARGV[i]
+			redis.call('srem', 'ql:j:' .. j .. '-dependents', jid)
 			redis.call('srem', 'ql:j:' .. jid .. '-dependencies', j)
 			if redis.call('scard', 'ql:j:' .. jid .. '-dependencies') == 0 then
 				local q, p = unpack(redis.call('hmget', 'ql:j:' .. jid, 'queue', 'priority'))
