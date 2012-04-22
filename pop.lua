@@ -26,7 +26,7 @@ local now     = assert(tonumber(ARGV[3]) , 'Pop(): Arg "now" missing or not a nu
 
 -- We should find the heartbeat interval for this queue
 -- heartbeat
-local _hb, _qhb = unpack(redis.call('hmget', 'ql:config', 'heartbeat', 'heartbeat-' .. queue))
+local _hb, _qhb = unpack(redis.call('hmget', 'ql:config', 'heartbeat', queue .. '-heartbeat'))
 local expires = now + tonumber(_qhb or _hb or 60)
 
 -- The bin is midnight of the provided day

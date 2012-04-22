@@ -19,7 +19,7 @@ local data   = ARGV[4]
 -- heartbeat. First, though, we need to find the queue
 -- this particular job is in
 local queue     = redis.call('hget', 'ql:j:' .. jid, 'queue') or ''
-local _hb, _qhb = unpack(redis.call('hmget', 'ql:config', 'heartbeat', 'heartbeat-' .. queue))
+local _hb, _qhb = unpack(redis.call('hmget', 'ql:config', 'heartbeat', queue .. '-heartbeat'))
 local expires   = now + tonumber(_qhb or _hb or 60)
 
 if data then
