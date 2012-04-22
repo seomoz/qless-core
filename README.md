@@ -491,7 +491,12 @@ order. Timestamps at the thousandths of a second granularity will maintain this
 property better. While for most applications it's likely not important, it is
 something to be aware of when writing language bindings.
 
+Filesystem Access
+-----------------
 
+It's intended to be a common usecase that bindings provide a worker script or 
+binary that runs several worker subprocesses. These should run with their 
+working directory as a sandbox.
 
 Internal Style Guide
 ====================
