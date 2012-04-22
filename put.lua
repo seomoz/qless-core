@@ -76,7 +76,7 @@ end
 
 -- If the job was previously in the 'completed' state, then we should remove
 -- it from being enqueued for destructination
-if state == 'completed' then
+if state == 'complete' then
 	redis.call('zrem', 'ql:completed', jid)
 end
 
