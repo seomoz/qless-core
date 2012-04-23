@@ -35,6 +35,9 @@ redis.call('zrem', 'ql:q:' .. oldqueue .. '-locks', jid)
 
 local remaining = redis.call('hincrby', 'ql:j:' .. jid, 'remaining', -1)
 
+-- Remove this job from the worker that was previously working it
+redis.call('zrem', 'ql:w:' .. worker .. ':jobs', jid)
+
 if remaining < 0 then
 	-- Now remove the instance from the schedule, and work queues for the queue it's in
 	local group = 'failed-retries-' .. queue
