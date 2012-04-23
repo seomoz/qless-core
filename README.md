@@ -126,6 +126,12 @@ Passing in the queue from which to pull items, the current time, when the locks
 for these returned items should expire, and the number of items to be popped
 off.
 
+Priority(0, jid, priority)
+--------------------------
+Accepts a jid, and a new priority for the job. If the job doesn't exist, then
+return false. Otherwise, return the updated priority. If the job is waiting,
+then the change will be reflected in the order in which it's popped
+
 Put(1, queue, jid, klass, data, now, delay, [priority, p], [tags, t], [retries, r], [depends, '[...]'])
 --------------------------------------------------------------------------
 Either create a new job in the provided queue with the provided attributes,
@@ -164,6 +170,17 @@ response hash should be returned. The response is JSON:
 		}
 	]
 
+Retry(0, jid, queue, worker, now, [delay])
+------------------------------------------
+This script accepts jid, queue, worker and delay for retrying a job. This is
+similar in functionality to `put`, except that this counts against the retries 
+a job has for a stage.
+
+If the worker is not the worker with a lock on the job, then it returns false.
+If the job is not actually running, then it returns false. Otherwise, it
+returns the number of retries remaining. If the allowed retries have been
+exhausted, then it is automatically failed, and a negative number is returned.
+
 SetConfig(0, option, [value])
 -----------------------------
 Set the configuration value for the provided option. If `value` is omitted,
@@ -198,6 +215,23 @@ The histogram's data points are at the second resolution for the first minute,
 the minute resolution for the first hour, the 15-minute resolution for the first
 day, the hour resolution for the first 3 days, and then at the day resolution
 from there on out. The `histogram` key is a list of those values.
+
+Tag(0, (('add' | 'remove'), jid, now, tag, [tag, ...]) | 'get', tag, [offset, [count]])
+----------------------------------------------------------------------------------
+Accepts a jid, 'add' or 'remove', and then a list of tags to either add or remove
+from the job. Alternatively, 'get', a tag to get jobs associated with that tag,
+and offset and count.
+
+If 'add' or 'remove', the response is a list of the jobs current tags, or False
+if the job doesn't exist. If 'get', the response is of the form:
+
+	{
+		total: ...,
+		jobs: [
+			jid,
+			...
+		]
+	}
 
 Track(0) | Track(0, 'track', jid, now, tag, ...) | Track(0, 'untrack', jid, now)
 --------------------------------------------------------------------------------
@@ -474,6 +508,14 @@ This is also another hash, `ql:s:stats:<day>:<queue>` with keys:
 - `failed`   -- This is how many are currently failed
 - `retries`  -- This is how many jobs we've had to retry
 
+Tags
+----
+All jobs store a JSON array of the tags that are associated with it. In addition,
+the keys `ql:t:<tag>` store a sorted set of all the jobs associated with that
+particular tag. The score of each jid in that tag is the time when that tag was
+added to that job. When jobs are tagged a second time with an existing tag, then
+it's a no-op.
+
 
 
 Notes About Implementing Bindings
@@ -493,10 +535,55 @@ something to be aware of when writing language bindings.
 
 Filesystem Access
 -----------------
-
 It's intended to be a common usecase that bindings provide a worker script or 
 binary that runs several worker subprocesses. These should run with their 
 working directory as a sandbox.
+
+Threading or Forking
+--------------------
+Resque holds the philosphy that each worker consists of two processes: a master
+process that grabs jobs, and an actual worker, which is a fork of the master
+process and actually does the work associated with the job. The major advantage
+of this as far as we can see it is that it's a good strategy for sandboxing any
+havoc that might occur when processing the job.
+
+However, apparently Ruby doesn't handle copy-on-write very well, and so there is
+a lot of overhead in not only system calls to fork a process, but also to load
+modules into memory. Other languages, however, may or may not suffer from this
+problem, but it's important to be aware of.
+
+Another project in the vein of Resque (in fact, it uses the same job structure),
+is [sidekiq](https://github.com/mperham/sidekiq), which uses threads in a master
+process to do work. The performance boost is substantial, not to mention the
+memory footprint. Most of this performance appears to be gained from the memory
+profile and not constantly allocating memory for every job.
+
+Ultimately, the choice is yours, but we thought it bore mentioning.
+
+Queue Popping Order
+-------------------
+Workers are allowed (and encouraged) to pop off of more than one queue. But then
+we get into the problem of what order they should be polled. Workers should support
+two modes of popping: ordered and round-robin. Consider queues `A`, `B`, and `C`
+with job counts:
+
+	A: 5
+	B: 2
+	C: 3
+
+In an ordered verion, the order in which the queues are specified has significance
+in the order in which jobs are popped. For example, if our queued were ordered 
+`C, B, A` in the worker, we'd pop jobs off:
+
+	C, C, C, B, B, A, A, A, A, A
+
+In the round-robin implementation, a worker pops off a job from each queue as it
+progress through all queues:
+
+	C, B, A, C, B, A, C, A, A, A
+
+
+
 
 Internal Style Guide
 ====================
