@@ -28,62 +28,62 @@ if command == 'add' then
 	local now  = assert(tonumber(ARGV[3]), 'Tag(): Arg "now" is not a number')
 	local tags = redis.call('hget', 'ql:j:' .. jid, 'tags')
 	-- If the job has been canceled / deleted, then return false
-	if tags == nil then
+	if tags then
+		-- Decode the json blob, convert to dictionary
+		tags = cjson.decode(tags)
+		local _tags = {}
+		for i,v in ipairs(tags) do
+			_tags[v] = true
+		end
+	
+		-- Otherwise, add the job to the sorted set with that tags
+		for i=4,#ARGV do
+			local tag = ARGV[i]
+			if _tags[tag] == nil then
+				table.insert(tags, tag)
+			end
+			redis.call('zadd', 'ql:t:' .. tag, now, jid)
+		end
+	
+		tags = cjson.encode(tags)
+		redis.call('hset', 'ql:j:' .. jid, 'tags', tags)
+		return tags
+	else
 		return false
 	end
-	
-	-- Decode the json blob, convert to dictionary
-	tags = cjson.decode(tags)
-	local _tags = {}
-	for i,v in ipairs(tags) do
-		_tags[v] = true
-	end
-	
-	-- Otherwise, add the job to the sorted set with that tags
-	for i=4,#ARGV do
-		local tag = ARGV[i]
-		if _tags[tag] == nil then
-			table.insert(tags, tag)
-		end
-		redis.call('zadd', 'ql:t:' .. tag, now, jid)
-	end
-	
-	tags = cjson.encode(tags)
-	redis.call('hset', 'ql:j:' .. jid, 'tags', tags)
-	return tags
 elseif command == 'remove' then
 	local jid  = assert(ARGV[2]          , 'Tag(): Arg "jid" missing')
 	local now  = assert(tonumber(ARGV[3]), 'Tag(): Arg "now" is not a number')
 	local tags = redis.call('hget', 'ql:j:' .. jid, 'tags')
 	-- If the job has been canceled / deleted, then return false
-	if tags == nil then
+	if tags then
+		-- Decode the json blob, convert to dictionary
+		tags = cjson.decode(tags)
+		local _tags = {}
+		for i,v in ipairs(tags) do
+			_tags[v] = true
+		end
+	
+		-- Otherwise, add the job to the sorted set with that tags
+		for i=4,#ARGV do
+			local tag = ARGV[i]
+			_tags[tag] = nil
+			redis.call('zrem', 'ql:t:' .. tag, jid)
+		end
+	
+		local results = {}
+		for i,tag in ipairs(tags) do
+			if _tags[tag] then
+				table.insert(results, tag)
+			end
+		end
+	
+		tags = cjson.encode(results)
+		redis.call('hset', 'ql:j:' .. jid, 'tags', tags)
+		return tags
+	else
 		return false
 	end
-	
-	-- Decode the json blob, convert to dictionary
-	tags = cjson.decode(tags)
-	local _tags = {}
-	for i,v in ipairs(tags) do
-		_tags[v] = true
-	end
-	
-	-- Otherwise, add the job to the sorted set with that tags
-	for i=4,#ARGV do
-		local tag = ARGV[i]
-		_tags[tag] = nil
-		redis.call('zrem', 'ql:t:' .. tag, jid)
-	end
-	
-	local results = {}
-	for i,tag in ipairs(tags) do
-		if _tags[tag] then
-			table.insert(results, tag)
-		end
-	end
-	
-	tags = cjson.encode(results)
-	redis.call('hset', 'ql:j:' .. jid, 'tags', tags)
-	return tags
 elseif command == 'get' then
 	local tag    = assert(ARGV[2]                , 'Tag(): Arg "tag" missing')
 	local offset = assert(tonumber(ARGV[3] or 0) , 'Tag(): Arg "offset" not a number: ' .. tostring(ARGV[3]))
