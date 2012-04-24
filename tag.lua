@@ -1,5 +1,7 @@
--- tag(0, (('add' | 'remove'), jid, now, tag, [tag, ...]) | 'get', tag, [offset, [count]])
--- ----------------------------------------------------------------------------------
+-- tag(0, ('add' | 'remove'), jid, now, tag, [tag, ...])
+-- tag(0, 'get', tag, [offset, [count]])
+-- tag(0, 'top', [offset, [count]])
+-- ------------------------------------------------------------------------------------------------------------------
 -- Accepts a jid, 'add' or 'remove', and then a list of tags
 -- to either add or remove from the job. Alternatively, 'get',
 -- a tag to get jobs associated with that tag, and offset and
@@ -16,6 +18,9 @@
 --			...
 --		]
 --	}
+--
+-- If 'top' is supplied, it returns the most commonly-used tags
+-- in a paginated fashion.
 
 if #KEYS ~= 0 then
 	error('Tag(): Got ' .. #KEYS .. ', expected 0')
@@ -43,6 +48,7 @@ if command == 'add' then
 				table.insert(tags, tag)
 			end
 			redis.call('zadd', 'ql:t:' .. tag, now, jid)
+			redis.call('zincrby', 'ql:tags', 1, tag)
 		end
 	
 		tags = cjson.encode(tags)
@@ -69,6 +75,7 @@ elseif command == 'remove' then
 			local tag = ARGV[i]
 			_tags[tag] = nil
 			redis.call('zrem', 'ql:t:' .. tag, jid)
+			redis.call('zincrby', 'ql:tags', -1, tag)
 		end
 	
 		local results = {}
@@ -92,6 +99,10 @@ elseif command == 'get' then
 		total = redis.call('zcard', 'ql:t:' .. tag),
 		jobs  = redis.call('zrange', 'ql:t:' .. tag, offset, count)
 	})
+elseif command == 'top' then
+	local offset = assert(tonumber(ARGV[2] or 0) , 'Tag(): Arg "offset" not a number: ' .. tostring(ARGV[2]))
+	local count  = assert(tonumber(ARGV[3] or 25), 'Tag(): Arg "count" not a number: ' .. tostring(ARGV[3]))
+	return cjson.encode(redis.call('zrevrangebyscore', 'ql:tags', '+inf', 2, 'limit', offset, count))
 else
 	error('Tag(): First argument must be "add", "remove" or "get"')
 end

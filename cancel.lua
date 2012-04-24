@@ -52,6 +52,7 @@ else
 	local tags = cjson.decode(redis.call('hget', 'ql:j:' .. jid, 'tags') or '{}')
 	for i, tag in ipairs(tags) do
 		redis.call('zrem', 'ql:t:' .. tag, jid)
+		redis.call('zincrby', 'ql:tags', -1, tag)
 	end
 	
 	-- Just go ahead and delete our data
