@@ -45,6 +45,6 @@ else
 	
     -- And now we should just update the locks
     local queue = redis.call('hget', 'ql:j:' .. jid, 'queue')
-    redis.call('zadd', 'ql:q:'.. queue, expires, jid)
+    redis.call('zadd', 'ql:q:'.. queue .. '-locks', expires, jid)
     return expires
 end
