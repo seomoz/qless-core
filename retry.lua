@@ -63,8 +63,10 @@ else
 	-- Put it in the queue again with a delay. Like put()
 	if delay > 0 then
 		redis.call('zadd', 'ql:q:' .. queue .. '-scheduled', now + delay, jid)
+		redis.call('hset', 'ql:j:' .. jid, 'state', 'scheduled')
 	else
 		redis.call('zadd', 'ql:q:' .. queue .. '-work', priority + (now / 10000000000), jid)
+		redis.call('hset', 'ql:j:' .. jid, 'state', 'waiting')
 	end
 end
 
