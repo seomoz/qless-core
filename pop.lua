@@ -76,8 +76,8 @@ for index, jid in ipairs(redis.call('zrangebyscore', key .. '-locks', 0, now, 'L
 	end
 	
 	-- Remove this job from the jobs that the worker that was running it has
-	local worker = redis.call('hget', 'ql:j:' .. jid, 'worker')
-	redis.call('zrem', 'ql:w:' .. worker .. ':jobs', jid)
+	local w = redis.call('hget', 'ql:j:' .. jid, 'worker')
+	redis.call('zrem', 'ql:w:' .. w .. ':jobs', jid)
 end
 
 -- If we got any expired locks, then we should increment the
