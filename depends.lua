@@ -22,7 +22,6 @@ end
 
 if ARGV[2] == 'on' then
 	-- These are the jids we legitimately have to wait on
-	redis.call('echo', 'Returning true')
 	for i=3,#ARGV do
 		local j = ARGV[i]
 		-- Make sure it's something other than 'nil' or complete.
