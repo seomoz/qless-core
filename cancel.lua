@@ -18,7 +18,7 @@ if state == 'complete' then
 	return False
 else
 	-- If this job has dependents, then we should probably fail
-	if redis.call('zcard', 'ql:j:' .. jid .. '-dependents') > 0 then
+	if redis.call('scard', 'ql:j:' .. jid .. '-dependents') > 0 then
 		error('Cancel(): ' .. jid .. ' has un-canceled jobs that depend on it')
 	end
 	
@@ -33,6 +33,12 @@ else
 		redis.call('zrem', 'ql:q:' .. queue .. '-locks', jid)
 		redis.call('zrem', 'ql:q:' .. queue .. '-scheduled', jid)
 		redis.call('zrem', 'ql:q:' .. queue .. '-depends', jid)
+	end
+	
+	-- We should probably go through all our dependencies and remove ourselves
+	-- from the list of dependents
+	for i, j in ipairs(redis.call('smembers', 'ql:j:' .. jid .. '-dependencies')) do
+		redis.call('srem', 'ql:j:' .. j .. '-dependents', jid)
 	end
 	
 	-- Delete any notion of dependencies it has
