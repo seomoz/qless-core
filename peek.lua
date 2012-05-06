@@ -48,6 +48,9 @@ if #keys < count then
         -- remove them from the scheduled queue
         table.insert(zadd, tonumber(redis.call('hget', 'ql:j:' .. jid, 'priority') or 0))
         table.insert(zadd, jid)
+		-- We should also update them to have the state 'waiting'
+		-- instead of 'scheduled'
+		redis.call('hset', 'ql:j:' .. jid, 'state', 'waiting')
     end
     
 	if #zadd > 0 then
