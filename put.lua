@@ -66,6 +66,7 @@ if oldqueue then
 	redis.call('zrem', 'ql:q:' .. oldqueue .. '-work', jid)
 	redis.call('zrem', 'ql:q:' .. oldqueue .. '-locks', jid)
 	redis.call('zrem', 'ql:q:' .. oldqueue .. '-scheduled', jid)
+	redis.call('zrem', 'ql:q:' .. oldqueue .. '-depends', jid)
 end
 
 -- If this had previously been given out to a worker,
