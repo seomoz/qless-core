@@ -1,4 +1,4 @@
--- Jobs(0, 'complete' | (('stalled' | 'running' | 'scheduled' | 'depends'), now, queue) [offset, [count]])
+-- Jobs(0, 'complete' | (('stalled' | 'running' | 'scheduled' | 'depends', 'recurring'), now, queue) [offset, [count]])
 -- -------------------------------------------------------------------------------------------------------
 -- 
 -- Return all the job ids currently considered to be in the provided state
@@ -33,6 +33,8 @@ else
 		return redis.call('zrange', 'ql:q:' .. queue .. '-scheduled', offset, offset + count - 1)
 	elseif t == 'depends' then
 		return redis.call('zrange', 'ql:q:' .. queue .. '-depends', offset, offset + count - 1)
+	elseif t == 'recurring' then
+		return redis.call('zrange', 'ql:q:' .. queue .. '-recur', offset, offset + count - 1)
 	else
 		error('Jobs(): Unknown type "' .. t .. '"')
 	end

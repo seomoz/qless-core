@@ -79,14 +79,65 @@ for index, jid in ipairs(redis.call('zrangebyscore', key .. '-locks', 0, now, 'L
 	local w = redis.call('hget', 'ql:j:' .. jid, 'worker')
 	redis.call('zrem', 'ql:w:' .. w .. ':jobs', jid)
 end
+-- Now we've checked __all__ the locks for this queue the could
+-- have expired, and are no more than the number requested.
 
 -- If we got any expired locks, then we should increment the
 -- number of retries for this stage for this bin
 redis.call('hincrby', 'ql:s:stats:' .. bin .. ':' .. queue, 'retries', #keys)
 
--- Now we've checked __all__ the locks for this queue the could
--- have expired, and are no more than the number requested. If
--- we still need values in order to meet the demand, then we 
+-- If we still need jobs in order to meet demand, then we should
+-- look for all the recurring jobs that need jobs run
+if #keys < count then
+	local r = redis.call('zrangebyscore', key .. '-recur', 0, now)
+	for index, jid in ipairs(r) do
+		-- For each of the jids that need jobs scheduled, first
+		-- get the last time each of them was run, and then increment
+		-- it by its interval. While this time is less than now,
+		-- we need to keep putting jobs on the queue
+		local klass, data, priority, tags, retries, interval, last_ran = unpack(redis.call('hmget', 'ql:r:' .. jid, 'klass', 'data', 'priority', 'tags', 'retries', 'interval', 'last-ran'))
+		local _tags = cjson.decode(tags)
+		last_ran = tonumber(last_ran)
+		
+		while last_ran < now do
+			local count = redis.call('hincrby', 'ql:r:' .. jid, 'count', 1)
+			
+			-- Add this job to the list of jobs tagged with whatever tags were supplied
+			for i, tag in ipairs(_tags) do
+				redis.call('zadd', 'ql:t:' .. tag, now, jid .. '-' .. count)
+				redis.call('zincrby', 'ql:tags', 1, tag)
+			end
+			
+			-- First, let's save its data
+			redis.call('hmset', 'ql:j:' .. jid .. '-' .. count,
+			    'jid'      , jid .. '-' .. count,
+				'klass'    , klass,
+			    'data'     , data,
+			    'priority' , priority,
+			    'tags'     , tags,
+			    'state'    , 'waiting',
+			    'worker'   , '',
+				'expires'  , 0,
+			    'queue'    , queue,
+				'retries'  , retries,
+				'remaining', retries,
+			    'history'  , cjson.encode({{
+					q     = queue,
+					put   = math.floor(now)
+				}}))
+			
+			-- Now, if a delay was provided, and if it's in the future,
+			-- then we'll have to schedule it. Otherwise, we're just
+			-- going to add it to the work queue.
+			redis.call('zadd', 'ql:q:' .. queue .. '-work', priority + (now / 10000000000), jid .. '-' .. count)
+			
+			last_ran = redis.call('hincrby', 'ql:r:' .. jid, 'last-ran', interval)
+		end
+		redis.call('zadd', 'ql:q:' .. queue .. '-recur', last_ran, jid)
+	end
+end
+
+-- If we still need values in order to meet the demand, then we 
 -- should check if any scheduled items, and if so, we should 
 -- insert them to ensure correctness when pulling off the next
 -- unit of work.

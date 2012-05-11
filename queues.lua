@@ -12,7 +12,8 @@
 -- 			'waiting': 5,
 -- 			'running': 5,
 -- 			'scheduled': 10,
--- 			'depends': 5
+-- 			'depends': 5,
+-- 			'recurring': 0
 -- 		}, {
 -- 			...
 -- 		}
@@ -36,7 +37,8 @@ if queue then
 		stalled   = stalled,
 		running   = redis.call('zcard', 'ql:q:' .. queue .. '-locks') - stalled,
 		scheduled = redis.call('zcard', 'ql:q:' .. queue .. '-scheduled'),
-		depends   = redis.call('zcard', 'ql:q:' .. queue .. '-depends')
+		depends   = redis.call('zcard', 'ql:q:' .. queue .. '-depends'),
+		recurring = redis.call('zcard', 'ql:q:' .. queue .. '-recur')
 	}
 else
 	for index, qname in ipairs(queuenames) do
@@ -47,7 +49,8 @@ else
 			stalled   = stalled,
 			running   = redis.call('zcard', 'ql:q:' .. qname .. '-locks') - stalled,
 			scheduled = redis.call('zcard', 'ql:q:' .. qname .. '-scheduled'),
-			depends   = redis.call('zcard', 'ql:q:' .. qname .. '-depends')
+			depends   = redis.call('zcard', 'ql:q:' .. qname .. '-depends'),
+			recurring = redis.call('zcard', 'ql:q:' .. qname .. '-recur')
 		})
 	end
 end
