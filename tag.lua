@@ -37,9 +37,7 @@ if command == 'add' then
 		-- Decode the json blob, convert to dictionary
 		tags = cjson.decode(tags)
 		local _tags = {}
-		for i,v in ipairs(tags) do
-			_tags[v] = true
-		end
+		for i,v in ipairs(tags) do _tags[v] = true end
 	
 		-- Otherwise, add the job to the sorted set with that tags
 		for i=4,#ARGV do
@@ -66,9 +64,7 @@ elseif command == 'remove' then
 		-- Decode the json blob, convert to dictionary
 		tags = cjson.decode(tags)
 		local _tags = {}
-		for i,v in ipairs(tags) do
-			_tags[v] = true
-		end
+		for i,v in ipairs(tags) do _tags[v] = true end
 	
 		-- Otherwise, add the job to the sorted set with that tags
 		for i=4,#ARGV do
@@ -79,11 +75,7 @@ elseif command == 'remove' then
 		end
 	
 		local results = {}
-		for i,tag in ipairs(tags) do
-			if _tags[tag] then
-				table.insert(results, tag)
-			end
-		end
+		for i,tag in ipairs(tags) do if _tags[tag] then table.insert(results, tag) end end
 	
 		tags = cjson.encode(results)
 		redis.call('hset', 'ql:j:' .. jid, 'tags', tags)

@@ -41,7 +41,6 @@ if command == 'on' then
 			'tags'    , cjson.encode(options.tags or {}),
 			'state'   , 'recur',
 			'queue'   , queue,
-			'last-ran', math.floor(now + offset + interval),
 			'type'    , 'interval',
 			-- How many jobs we've spawned from this
 			'count'   , 0,
@@ -66,10 +65,8 @@ elseif command == 'off' then
 	-- First, find out what queue it was attached to
 	local queue = redis.call('hget', 'ql:r:' .. jid, 'queue')
 	if queue then
-		redis.call('echo', 'in queue: ' .. queue)
 		-- Now, delete it from the queue it was attached to, and delete the thing itself
 		redis.call('zrem', 'ql:q:' .. queue .. '-recur', jid)
-		redis.call('echo', 'Deleted ' .. jid .. ' from ' .. queue)
 		redis.call('del', 'ql:r:' .. jid)
 		return true
 	else
@@ -111,8 +108,8 @@ elseif command == 'update' then
 				-- If the command is 'interval', then we need to update the time
 				-- when it should next be scheduled
 				if key == 'interval' then
-					local queue, interval = unpack(redis.call('hget', 'ql:r:' .. jid, 'queue', 'interval'))
-					redis.call('zincrby', 'ql:q:' .. queue .. '-recur', tonumber(interval) - value, jid)
+					local queue, interval = unpack(redis.call('hmget', 'ql:r:' .. jid, 'queue', 'interval'))
+					redis.call('zincrby', 'ql:q:' .. queue .. '-recur', value - tonumber(interval), jid)
 				end
 				redis.call('hset', 'ql:r:' .. jid, key, value)
 			elseif key == 'data' then
@@ -134,7 +131,47 @@ elseif command == 'update' then
 		return false
 	end
 elseif command == 'tag' then
+	local jid = assert(ARGV[2], 'Recur(): Arg "jid" missing')
+	local tags = redis.call('hget', 'ql:r:' .. jid, 'tags')
+	-- If the job has been canceled / deleted, then return false
+	if tags then
+		-- Decode the json blob, convert to dictionary
+		tags = cjson.decode(tags)
+		local _tags = {}
+		for i,v in ipairs(tags) do _tags[v] = true end
+		
+		-- Otherwise, add the job to the sorted set with that tags
+		for i=3,#ARGV do if _tags[ARGV[i]] == nil then table.insert(tags, ARGV[i]) end end
+		
+		tags = cjson.encode(tags)
+		redis.call('hset', 'ql:r:' .. jid, 'tags', tags)
+		return tags
+	else
+		return false
+	end
 elseif command == 'untag' then
+	local jid  = assert(ARGV[2], 'Recur(): Arg "jid" missing')
+	-- Get the existing tags
+	local tags = redis.call('hget', 'ql:r:' .. jid, 'tags')
+	-- If the job has been canceled / deleted, then return false
+	if tags then
+		-- Decode the json blob, convert to dictionary
+		tags = cjson.decode(tags)
+		local _tags    = {}
+		-- Make a hash
+		for i,v in ipairs(tags) do _tags[v] = true end
+		-- Delete these from the hash
+		for i = 3,#ARGV do _tags[ARGV[i]] = nil end
+		-- Back into a list
+		local results = {}
+		for i, tag in ipairs(tags) do if _tags[tag] then table.insert(results, tag) end end
+		-- json encode them, set, and return
+		tags = cjson.encode(results)
+		redis.call('hset', 'ql:r:' .. jid, 'tags', tags)
+		return tags
+	else
+		return false
+	end
 else
 	error('Recur(): First argument must be one of [on, off, get, update, tag, untag]. Got ' .. tostring(ARGV[1]))
 end

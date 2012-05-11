@@ -95,11 +95,10 @@ if #keys < count then
 		-- get the last time each of them was run, and then increment
 		-- it by its interval. While this time is less than now,
 		-- we need to keep putting jobs on the queue
-		local klass, data, priority, tags, retries, interval, last_ran = unpack(redis.call('hmget', 'ql:r:' .. jid, 'klass', 'data', 'priority', 'tags', 'retries', 'interval', 'last-ran'))
+		local klass, data, priority, tags, retries, interval = unpack(redis.call('hmget', 'ql:r:' .. jid, 'klass', 'data', 'priority', 'tags', 'retries', 'interval'))
 		local _tags = cjson.decode(tags)
-		last_ran = tonumber(last_ran)
 		
-		while last_ran < now do
+		while math.floor(tonumber(redis.call('zscore', key .. '-recur', jid))) <= now do
 			local count = redis.call('hincrby', 'ql:r:' .. jid, 'count', 1)
 			
 			-- Add this job to the list of jobs tagged with whatever tags were supplied
@@ -129,11 +128,10 @@ if #keys < count then
 			-- Now, if a delay was provided, and if it's in the future,
 			-- then we'll have to schedule it. Otherwise, we're just
 			-- going to add it to the work queue.
-			redis.call('zadd', 'ql:q:' .. queue .. '-work', priority + (now / 10000000000), jid .. '-' .. count)
+			redis.call('zadd', key .. '-work', priority + (now / 10000000000), jid .. '-' .. count)
 			
-			last_ran = redis.call('hincrby', 'ql:r:' .. jid, 'last-ran', interval)
+			redis.call('zincrby', key .. '-recur', interval, jid)
 		end
-		redis.call('zadd', 'ql:q:' .. queue .. '-recur', last_ran, jid)
 	end
 end
 
