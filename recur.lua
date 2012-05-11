@@ -25,6 +25,9 @@ if command == 'on' then
 	if spec == 'interval' then
 		local interval = assert(tonumber(ARGV[8]) , 'Recur(): Arg "interval" must be a number: '   .. tostring(ARGV[8]))
 		local offset   = assert(tonumber(ARGV[9]) , 'Recur(): Arg "offset" must be a number: '     .. tostring(ARGV[9]))
+		if interval <= 0 then
+			error('Recur(): Arg "interval" must be greater than or equal to 0')
+		end
 		-- Read in all the optional parameters
 		local options = {}
 		for i = 10, #ARGV, 2 do options[ARGV[i]] = ARGV[i + 1] end
@@ -47,7 +50,7 @@ if command == 'on' then
 			'interval', interval,
 			'retries' , options.retries)
 		-- Now, we should schedule the next run of the job
-		redis.call('zadd', 'ql:q:' .. queue .. '-recur', now + offset + interval, jid)
+		redis.call('zadd', 'ql:q:' .. queue .. '-recur', now + offset, jid)
 		
 		-- Lastly, we're going to make sure that this item is in the
 		-- set of known queues. We should keep this sorted by the 
