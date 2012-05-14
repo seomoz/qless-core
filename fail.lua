@@ -49,6 +49,10 @@ if state ~= 'running' then
 	return false
 end
 
+if redis.call('zscore', 'ql:tracked', jid) ~= false then
+	redis.call('publish', 'failed', jid)
+end
+
 -- Remove this job from the jobs that the worker that was running it has
 redis.call('zrem', 'ql:w:' .. worker .. ':jobs', jid)
 

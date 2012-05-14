@@ -113,6 +113,10 @@ redis.call('hmset', 'ql:s:run:' .. bin .. ':' .. queue, 'total', count, 'mean', 
 -- Remove this job from the jobs that the worker that was running it has
 redis.call('zrem', 'ql:w:' .. worker .. ':jobs', jid)
 
+if redis.call('zscore', 'ql:tracked', jid) ~= false then
+	redis.call('publish', 'completed', jid)
+end
+
 if nextq then
 	-- Enqueue the job
 	table.insert(history, {

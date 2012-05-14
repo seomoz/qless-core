@@ -32,8 +32,10 @@ if ARGV[1] ~= nil then
 	local jid = assert(ARGV[2]          , 'Track(): Arg "jid" missing')
 	local now = assert(tonumber(ARGV[3]), 'Track(): Arg "now" missing or not a number: ' .. (ARGV[3] or 'nil'))
 	if string.lower(ARGV[1]) == 'track' then
+		redis.call('publish', 'track', jid)
 		return redis.call('zadd', 'ql:tracked', now, jid)
 	elseif string.lower(ARGV[1]) == 'untrack' then
+		redis.call('publish', 'untrack', jid)
 		return redis.call('zrem', 'ql:tracked', jid)
 	else
 		error('Track(): Unknown action "' .. ARGV[1] .. '"')

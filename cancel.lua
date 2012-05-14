@@ -61,6 +61,11 @@ else
 		redis.call('zincrby', 'ql:tags', -1, tag)
 	end
 	
+	-- If the job was being tracked, we should notify
+	if redis.call('zscore', 'ql:tracked', jid) ~= false then
+		redis.call('publish', 'canceled', jid)
+	end
+	
 	-- Just go ahead and delete our data
 	redis.call('del', 'ql:j:' .. jid)
 end

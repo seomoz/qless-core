@@ -70,9 +70,17 @@ for index, jid in ipairs(redis.call('zrangebyscore', key .. '-locks', 0, now, 'L
 		-- Add this type of failure to the list of failures
 		redis.call('sadd', 'ql:failures', group)
 		-- And add this particular instance to the failed types
-		redis.call('lpush', 'ql:f:' .. group, jid)		
+		redis.call('lpush', 'ql:f:' .. group, jid)
+		
+		if redis.call('zscore', 'ql:tracked', jid) ~= false then
+			redis.call('publish', 'failed', jid)
+		end
 	else
 	    table.insert(keys, jid)
+		
+		if redis.call('zscore', 'ql:tracked', jid) ~= false then
+			redis.call('publish', 'stalled', jid)
+		end
 	end
 	
 	-- Remove this job from the jobs that the worker that was running it has
@@ -233,14 +241,19 @@ for index, jid in ipairs(keys) do
 	local job = redis.call(
 	    'hmget', 'ql:j:' .. jid, 'jid', 'klass', 'state', 'queue', 'worker', 'priority',
 		'expires', 'retries', 'remaining', 'data', 'tags', 'history', 'failure')
-		
+	
+	local tracked = redis.call('zscore', 'ql:tracked', jid) ~= false
+	if tracked then
+		redis.call('publish', 'popped', jid)
+	end
+	
 	table.insert(response, cjson.encode({
 	    jid          = job[1],
 		klass        = job[2],
 	    state        = job[3],
 	    queue        = job[4],
 		worker       = job[5] or '',
-		tracked      = redis.call('zscore', 'ql:tracked', jid) ~= false,
+		tracked      = tracked,
 		priority     = tonumber(job[6]),
 		expires      = tonumber(job[7]) or 0,
 		retries      = tonumber(job[8]),

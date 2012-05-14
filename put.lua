@@ -149,4 +149,8 @@ if redis.call('zscore', 'ql:queues', queue) == false then
 	redis.call('zadd', 'ql:queues', now, queue)
 end
 
+if redis.call('zscore', 'ql:tracked', jid) ~= false then
+	redis.call('publish', 'put', jid)
+end
+
 return jid
