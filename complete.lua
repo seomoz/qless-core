@@ -153,7 +153,7 @@ if nextq then
 			redis.call('hset', 'ql:j:' .. jid, 'state', 'depends')
 			return 'depends'
 		else
-			redis.call('zadd', 'ql:q:' .. nextq .. '-work', priority + (now / 10000000000), jid)
+			redis.call('zadd', 'ql:q:' .. nextq .. '-work', priority - (now / 10000000000), jid)
 			return 'waiting'
 		end
 	end

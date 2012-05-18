@@ -138,7 +138,7 @@ else
 		redis.call('zadd', 'ql:q:' .. queue .. '-depends', now, jid)
 		redis.call('hset', 'ql:j:' .. jid, 'state', 'depends')
 	else
-		redis.call('zadd', 'ql:q:' .. queue .. '-work', priority + (now / 10000000000), jid)
+		redis.call('zadd', 'ql:q:' .. queue .. '-work', priority - (now / 10000000000), jid)
 	end
 end
 

@@ -136,7 +136,7 @@ if #keys < count then
 			-- Now, if a delay was provided, and if it's in the future,
 			-- then we'll have to schedule it. Otherwise, we're just
 			-- going to add it to the work queue.
-			redis.call('zadd', key .. '-work', priority + (now / 10000000000), jid .. '-' .. count)
+			redis.call('zadd', key .. '-work', priority - (now / 10000000000), jid .. '-' .. count)
 			
 			redis.call('zincrby', key .. '-recur', interval, jid)
 		end
@@ -170,7 +170,7 @@ if #keys < count then
     
     -- And now we should get up to the maximum number of requested
     -- work items from the work queue.
-    for index, jid in ipairs(redis.call('zrange', key .. '-work', 0, (count - #keys) - 1)) do
+    for index, jid in ipairs(redis.call('zrevrange', key .. '-work', 0, (count - #keys) - 1)) do
         table.insert(keys, jid)
     end
 end
