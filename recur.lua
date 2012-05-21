@@ -125,6 +125,7 @@ elseif command == 'update' then
 				local score = redis.call('zscore', 'ql:q:' .. queue .. '-recur', jid)
 				redis.call('zrem', 'ql:q:' .. queue .. '-recur', jid)
 				redis.call('zadd', 'ql:q:' .. value .. '-recur', score, jid)
+				redis.call('hset', 'ql:r:' .. jid, 'queue', value)
 			else
 				error('Recur(): Unrecognized option "' .. key .. '"')
 			end
