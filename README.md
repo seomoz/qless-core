@@ -386,7 +386,8 @@ configuration options that `qless` is meant to support:
 	How many seconds to keep jobs after they're completed
 1. `heartbeat-<queue name>` --
 	The heartbeat interval (in seconds) for a particular queue
-
+1. `max-worker-age` --
+    How long before workers are considered disappeared
 
 
 Internal Redis Structure

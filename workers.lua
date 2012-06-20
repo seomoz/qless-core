@@ -34,6 +34,20 @@ end
 
 local now = assert(tonumber(ARGV[1]), 'Workers(): Arg "now" missing or not a number: ' .. (ARGV[1] or 'nil'))
 
+-- Clean up all the workers' job lists if they're too old. This is determined
+-- by the `max-worker-age` configuration, defaulting to the last day. Seems
+-- like a 'reasonable' default
+local interval = tonumber(
+	redis.call('hget', 'ql:config', 'max-worker-age')) or 86400
+
+local workers  = redis.call('zrangebyscore', 'ql:workers', 0, now - interval)
+for index, worker in ipairs(workers) do
+	redis.call('del', 'ql:w:' .. worker .. ':jobs')
+end
+
+-- And now remove them from the list of known workers
+redis.call('zremrangebyscore', 'ql:workers', 0, now - interval)
+
 if #ARGV == 1 then
 	local response = {}
 	local workers = redis.call('zrevrange', 'ql:workers', 0, -1)
@@ -47,7 +61,6 @@ if #ARGV == 1 then
 	return cjson.encode(response)
 else
 	local worker = assert(ARGV[2], 'Workers(): Arg "worker" missing.')
-	redis.call('exists', worker)
 	local response = {
 		jobs    = redis.call('zrevrangebyscore', 'ql:w:' .. worker .. ':jobs', now + 8640000, now),
 		stalled = redis.call('zrevrangebyscore', 'ql:w:' .. worker .. ':jobs', now, 0)
