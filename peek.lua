@@ -43,7 +43,10 @@ if #keys < count then
 		local klass, data, priority, tags, retries, interval = unpack(redis.call('hmget', 'ql:r:' .. jid, 'klass', 'data', 'priority', 'tags', 'retries', 'interval'))
 		local _tags = cjson.decode(tags)
 		
-		while math.floor(tonumber(redis.call('zscore', key .. '-recur', jid))) < now do
+		-- We're saving this value so that in the history, we can accurately 
+		-- reflect when the job would normally have been scheduled
+		local score = math.floor(tonumber(redis.call('zscore', key .. '-recur', jid)))
+		while score <= now do
 			local count = redis.call('hincrby', 'ql:r:' .. jid, 'count', 1)
 			
 			-- Add this job to the list of jobs tagged with whatever tags were supplied
@@ -54,28 +57,31 @@ if #keys < count then
 			
 			-- First, let's save its data
 			redis.call('hmset', 'ql:j:' .. jid .. '-' .. count,
-			    'jid'      , jid .. '-' .. count,
+				'jid'      , jid .. '-' .. count,
 				'klass'    , klass,
-			    'data'     , data,
-			    'priority' , priority,
-			    'tags'     , tags,
-			    'state'    , 'waiting',
-			    'worker'   , '',
+				'data'     , data,
+				'priority' , priority,
+				'tags'     , tags,
+				'state'    , 'waiting',
+				'worker'   , '',
 				'expires'  , 0,
-			    'queue'    , queue,
+				'queue'    , queue,
 				'retries'  , retries,
 				'remaining', retries,
-			    'history'  , cjson.encode({{
+				'history'  , cjson.encode({{
+					-- The job was essentially put in this queue at this time,
+					-- and not the current time
 					q     = queue,
-					put   = math.floor(now)
+					put   = math.floor(score)
 				}}))
 			
 			-- Now, if a delay was provided, and if it's in the future,
 			-- then we'll have to schedule it. Otherwise, we're just
 			-- going to add it to the work queue.
-			redis.call('zadd', key .. '-work', priority - (now / 10000000000), jid .. '-' .. count)
+			redis.call('zadd', key .. '-work', priority - (score / 10000000000), jid .. '-' .. count)
 			
 			redis.call('zincrby', key .. '-recur', interval, jid)
+			score = score + interval
 		end
 	end
 end
