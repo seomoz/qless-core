@@ -4,6 +4,10 @@
 # that use Qless. Qless needs redis 2.6 (which has RC release but no
 # final yet), and Travis has 2.4 installed. This will install and
 # start 2.6 as a daemon.
+#
+# In your .travis.yml, add:
+# before_install:
+#  - curl -s https://raw.github.com/seomoz/qless-core/master/scripts/install_and_run_redis_2_6 | sh
 
 REDIS_VERSION=2.6.0-rc6
 
