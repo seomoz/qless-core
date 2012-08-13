@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+
+# This is intended for use as part of a Travis CI build, for projects
+# that use Qless. Qless needs redis 2.6 (which has RC release but no
+# final yet), and Travis has 2.4 installed. This will install and
+# start 2.6 as a daemon.
+
+REDIS_VERSION=2.6.0-rc6
+
+# shutdown the 2.4 server
+redis-cli shutdown
+
+# download
+wget http://redis.googlecode.com/files/redis-$REDIS_VERSION.tar.gz
+
+# extract
+tar xzf redis-$REDIS_VERSION.tar.gz
+
+# make
+cd redis-$REDIS_VERSION
+make
+
+# daemonize!
+echo "daemonize yes" > redis.conf
+
+# start the 2.6 server
+./src/redis-server redis.conf
+
