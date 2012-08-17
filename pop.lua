@@ -42,6 +42,10 @@ redis.call('zadd', 'ql:workers', now, worker)
 -- Iterate through all the expired locks and add them to the list
 -- of keys that we'll return
 for index, jid in ipairs(redis.call('zrangebyscore', key .. '-locks', 0, now, 'LIMIT', 0, count)) do
+	-- Remove this job from the jobs that the worker that was running it has
+	local w = redis.call('hget', 'ql:j:' .. jid, 'worker')
+	redis.call('zrem', 'ql:w:' .. w .. ':jobs', jid)
+	
 	-- For each of these, decrement their retries. If any of them
 	-- have exhausted their retries, then we should mark them as
 	-- failed.
@@ -82,10 +86,6 @@ for index, jid in ipairs(redis.call('zrangebyscore', key .. '-locks', 0, now, 'L
 			redis.call('publish', 'stalled', jid)
 		end
 	end
-	
-	-- Remove this job from the jobs that the worker that was running it has
-	local w = redis.call('hget', 'ql:j:' .. jid, 'worker')
-	redis.call('zrem', 'ql:w:' .. w .. ':jobs', jid)
 end
 -- Now we've checked __all__ the locks for this queue the could
 -- have expired, and are no more than the number requested.
