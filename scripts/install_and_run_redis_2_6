@@ -31,7 +31,7 @@ tar xzf redis-$REDIS_VERSION.tar.gz
 
 # make
 cd redis-$REDIS_VERSION
-REDIS_26_DIR = `pwd`
+REDIS_26_DIR=`pwd`
 make
 
 # daemonize!
