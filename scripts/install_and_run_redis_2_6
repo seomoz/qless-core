@@ -31,13 +31,14 @@ tar xzf redis-$REDIS_VERSION.tar.gz
 
 # make
 cd redis-$REDIS_VERSION
+REDIS_26_DIR = `pwd`
 make
-make test
 
 # daemonize!
 echo "daemonize yes" > redis.conf
 
 # start the 2.6 server
+cd $REDIS_26_DIR
 ./src/redis-server redis.conf
 
 # Verify that 2.6 is running
