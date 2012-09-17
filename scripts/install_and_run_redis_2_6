@@ -12,6 +12,9 @@
 # kill the script on error
 set -e
 
+# this is needed by redis
+sudo apt-get install tcl8.5
+
 REDIS_VERSION=2.6.0-rc6
 
 # Check what is running
