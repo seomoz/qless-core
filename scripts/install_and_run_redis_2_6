@@ -21,7 +21,7 @@ REDIS_VERSION=2.6.0-rc6
 redis-cli info | grep redis_version
 
 # shutdown the 2.4 server
-service stop redis-server
+service stop redis
 
 # download
 wget http://redis.googlecode.com/files/redis-$REDIS_VERSION.tar.gz
