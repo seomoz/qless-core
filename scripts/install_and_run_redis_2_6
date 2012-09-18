@@ -23,6 +23,9 @@ redis-cli info | grep redis_version
 # shutdown the 2.4 server
 redis-cli shutdown
 
+# This should output `Could not connect...`
+redis-cli info
+
 # download
 wget http://redis.googlecode.com/files/redis-$REDIS_VERSION.tar.gz
 
@@ -41,5 +44,10 @@ echo "daemonize yes" > redis.conf
 cd $REDIS_26_DIR
 ./src/redis-server redis.conf
 
+echo $PATH
+echo `which redis-server`
+
 # Verify that 2.6 is running
 redis-cli info | grep redis_version
+
+echo DONE
