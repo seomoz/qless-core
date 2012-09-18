@@ -20,6 +20,9 @@ REDIS_VERSION=2.6.0-rc6
 # Check what is running
 redis-cli info | grep redis_version
 
+# shutdown the 2.4 server
+redis-cli shutdown
+
 # download
 wget http://redis.googlecode.com/files/redis-$REDIS_VERSION.tar.gz
 
@@ -30,22 +33,13 @@ tar xzf redis-$REDIS_VERSION.tar.gz
 cd redis-$REDIS_VERSION
 REDIS_26_DIR=`pwd`
 make
+make install
 
 # daemonize!
 echo "daemonize yes" > redis.conf
 
-ps aux | grep redis
-
-# shutdown the 2.4 server
-redis-cli shutdown
-ps aux | grep redis
-
 # start the 2.6 server
-./src/redis-server redis.conf
-
-ps aux | grep redis
+redis-server redis.conf
 
 # Verify that 2.6 is running
 redis-cli info | grep redis_version
-
-echo DONE
