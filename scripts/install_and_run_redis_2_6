@@ -33,7 +33,7 @@ tar xzf redis-$REDIS_VERSION.tar.gz
 cd redis-$REDIS_VERSION
 REDIS_26_DIR=`pwd`
 make
-sudo make install
+sudo make PREFIX=/usr/bin install
 
 # daemonize!
 echo "daemonize yes" > redis.conf
