@@ -23,9 +23,6 @@ redis-cli info | grep redis_version
 # shutdown the 2.4 server
 redis-cli shutdown
 
-# This should output `Could not connect...`
-redis-cli info
-
 # download
 wget http://redis.googlecode.com/files/redis-$REDIS_VERSION.tar.gz
 
