@@ -12,13 +12,7 @@
 # kill the script on error
 set -e
 
-# this is needed by redis
-sudo apt-get install tcl8.5
-
 REDIS_VERSION=2.6.0-rc6
-
-# Check what is running
-redis-cli info | grep redis_version
 
 # shutdown the 2.4 server
 sudo service redis-server stop
@@ -31,9 +25,8 @@ tar xzf redis-$REDIS_VERSION.tar.gz
 
 # make
 cd redis-$REDIS_VERSION
-REDIS_26_DIR=`pwd`
 make
-sudo make PREFIX=/usr install
+sudo make install
 
 # daemonize!
 echo "daemonize yes" > redis.conf
