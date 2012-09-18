@@ -41,8 +41,8 @@ echo "daemonize yes" > redis.conf
 cd $REDIS_26_DIR
 ./src/redis-server redis.conf
 
-echo $PATH
-echo `which redis-server`
+./src/redis-server -v
+redis-server -v
 
 # Verify that 2.6 is running
 redis-cli info | grep redis_version
