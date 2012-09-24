@@ -9,10 +9,13 @@
 # before_install:
 #  - curl -s https://raw.github.com/seomoz/qless-core/master/scripts/install_and_run_redis_2_6 | sh
 
+# kill the script on error
+set -e
+
 REDIS_VERSION=2.6.0-rc6
 
 # shutdown the 2.4 server
-redis-cli shutdown
+sudo service redis-server stop
 
 # download
 wget http://redis.googlecode.com/files/redis-$REDIS_VERSION.tar.gz
@@ -23,10 +26,13 @@ tar xzf redis-$REDIS_VERSION.tar.gz
 # make
 cd redis-$REDIS_VERSION
 make
+sudo make install
 
 # daemonize!
 echo "daemonize yes" > redis.conf
 
 # start the 2.6 server
-./src/redis-server redis.conf
+redis-server redis.conf
 
+# Verify that 2.6 is running
+redis-cli info | grep redis_version
