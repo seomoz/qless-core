@@ -34,6 +34,8 @@ if command == 'on' then
 		options.tags     = assert(cjson.decode(options.tags or {}), 'Recur(): Arg "tags" must be JSON-encoded array of string. Got: ' .. tostring(options.tags))
 		options.priority = assert(tonumber(options.priority or 0) , 'Recur(): Arg "priority" must be a number. Got: ' .. tostring(options.priority))
 		options.retries  = assert(tonumber(options.retries  or 0) , 'Recur(): Arg "retries" must be a number. Got: ' .. tostring(options.retries))
+
+		local count = redis.call('hget', 'ql:r:' .. jid, 'count') or 0
 		
 		-- Do some insertions
 		redis.call('hmset', 'ql:r:' .. jid,
@@ -46,7 +48,7 @@ if command == 'on' then
 			'queue'   , queue,
 			'type'    , 'interval',
 			-- How many jobs we've spawned from this
-			'count'   , 0,
+			'count'   , count,
 			'interval', interval,
 			'retries' , options.retries)
 		-- Now, we should schedule the next run of the job
@@ -102,9 +104,9 @@ elseif command == 'update' then
 	local options = {}
 	
 	-- Make sure that the job exists
-	if redis.call('exists', 'ql:r:' .. jid) then
+	if redis.call('exists', 'ql:r:' .. jid) ~= 0 then
 		for i = 3, #ARGV, 2 do
-			local key   = ARGV[i]
+			local key = ARGV[i]
 			local value = ARGV[i+1]
 			if key == 'priority' or key == 'interval' or key == 'retries' then
 				value = assert(tonumber(value), 'Recur(): Arg "' .. key .. '" must be a number: ' .. tostring(value))
