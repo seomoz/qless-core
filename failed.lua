@@ -43,7 +43,7 @@ if group then
 		total = redis.call('llen', 'ql:f:' .. group),
 		jobs  = {}
 	}
-	local jids = redis.call('lrange', 'ql:f:' .. group, start, limit)
+	local jids = redis.call('lrange', 'ql:f:' .. group, start, limit - 1)
 	for index, jid in ipairs(jids) do
 		local job = redis.call(
 		    'hmget', 'ql:j:' .. jid, 'jid', 'klass', 'state', 'queue', 'worker', 'priority',
