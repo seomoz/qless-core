@@ -97,7 +97,10 @@ redis.call('hincrby', 'ql:s:stats:' .. bin .. ':' .. queue, 'retries', #keys)
 -- If we still need jobs in order to meet demand, then we should
 -- look for all the recurring jobs that need jobs run
 if #keys < count then
-	local r = redis.call('zrangebyscore', key .. '-recur', 0, now)
+	-- This is how many jobs we've moved so far
+	local moved = 0
+	-- These are the recurring jobs that need work
+	local r = redis.call('zrangebyscore', key .. '-recur', 0, now, 'LIMIT', 0, (count - #keys))
 	for index, jid in ipairs(r) do
 		-- For each of the jids that need jobs scheduled, first
 		-- get the last time each of them was run, and then increment
@@ -109,7 +112,13 @@ if #keys < count then
 		-- We're saving this value so that in the history, we can accurately 
 		-- reflect when the job would normally have been scheduled
 		local score = math.floor(tonumber(redis.call('zscore', key .. '-recur', jid)))
-		while score <= now do
+
+		while (score <= now) and (moved < (count - #keys)) do
+			-- Increment the count of how many jobs we've moved from recurring
+			-- to 'work'
+			moved = moved + 1
+
+			-- the count'th job that we've moved from this recurring job
 			local count = redis.call('hincrby', 'ql:r:' .. jid, 'count', 1)
 			
 			-- Add this job to the list of jobs tagged with whatever tags were supplied
