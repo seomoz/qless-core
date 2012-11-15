@@ -35,7 +35,14 @@ if command == 'on' then
 		options.priority = assert(tonumber(options.priority or 0) , 'Recur(): Arg "priority" must be a number. Got: ' .. tostring(options.priority))
 		options.retries  = assert(tonumber(options.retries  or 0) , 'Recur(): Arg "retries" must be a number. Got: ' .. tostring(options.retries))
 
-		local count = redis.call('hget', 'ql:r:' .. jid, 'count') or 0
+		local count, old_queue = unpack(redis.call('hmget', 'ql:r:' .. jid, 'count', 'queue'))
+		count = count or 0
+
+		-- If it has previously been in another queue, then we should remove 
+		-- some information about it
+		if old_queue then
+			redis.call('zrem', 'ql:q:' .. old_queue .. '-recur', jid)
+		end
 		
 		-- Do some insertions
 		redis.call('hmset', 'ql:r:' .. jid,
