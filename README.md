@@ -1,19 +1,18 @@
 API
 ===
-Here is some brief documentation of how the lua scripts work and what they expect.
-Each invocation begins with a number, which describes how many of the provided
-values are considered `KEYS`, as they refer in some sense to a Redis key. The
-remaining values are considered `ARGV`. This is a distinction that Redis makes
-internally, and should be considered a magic number.
+Here is some brief documentation of how the lua scripts work and what they 
+expect. Each invocation begins with a number, which describes how many of the
+provided values are considered `KEYS`, as they refer in some sense to a Redis 
+key. The remaining values are considered `ARGV`. This is a distinction that 
+Redis makes internally, and should be considered a magic number.
 
 Common Arguments
 ----------------
-
-All times are specified as UTC timestamps. I imagine this is something that might
-become somewhat contentious. Lua scripts are not allowed access to the system
-clock. They actually have a pretty good reason for that, but it also means that
-each client must provide their own times. This has the side effect of requiring
-that all clients have relatively __synchronized clocks__.
+All times are specified as UTC timestamps. I imagine this is something that 
+might become somewhat contentious. Lua scripts are not allowed access to the 
+system clock. They actually have a pretty good reason for that, but it also 
+means that each client must provide their own times. This has the side effect 
+of requiring that all clients have relatively __synchronized clocks__.
 
 - `id` -- the id of the job, a hexadecimal uuid
 - `data` -- a JSON blob representing the user data associated with a job
@@ -33,32 +32,32 @@ be considered waiting immediately. Job dependencies can also be injected at
 this time. __Returns__: The updated state, or False on error
 
 Depends(0, jid, ('on', [jid, [jid, [...]]]) | ('off', ('all' | [jid, [jid, [...]]]))
-------------------------------------------------------------------------------------
-Add or remove dependencies a job has. If 'on' is provided, the provided jids are 
-added as dependencies. If 'off' and 'all' are provided, then all the current dependencies
-are removed. If 'off' is provided and the next argument is not 'all', then those
-jids are removed as dependencies.
+-------------------------------------------------------------------------------
+Add or remove dependencies a job has. If 'on' is provided, the provided jids
+are added as dependencies. If 'off' and 'all' are provided, then all the 
+current dependencies are removed. If 'off' is provided and the next argument 
+is not 'all', then those jids are removed as dependencies.
 
-If a job is not already in the 'depends' state, then this call will return false.
-Otherwise, it will return true
+If a job is not already in the 'depends' state, then this call will return 
+false. Otherwise, it will return true
 
 Fail(0, id, worker, type, message, now, [data])
 -----------------------------------------------
 Mark the particular job as failed, with the provided type, and a more specific
-message. By `type`, we mean some phrase that might be one of several categorical
-modes of failure. The `message` is something more job-specific, like perhaps
-a traceback.
+message. By `type`, we mean some phrase that might be one of several
+categorical modes of failure. The `message` is something more job-specific,
+like perhaps a traceback.
 
 This method should __not__ be used to note that a job has been dropped or has 
-failed in a transient way. This method __should__ be used to note that a job has
-something really wrong with it that must be remedied.
+failed in a transient way. This method __should__ be used to note that a job
+has something really wrong with it that must be remedied.
 
-The motivation behind the `type` is so that similar errors can be grouped together.
-Optionally, updated data can be provided for the job. A job in any state can be
-marked as failed. If it has been given to a worker as a job, then its subsequent
-requests to heartbeat or complete that job will fail. Failed jobs are kept until
-they are canceled or completed. __Returns__ the id of the failed job if successful,
-or `False` on failure.
+The motivation behind the `type` is so that similar errors can be grouped
+together. Optionally, updated data can be provided for the job. A job in any 
+state can be marked as failed. If it has been given to a worker as a job, then
+its subsequent requests to heartbeat or complete that job will fail. Failed
+jobs are kept until they are canceled or completed. __Returns__ the id of the
+failed job if successful, or `False` on failure.
 
 Failed(0, [type, [start, [limit]]])
 -----------------------------------
@@ -155,8 +154,8 @@ __Returns__: The id of the put job, or raises an error on failure
 Queues(0, now, [queue])
 -----------------------
 Return all the queues we know about, with how many jobs are scheduled, waiting,
-and running in that queue. If a queue name is provided, then only the appropriate
-response hash should be returned. The response is JSON:
+and running in that queue. If a queue name is provided, then only the
+appropriate response hash should be returned. The response is JSON:
 
 	[
 		{
@@ -212,15 +211,15 @@ are returned are a JSON blob:
 	}
 
 The histogram's data points are at the second resolution for the first minute,
-the minute resolution for the first hour, the 15-minute resolution for the first
-day, the hour resolution for the first 3 days, and then at the day resolution
-from there on out. The `histogram` key is a list of those values.
+the minute resolution for the first hour, the 15-minute resolution for the
+first day, the hour resolution for the first 3 days, and then at the day
+resolution from there on out. The `histogram` key is a list of those values.
 
 Tag(0, (('add' | 'remove'), jid, now, tag, [tag, ...]) | 'get', tag, [offset, [count]])
 ----------------------------------------------------------------------------------
-Accepts a jid, 'add' or 'remove', and then a list of tags to either add or remove
-from the job. Alternatively, 'get', a tag to get jobs associated with that tag,
-and offset and count.
+Accepts a jid, 'add' or 'remove', and then a list of tags to either add or
+remove from the job. Alternatively, 'get', a tag to get jobs associated with
+that tag, and offset and count.
 
 If 'add' or 'remove', the response is a list of the jobs current tags, or False
 if the job doesn't exist. If 'get', the response is of the form:
@@ -234,11 +233,12 @@ if the job doesn't exist. If 'get', the response is of the form:
 	}
 
 Track(0) | Track(0, 'track', jid, now, tag, ...) | Track(0, 'untrack', jid, now)
---------------------------------------------------------------------------------
+-------------------------------------------------------------------------------
 If no arguments are provided, it returns details of all currently-tracked jobs.
-If the first argument is 'track', then it will start tracking the job associated
-with that id, and 'untrack' stops tracking it. In this context, tracking is
-nothing more than saving the job to a list of jobs that are considered special.
+If the first argument is 'track', then it will start tracking the job
+associated with that id, and 'untrack' stops tracking it. In this context,
+tracking is nothing more than saving the job to a list of jobs that are
+considered special.
 __Returns__ JSON:
 
 	{
@@ -287,12 +287,16 @@ If a worker id is provided, then expect a response of the form:
 		]
 	}
 
+Unfail(0, now, group, queue, [count])
+-------------------------------------
+Move the first `count` jobs from failure `group` to `queue`. This is
+significantly faster than moving each of the jobs individually, so when moving
+lots of failed jobs, use this.
+
 ConsistencyCheck(0, [resolve])
 ------------------------------
 __Unimplemented__ This is something I may implement at some point to 
 serve as a method for checking the consistency of qless.
-
-
 
 Features and Philosophy
 =======================
@@ -326,16 +330,18 @@ they are grouped by the day it was completed.
 Tracking
 --------
 Jobs can be tracked, which just means that they are accessible and displayable.
-This can be useful if you just want to keep tabs on the progress of jobs through
-the pipeline. All the currently-tracked jobs are stored in a sorted set, `ql:tracked`.
+This can be useful if you just want to keep tabs on the progress of jobs
+through the pipeline. All the currently-tracked jobs are stored in a sorted
+set, `ql:tracked`.
 
 Failures
 --------
 Failures are stored in such a way that we can quickly summarize the number of
-failures of a given type, but also which items have succumb to that type of failure.
-With that in mind, there is a Redis set, `ql:failures` whose members are the
-names of the various failure lists. Each type of failure then has its own list of
-instance ids that encountered such a failure. For example, we might have:
+failures of a given type, but also which items have succumb to that type of
+failure. With that in mind, there is a Redis set, `ql:failures` whose members
+are the names of the various failure lists. Each type of failure then has its
+own list of instance ids that encountered such a failure. For example, we
+might have:
 
 	ql:failures
 	=============
@@ -349,8 +355,8 @@ instance ids that encountered such a failure. For example, we might have:
 
 Worker Data
 -----------
-We'll keep a sorted set of workers sorted by the last time they had any activity.
-We'll store this set at `ql:workers`.
+We'll keep a sorted set of workers sorted by the last time they had any
+activity. We'll store this set at `ql:workers`.
 
 In addition to this list, we'll keep a set of the jids that a worker currently
 has locks for at `ql:w:<worker>:jobs`. This should be sorted by the time when
@@ -366,7 +372,6 @@ by the policies for the maximum number of retained completed jobs, and by the
 maximum age for retained jobs. To accomplish this, we'll use a sorted list to
 keep track of which items should be expired. This list should be stored in the
 key `ql:completed`
-
 
 
 Configuration Options
@@ -504,19 +509,18 @@ Stats are stored under two hashes: `ql:s:wait:<day>:<queue>` and
 
 This is also another hash, `ql:s:stats:<day>:<queue>` with keys:
 
-- `failures` -- This is how many failures there have been. If a job is run twice
-	and fails repeatedly, this is incremented twice.
+- `failures` -- This is how many failures there have been. If a job is run
+	twice and fails repeatedly, this is incremented twice.
 - `failed`   -- This is how many are currently failed
 - `retries`  -- This is how many jobs we've had to retry
 
 Tags
 ----
-All jobs store a JSON array of the tags that are associated with it. In addition,
-the keys `ql:t:<tag>` store a sorted set of all the jobs associated with that
-particular tag. The score of each jid in that tag is the time when that tag was
-added to that job. When jobs are tagged a second time with an existing tag, then
-it's a no-op.
-
+All jobs store a JSON array of the tags that are associated with it. In
+addition, the keys `ql:t:<tag>` store a sorted set of all the jobs associated
+with that particular tag. The score of each jid in that tag is the time when
+that tag was added to that job. When jobs are tagged a second time with an
+existing tag, then it's a no-op.
 
 
 Notes About Implementing Bindings
@@ -548,42 +552,40 @@ process and actually does the work associated with the job. The major advantage
 of this as far as we can see it is that it's a good strategy for sandboxing any
 havoc that might occur when processing the job.
 
-However, apparently Ruby doesn't handle copy-on-write very well, and so there is
-a lot of overhead in not only system calls to fork a process, but also to load
-modules into memory. Other languages, however, may or may not suffer from this
-problem, but it's important to be aware of.
+However, apparently Ruby doesn't handle copy-on-write very well, and so there
+is a lot of overhead in not only system calls to fork a process, but also to
+load modules into memory. Other languages, however, may or may not suffer from
+this problem, but it's important to be aware of.
 
-Another project in the vein of Resque (in fact, it uses the same job structure),
-is [sidekiq](https://github.com/mperham/sidekiq), which uses threads in a master
-process to do work. The performance boost is substantial, not to mention the
-memory footprint. Most of this performance appears to be gained from the memory
-profile and not constantly allocating memory for every job.
+Another project in the vein of Resque (in fact, it uses the same job structure)
+is [sidekiq](https://github.com/mperham/sidekiq), which uses threads in a
+master process to do work. The performance boost is substantial, not to
+mention the memory footprint. Most of this performance appears to be gained
+from the memory profile and not constantly allocating memory for every job.
 
 Ultimately, the choice is yours, but we thought it bore mentioning.
 
 Queue Popping Order
 -------------------
-Workers are allowed (and encouraged) to pop off of more than one queue. But then
-we get into the problem of what order they should be polled. Workers should support
-two modes of popping: ordered and round-robin. Consider queues `A`, `B`, and `C`
-with job counts:
+Workers are allowed (and encouraged) to pop off of more than one queue. But
+then we get into the problem of what order they should be polled. Workers
+should support two modes of popping: ordered and round-robin. Consider queues
+`A`, `B`, and `C` with job counts:
 
 	A: 5
 	B: 2
 	C: 3
 
-In an ordered verion, the order in which the queues are specified has significance
-in the order in which jobs are popped. For example, if our queued were ordered 
-`C, B, A` in the worker, we'd pop jobs off:
+In an ordered verion, the order in which the queues are specified has
+significance in the order in which jobs are popped. For example, if our queued
+were ordered `C, B, A` in the worker, we'd pop jobs off:
 
 	C, C, C, B, B, A, A, A, A, A
 
-In the round-robin implementation, a worker pops off a job from each queue as it
-progress through all queues:
+In the round-robin implementation, a worker pops off a job from each queue as
+it progress through all queues:
 
 	C, B, A, C, B, A, C, A, A, A
-
-
 
 
 Internal Style Guide
@@ -592,23 +594,15 @@ These aren't meant to be stringent, but just to keep myself sane so that when
 moving between different chunks of code that it's all formatted similarly, and
 the same variable names have the same meaning.
 
-1. Parameter sanitization should be performed as early as possible. This includes
-	making use of `assert` and `error` based on the number and type of arguments.
+1. Parameter sanitization should be performed as early as possible. This
+	includes making use of `assert` and `error` based on the number and type
+	of arguments.
 1. Job ids should be referred to as `jid`, both internally and in the clients.
 1. Failure types should be described with `group`. I'm not terribly thrilled
 	with the term, but I thought it was better than 'kind.' After spending
 	some time with a Thesaurus, I didn't find anything that appealed to me more
-1. Job types should be described as `klass` (nod to Resque), because both 'type'
-	and 'class' are commonly used in languages.
-
-
-
-
-
-
-
-
-
+1. Job types should be described as `klass` (nod to Resque), because both
+	'type' and 'class' are commonly used in languages.
 
 
 
