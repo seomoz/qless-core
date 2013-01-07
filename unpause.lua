@@ -1,12 +1,12 @@
--- This script takes the name of the queue and removes it
+-- This script takes the name of the queue(s) and removes it
 -- from the ql:paused_queues set.
 --
--- Args:
---    1) The queue to unpause.
+-- Args: The list of queues to pause.
+
+if #KEYS > 0 then error('Pause(): No Keys should be provided') end
+if #ARGV < 1 then error('Pause(): Must provide at least one queue to pause') end
 
 local key = 'ql:paused_queues'
 
-for index, queue in ipairs(ARGV) do
-  redis.call('srem', key, queue)
-end
+redis.call('srem', key, unpack(ARGV))
 
