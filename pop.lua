@@ -39,6 +39,10 @@ local keys = {}
 -- Make sure we this worker to the list of seen workers
 redis.call('zadd', 'ql:workers', now, worker)
 
+if redis.call('sismember', 'ql:paused_queues', queue) == 1 then
+  return {}
+end
+
 -- Iterate through all the expired locks and add them to the list
 -- of keys that we'll return
 for index, jid in ipairs(redis.call('zrangebyscore', key .. '-locks', 0, now, 'LIMIT', 0, count)) do
