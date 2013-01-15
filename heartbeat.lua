@@ -27,7 +27,8 @@ if data then
 end
 
 -- First, let's see if the worker still owns this job, and there is a worker
-if redis.call('hget', 'ql:j:' .. jid, 'worker') ~= worker or #worker == 0 then
+local job_worker = redis.call('hget', 'ql:j:' .. jid, 'worker')
+if job_worker ~= worker or #job_worker == 0 then
     return false
 else
     -- Otherwise, optionally update the user data, and the heartbeat
