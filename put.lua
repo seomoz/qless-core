@@ -54,6 +54,13 @@ if delay > 0 and #depends > 0 then
 	error('Put(): "delay" and "depends" are not allowed to be used together')
 end
 
+-- Send out a log message
+redis.call('publish', 'log', cjson.encode({
+	jid   = jid,
+	event = 'put',
+	queue = queue
+}))
+
 -- Update the history to include this new change
 local history = cjson.decode(history or '{}')
 table.insert(history, {
@@ -73,6 +80,12 @@ end
 -- make sure to remove it from that worker's jobs
 if worker then
 	redis.call('zrem', 'ql:w:' .. worker .. ':jobs', jid)
+	-- We need to inform whatever worker had that job
+	redis.call('publish', worker, cjson.encode({
+		jid   = jid,
+		event = 'put',
+		queue = queue
+	}))
 end
 
 -- If the job was previously in the 'completed' state, then we should remove

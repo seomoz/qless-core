@@ -118,12 +118,20 @@ if redis.call('zscore', 'ql:tracked', jid) ~= false then
 end
 
 if nextq then
+	-- Send a message out to log
+	redis.call('publish', 'log', cjson.encode({
+		jid   = jid,
+		event = 'advanced',
+		queue = queue,
+		to    = nextq
+	}))
+
 	-- Enqueue the job
 	table.insert(history, {
 		q     = nextq,
 		put   = math.floor(now)
 	})
-	
+
 	-- We're going to make sure that this queue is in the
 	-- set of known queues
 	if redis.call('zscore', 'ql:queues', nextq) == false then
@@ -158,6 +166,13 @@ if nextq then
 		end
 	end
 else
+	-- Send a message out to log
+	redis.call('publish', 'log', cjson.encode({
+		jid   = jid,
+		event = 'completed',
+		queue = queue
+	}))
+
 	redis.call('hmset', 'ql:j:' .. jid, 'state', 'complete', 'worker', '', 'failure', '{}',
 		'queue', '', 'expires', 0, 'history', cjson.encode(history), 'remaining', tonumber(retries))
 	

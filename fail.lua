@@ -50,6 +50,15 @@ if state ~= 'running' then
 	return false
 end
 
+-- Send out a log message
+redis.call('publish', 'log', cjson.encode({
+	jid     = jid,
+	event   = 'failed',
+	worker  = worker,
+	group   = group,
+	message = message
+}))
+
 if redis.call('zscore', 'ql:tracked', jid) ~= false then
 	redis.call('publish', 'failed', jid)
 end

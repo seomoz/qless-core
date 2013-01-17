@@ -33,9 +33,21 @@ if command == 'get' then
 elseif command == 'set' then
 	local option = assert(ARGV[2], 'Config(): Arg "option" missing')
 	local value  = assert(ARGV[3], 'Config(): Arg "value" missing')
+	-- Send out a log message
+	redis.call('publish', 'log', cjson.encode({
+		event  = 'config set',
+		option = option
+	}))
+
 	redis.call('hset', 'ql:config', option, value)
 elseif command == 'unset' then
 	local option = assert(ARGV[2], 'Config(): Arg "option" missing')
+	-- Send out a log message
+	redis.call('publish', 'log', cjson.encode({
+		event  = 'config unset',
+		option = option
+	}))
+
 	redis.call('hdel', 'ql:config', option)
 else
 	error('Config(): Unrecognized command ' .. command)
