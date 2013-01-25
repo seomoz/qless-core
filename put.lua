@@ -32,7 +32,8 @@ end
 local queue    = assert(KEYS[1]               , 'Put(): Key "queue" missing')
 local jid      = assert(ARGV[1]               , 'Put(): Arg "jid" missing')
 local klass    = assert(ARGV[2]               , 'Put(): Arg "klass" missing')
-local data     = assert(cjson.decode(ARGV[3]) , 'Put(): Arg "data" missing or not JSON: '    .. tostring(ARGV[3]))
+local raw_data = ARGV[3]
+local data     = assert(cjson.decode(raw_data) , 'Put(): Arg "data" missing or not JSON: '   .. tostring(raw_data))
 local now      = assert(tonumber(ARGV[4])     , 'Put(): Arg "now" missing or not a number: ' .. tostring(ARGV[4]))
 local delay    = assert(tonumber(ARGV[5])     , 'Put(): Arg "delay" not a number: '          .. tostring(ARGV[5]))
 
@@ -107,7 +108,7 @@ end
 redis.call('hmset', 'ql:j:' .. jid,
     'jid'      , jid,
 	'klass'    , klass,
-    'data'     , cjson.encode(data),
+    'data'     , raw_data,
     'priority' , priority,
     'tags'     , cjson.encode(tags),
     'state'    , ((delay > 0) and 'scheduled') or 'waiting',
