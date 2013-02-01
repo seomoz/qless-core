@@ -6,7 +6,7 @@
 -- will be reflected in the order in which it's popped
 
 if #KEYS ~= 0 then
-	error('Priority(): Got ' .. #KEYS .. ', expected 0')
+  error('Priority(): Got ' .. #KEYS .. ', expected 0')
 end
 
 local jid      = assert(ARGV[1]          , 'Priority(): Arg "jid" missing')
@@ -16,17 +16,17 @@ local priority = assert(tonumber(ARGV[2]), 'Priority(): Arg "priority" missing o
 local queue = redis.call('hget', 'ql:j:' .. jid, 'queue')
 
 if queue == nil then
-	return false
+  return false
 elseif queue == '' then
-	-- Just adjust the priority
-	redis.call('hset', 'ql:j:' .. jid, 'priority', priority)
-	return priority
+  -- Just adjust the priority
+  redis.call('hset', 'ql:j:' .. jid, 'priority', priority)
+  return priority
 else
-	-- Adjust the priority and see if it's a candidate for updating
-	-- its priority in the queue it's currently in
-	if redis.call('zscore', 'ql:q:' .. queue .. '-work', jid) then
-		redis.call('zadd', 'ql:q:' .. queue .. '-work', priority, jid)
-	end
-	redis.call('hset', 'ql:j:' .. jid, 'priority', priority)
-	return priority
+  -- Adjust the priority and see if it's a candidate for updating
+  -- its priority in the queue it's currently in
+  if redis.call('zscore', 'ql:q:' .. queue .. '-work', jid) then
+    redis.call('zadd', 'ql:q:' .. queue .. '-work', priority, jid)
+  end
+  redis.call('hset', 'ql:j:' .. jid, 'priority', priority)
+  return priority
 end

@@ -31,17 +31,17 @@ local depends = assert(cjson.decode(options['depends'] or '[]'), 'Complete(): Ar
 
 -- Delay and depends are not allowed together
 if delay > 0 and #depends > 0 then
-	error('Complete(): "delay" and "depends" are not allowed to be used together')
+  error('Complete(): "delay" and "depends" are not allowed to be used together')
 end
 
 -- Depends doesn't make sense without nextq
 if options['delay'] and nextq == nil then
-	error('Complete(): "delay" cannot be used without a "next".')
+  error('Complete(): "delay" cannot be used without a "next".')
 end
 
 -- Depends doesn't make sense without nextq
 if options['depends'] and nextq == nil then
-	error('Complete(): "depends" cannot be used without a "next".')
+  error('Complete(): "depends" cannot be used without a "next".')
 end
 
 -- The bin is midnight of the provided day
@@ -52,7 +52,7 @@ local bin = now - (now % 86400)
 local lastworker, history, state, priority, retries = unpack(redis.call('hmget', 'ql:j:' .. jid, 'worker', 'history', 'state', 'priority', 'retries', 'dependents'))
 
 if (lastworker ~= worker) or (state ~= 'running') then
-	return false
+  return false
 end
 
 -- Now we can assume that the worker does own the job. We need to
@@ -66,7 +66,7 @@ history = cjson.decode(history)
 history[#history]['done'] = math.floor(now)
 
 if data then
-	redis.call('hset', 'ql:j:' .. jid, 'data', cjson.encode(data))
+  redis.call('hset', 'ql:j:' .. jid, 'data', cjson.encode(data))
 end
 
 -- Remove the job from the previous queue
@@ -83,14 +83,14 @@ local waiting = math.floor(now) - history[#history]['popped']
 local count, mean, vk = unpack(redis.call('hmget', 'ql:s:run:' .. bin .. ':' .. queue, 'total', 'mean', 'vk'))
 count = count or 0
 if count == 0 then
-	mean  = waiting
-	vk    = 0
-	count = 1
+  mean  = waiting
+  vk    = 0
+  count = 1
 else
-	count = count + 1
-	local oldmean = mean
-	mean  = mean + (waiting - mean) / count
-	vk    = vk + (waiting - mean) * (waiting - oldmean)
+  count = count + 1
+  local oldmean = mean
+  mean  = mean + (waiting - mean) / count
+  vk    = vk + (waiting - mean) * (waiting - oldmean)
 end
 -- Now, update the histogram
 -- - `s1`, `s2`, ..., -- second-resolution histogram counts
@@ -99,14 +99,14 @@ end
 -- - `d1`, `d2`, ..., -- day-resolution
 waiting = math.floor(waiting)
 if waiting < 60 then -- seconds
-	redis.call('hincrby', 'ql:s:run:' .. bin .. ':' .. queue, 's' .. waiting, 1)
+  redis.call('hincrby', 'ql:s:run:' .. bin .. ':' .. queue, 's' .. waiting, 1)
 elseif waiting < 3600 then -- minutes
-	redis.call('hincrby', 'ql:s:run:' .. bin .. ':' .. queue, 'm' .. math.floor(waiting / 60), 1)
+  redis.call('hincrby', 'ql:s:run:' .. bin .. ':' .. queue, 'm' .. math.floor(waiting / 60), 1)
 elseif waiting < 86400 then -- hours
-	redis.call('hincrby', 'ql:s:run:' .. bin .. ':' .. queue, 'h' .. math.floor(waiting / 3600), 1)
+  redis.call('hincrby', 'ql:s:run:' .. bin .. ':' .. queue, 'h' .. math.floor(waiting / 3600), 1)
 else -- days
-	redis.call('hincrby', 'ql:s:run:' .. bin .. ':' .. queue, 'd' .. math.floor(waiting / 86400), 1)
-end		
+  redis.call('hincrby', 'ql:s:run:' .. bin .. ':' .. queue, 'd' .. math.floor(waiting / 86400), 1)
+end    
 redis.call('hmset', 'ql:s:run:' .. bin .. ':' .. queue, 'total', count, 'mean', mean, 'vk', vk)
 ----------------------------------------------------------
 
@@ -114,105 +114,105 @@ redis.call('hmset', 'ql:s:run:' .. bin .. ':' .. queue, 'total', count, 'mean', 
 redis.call('zrem', 'ql:w:' .. worker .. ':jobs', jid)
 
 if redis.call('zscore', 'ql:tracked', jid) ~= false then
-	redis.call('publish', 'completed', jid)
+  redis.call('publish', 'completed', jid)
 end
 
 if nextq then
-	-- Enqueue the job
-	table.insert(history, {
-		q     = nextq,
-		put   = math.floor(now)
-	})
-	
-	-- We're going to make sure that this queue is in the
-	-- set of known queues
-	if redis.call('zscore', 'ql:queues', nextq) == false then
-		redis.call('zadd', 'ql:queues', now, nextq)
-	end
-	
-	redis.call('hmset', 'ql:j:' .. jid, 'state', 'waiting', 'worker', '', 'failure', '{}',
-		'queue', nextq, 'expires', 0, 'history', cjson.encode(history), 'remaining', tonumber(retries))
-	
-	if delay > 0 then
-	    redis.call('zadd', 'ql:q:' .. nextq .. '-scheduled', now + delay, jid)
-		return 'scheduled'
-	else
-		-- These are the jids we legitimately have to wait on
-		local count = 0
-		for i, j in ipairs(depends) do
-			-- Make sure it's something other than 'nil' or complete.
-			local state = redis.call('hget', 'ql:j:' .. j, 'state')
-			if (state and state ~= 'complete') then
-				count = count + 1
-				redis.call('sadd', 'ql:j:' .. j .. '-dependents'  , jid)
-				redis.call('sadd', 'ql:j:' .. jid .. '-dependencies', j)
-			end
-		end
-		if count > 0 then
-			redis.call('zadd', 'ql:q:' .. nextq .. '-depends', now, jid)
-			redis.call('hset', 'ql:j:' .. jid, 'state', 'depends')
-			return 'depends'
-		else
-			redis.call('zadd', 'ql:q:' .. nextq .. '-work', priority - (now / 10000000000), jid)
-			return 'waiting'
-		end
-	end
+  -- Enqueue the job
+  table.insert(history, {
+    q     = nextq,
+    put   = math.floor(now)
+  })
+  
+  -- We're going to make sure that this queue is in the
+  -- set of known queues
+  if redis.call('zscore', 'ql:queues', nextq) == false then
+    redis.call('zadd', 'ql:queues', now, nextq)
+  end
+  
+  redis.call('hmset', 'ql:j:' .. jid, 'state', 'waiting', 'worker', '', 'failure', '{}',
+    'queue', nextq, 'expires', 0, 'history', cjson.encode(history), 'remaining', tonumber(retries))
+  
+  if delay > 0 then
+      redis.call('zadd', 'ql:q:' .. nextq .. '-scheduled', now + delay, jid)
+    return 'scheduled'
+  else
+    -- These are the jids we legitimately have to wait on
+    local count = 0
+    for i, j in ipairs(depends) do
+      -- Make sure it's something other than 'nil' or complete.
+      local state = redis.call('hget', 'ql:j:' .. j, 'state')
+      if (state and state ~= 'complete') then
+        count = count + 1
+        redis.call('sadd', 'ql:j:' .. j .. '-dependents'  , jid)
+        redis.call('sadd', 'ql:j:' .. jid .. '-dependencies', j)
+      end
+    end
+    if count > 0 then
+      redis.call('zadd', 'ql:q:' .. nextq .. '-depends', now, jid)
+      redis.call('hset', 'ql:j:' .. jid, 'state', 'depends')
+      return 'depends'
+    else
+      redis.call('zadd', 'ql:q:' .. nextq .. '-work', priority - (now / 10000000000), jid)
+      return 'waiting'
+    end
+  end
 else
-	redis.call('hmset', 'ql:j:' .. jid, 'state', 'complete', 'worker', '', 'failure', '{}',
-		'queue', '', 'expires', 0, 'history', cjson.encode(history), 'remaining', tonumber(retries))
-	
-	-- Do the completion dance
-	local count, time = unpack(redis.call('hmget', 'ql:config', 'jobs-history-count', 'jobs-history'))
-	
-	-- These are the default values
-	count = tonumber(count or 50000)
-	time  = tonumber(time  or 7 * 24 * 60 * 60)
-	
-	-- Schedule this job for destructination eventually
-	redis.call('zadd', 'ql:completed', now, jid)
-	
-	-- Now look at the expired job data. First, based on the current time
-	local jids = redis.call('zrangebyscore', 'ql:completed', 0, now - time)
-	-- Any jobs that need to be expired... delete
-	for index, jid in ipairs(jids) do
-		local tags = cjson.decode(redis.call('hget', 'ql:j:' .. jid, 'tags') or '{}')
-		for i, tag in ipairs(tags) do
-			redis.call('zrem', 'ql:t:' .. tag, jid)
-			redis.call('zincrby', 'ql:tags', -1, tag)
-		end
-		redis.call('del', 'ql:j:' .. jid)
-	end
-	-- And now remove those from the queued-for-cleanup queue
-	redis.call('zremrangebyscore', 'ql:completed', 0, now - time)
-	
-	-- Now take the all by the most recent 'count' ids
-	jids = redis.call('zrange', 'ql:completed', 0, (-1-count))
-	for index, jid in ipairs(jids) do
-		local tags = cjson.decode(redis.call('hget', 'ql:j:' .. jid, 'tags') or '{}')
-		for i, tag in ipairs(tags) do
-			redis.call('zrem', 'ql:t:' .. tag, jid)
-			redis.call('zincrby', 'ql:tags', -1, tag)
-		end
-		redis.call('del', 'ql:j:' .. jid)
-	end
-	redis.call('zremrangebyrank', 'ql:completed', 0, (-1-count))
-	
-	-- Alright, if this has any dependents, then we should go ahead
-	-- and unstick those guys.
-	for i, j in ipairs(redis.call('smembers', 'ql:j:' .. jid .. '-dependents')) do
-		redis.call('srem', 'ql:j:' .. j .. '-dependencies', jid)
-		if redis.call('scard', 'ql:j:' .. j .. '-dependencies') == 0 then
-			local q, p = unpack(redis.call('hmget', 'ql:j:' .. j, 'queue', 'priority'))
-			if q then
-				redis.call('zrem', 'ql:q:' .. q .. '-depends', j)
-				redis.call('zadd', 'ql:q:' .. q .. '-work', p, j)
-				redis.call('hset', 'ql:j:' .. j, 'state', 'waiting')
-			end
-		end
-	end
-	
-	-- Delete our dependents key
-	redis.call('del', 'ql:j:' .. jid .. '-dependents')
-	
-	return 'complete'
+  redis.call('hmset', 'ql:j:' .. jid, 'state', 'complete', 'worker', '', 'failure', '{}',
+    'queue', '', 'expires', 0, 'history', cjson.encode(history), 'remaining', tonumber(retries))
+  
+  -- Do the completion dance
+  local count, time = unpack(redis.call('hmget', 'ql:config', 'jobs-history-count', 'jobs-history'))
+  
+  -- These are the default values
+  count = tonumber(count or 50000)
+  time  = tonumber(time  or 7 * 24 * 60 * 60)
+  
+  -- Schedule this job for destructination eventually
+  redis.call('zadd', 'ql:completed', now, jid)
+  
+  -- Now look at the expired job data. First, based on the current time
+  local jids = redis.call('zrangebyscore', 'ql:completed', 0, now - time)
+  -- Any jobs that need to be expired... delete
+  for index, jid in ipairs(jids) do
+    local tags = cjson.decode(redis.call('hget', 'ql:j:' .. jid, 'tags') or '{}')
+    for i, tag in ipairs(tags) do
+      redis.call('zrem', 'ql:t:' .. tag, jid)
+      redis.call('zincrby', 'ql:tags', -1, tag)
+    end
+    redis.call('del', 'ql:j:' .. jid)
+  end
+  -- And now remove those from the queued-for-cleanup queue
+  redis.call('zremrangebyscore', 'ql:completed', 0, now - time)
+  
+  -- Now take the all by the most recent 'count' ids
+  jids = redis.call('zrange', 'ql:completed', 0, (-1-count))
+  for index, jid in ipairs(jids) do
+    local tags = cjson.decode(redis.call('hget', 'ql:j:' .. jid, 'tags') or '{}')
+    for i, tag in ipairs(tags) do
+      redis.call('zrem', 'ql:t:' .. tag, jid)
+      redis.call('zincrby', 'ql:tags', -1, tag)
+    end
+    redis.call('del', 'ql:j:' .. jid)
+  end
+  redis.call('zremrangebyrank', 'ql:completed', 0, (-1-count))
+  
+  -- Alright, if this has any dependents, then we should go ahead
+  -- and unstick those guys.
+  for i, j in ipairs(redis.call('smembers', 'ql:j:' .. jid .. '-dependents')) do
+    redis.call('srem', 'ql:j:' .. j .. '-dependencies', jid)
+    if redis.call('scard', 'ql:j:' .. j .. '-dependencies') == 0 then
+      local q, p = unpack(redis.call('hmget', 'ql:j:' .. j, 'queue', 'priority'))
+      if q then
+        redis.call('zrem', 'ql:q:' .. q .. '-depends', j)
+        redis.call('zadd', 'ql:q:' .. q .. '-work', p, j)
+        redis.call('hset', 'ql:j:' .. j, 'state', 'waiting')
+      end
+    end
+  end
+  
+  -- Delete our dependents key
+  redis.call('del', 'ql:j:' .. jid .. '-dependents')
+  
+  return 'complete'
 end
