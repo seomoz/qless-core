@@ -21,6 +21,7 @@ local queue    = assert(ARGV[2]               , 'Retry(): Arg "queue" missing')
 local worker   = assert(ARGV[3]               , 'Retry(): Arg "worker" missing')
 local now      = assert(tonumber(ARGV[4])     , 'Retry(): Arg "now" missing')
 local delay    = assert(tonumber(ARGV[5] or 0), 'Retry(): Arg "delay" not a number: ' .. tostring(ARGV[5]))
+local message  = ARGV[6]
 
 -- Let's see what the old priority, history and tags were
 local oldqueue, state, retries, oldworker, priority = unpack(redis.call('hmget', 'ql:j:' .. jid, 'queue', 'state', 'retries', 'worker', 'priority'))
@@ -47,10 +48,17 @@ if remaining < 0 then
 	history = cjson.decode(history or '[]')
 	history[#history]['failed'] = now
 	
+	local full_failure_message =  'Job exhuasted retries in queue "' .. queue .. '".'
+
+	-- Append failure message if supplied
+	if message then
+		full_failure_message = full_failure_message .. "\n\nLast failure:\n" .. message
+	end
+
 	redis.call('hmset', 'ql:j:' .. jid, 'state', 'failed', 'worker', '',
 		'expires', '', 'history', cjson.encode(history), 'failure', cjson.encode({
 			['group']   = group,
-			['message'] = 'Job exhuasted retries in queue "' .. queue .. '"',
+			['message'] = full_failure_message,
 			['when']    = now,
 			['worker']  = worker
 		}))
