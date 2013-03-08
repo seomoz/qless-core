@@ -13,7 +13,7 @@
 -- number is returned.
 
 if #KEYS ~= 0 then
-	error('Retry(): Got ' .. #KEYS .. ', expected 0')
+  error('Retry(): Got ' .. #KEYS .. ', expected 0')
 end
 
 local jid      = assert(ARGV[1]               , 'Retry(): Arg "jid" missing')
@@ -27,7 +27,7 @@ local oldqueue, state, retries, oldworker, priority = unpack(redis.call('hmget',
 
 -- If this isn't the worker that owns
 if oldworker ~= worker or (state ~= 'running') then
-	return false
+  return false
 end
 
 -- Remove it from the locks key of the old queue
@@ -39,35 +39,35 @@ local remaining = redis.call('hincrby', 'ql:j:' .. jid, 'remaining', -1)
 redis.call('zrem', 'ql:w:' .. worker .. ':jobs', jid)
 
 if remaining < 0 then
-	-- Now remove the instance from the schedule, and work queues for the queue it's in
-	local group = 'failed-retries-' .. queue
-	-- First things first, we should get the history
-	local history = redis.call('hget', 'ql:j:' .. jid, 'history')
-	-- Now, take the element of the history for which our provided worker is the worker, and update 'failed'
-	history = cjson.decode(history or '[]')
-	history[#history]['failed'] = now
-	
-	redis.call('hmset', 'ql:j:' .. jid, 'state', 'failed', 'worker', '',
-		'expires', '', 'history', cjson.encode(history), 'failure', cjson.encode({
-			['group']   = group,
-			['message'] = 'Job exhuasted retries in queue "' .. queue .. '"',
-			['when']    = now,
-			['worker']  = worker
-		}))
-	
-	-- Add this type of failure to the list of failures
-	redis.call('sadd', 'ql:failures', group)
-	-- And add this particular instance to the failed types
-	redis.call('lpush', 'ql:f:' .. group, jid)
+  -- Now remove the instance from the schedule, and work queues for the queue it's in
+  local group = 'failed-retries-' .. queue
+  -- First things first, we should get the history
+  local history = redis.call('hget', 'ql:j:' .. jid, 'history')
+  -- Now, take the element of the history for which our provided worker is the worker, and update 'failed'
+  history = cjson.decode(history or '[]')
+  history[#history]['failed'] = now
+  
+  redis.call('hmset', 'ql:j:' .. jid, 'state', 'failed', 'worker', '',
+    'expires', '', 'history', cjson.encode(history), 'failure', cjson.encode({
+      ['group']   = group,
+      ['message'] = 'Job exhuasted retries in queue "' .. queue .. '"',
+      ['when']    = now,
+      ['worker']  = worker
+    }))
+  
+  -- Add this type of failure to the list of failures
+  redis.call('sadd', 'ql:failures', group)
+  -- And add this particular instance to the failed types
+  redis.call('lpush', 'ql:f:' .. group, jid)
 else
-	-- Put it in the queue again with a delay. Like put()
-	if delay > 0 then
-		redis.call('zadd', 'ql:q:' .. queue .. '-scheduled', now + delay, jid)
-		redis.call('hset', 'ql:j:' .. jid, 'state', 'scheduled')
-	else
-		redis.call('zadd', 'ql:q:' .. queue .. '-work', priority - (now / 10000000000), jid)
-		redis.call('hset', 'ql:j:' .. jid, 'state', 'waiting')
-	end
+  -- Put it in the queue again with a delay. Like put()
+  if delay > 0 then
+    redis.call('zadd', 'ql:q:' .. queue .. '-scheduled', now + delay, jid)
+    redis.call('hset', 'ql:j:' .. jid, 'state', 'scheduled')
+  else
+    redis.call('zadd', 'ql:q:' .. queue .. '-work', priority - (now / 10000000000), jid)
+    redis.call('hset', 'ql:j:' .. jid, 'state', 'waiting')
+  end
 end
 
 return remaining

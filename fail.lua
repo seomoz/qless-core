@@ -39,7 +39,7 @@ local data    = ARGV[6]
 local bin = now - (now % 86400)
 
 if data then
-	data = cjson.decode(data)
+  data = cjson.decode(data)
 end
 
 -- First things first, we should get the history
@@ -47,11 +47,11 @@ local history, queue, state = unpack(redis.call('hmget', 'ql:j:' .. jid, 'histor
 
 -- If the job has been completed, we cannot fail it
 if state ~= 'running' then
-	return false
+  return false
 end
 
 if redis.call('zscore', 'ql:tracked', jid) ~= false then
-	redis.call('publish', 'failed', jid)
+  redis.call('publish', 'failed', jid)
 end
 
 -- Remove this job from the jobs that the worker that was running it has
@@ -60,18 +60,18 @@ redis.call('zrem', 'ql:w:' .. worker .. ':jobs', jid)
 -- Now, take the element of the history for which our provided worker is the worker, and update 'failed'
 history = cjson.decode(history or '[]')
 if #history > 0 then
-	for i=#history,1,-1 do
-		if history[i]['worker'] == worker then
-			history[i]['failed'] = math.floor(now)
-		end
-	end
+  for i=#history,1,-1 do
+    if history[i]['worker'] == worker then
+      history[i]['failed'] = math.floor(now)
+    end
+  end
 else
-	history = {
-		{
-			worker = worker,
-			failed = math.floor(now)
-		}
-	}
+  history = {
+    {
+      worker = worker,
+      failed = math.floor(now)
+    }
+  }
 end
 
 -- Increment the number of failures for that queue for the
@@ -86,16 +86,16 @@ redis.call('zrem', 'ql:q:' .. queue .. '-scheduled', jid)
 
 -- The reason that this appears here is that the above will fail if the job doesn't exist
 if data then
-	redis.call('hset', 'ql:j:' .. jid, 'data', cjson.encode(data))
+  redis.call('hset', 'ql:j:' .. jid, 'data', cjson.encode(data))
 end
 
 redis.call('hmset', 'ql:j:' .. jid, 'state', 'failed', 'worker', '',
-	'expires', '', 'history', cjson.encode(history), 'failure', cjson.encode({
-		['group']   = group,
-		['message'] = message,
-		['when']    = math.floor(now),
-		['worker']  = worker
-	}))
+  'expires', '', 'history', cjson.encode(history), 'failure', cjson.encode({
+    ['group']   = group,
+    ['message'] = message,
+    ['when']    = math.floor(now),
+    ['worker']  = worker
+  }))
 
 -- Add this group of failure to the list of failures
 redis.call('sadd', 'ql:failures', group)

@@ -23,7 +23,7 @@ local _hb, _qhb = unpack(redis.call('hmget', 'ql:config', 'heartbeat', queue .. 
 local expires   = now + tonumber(_qhb or _hb or 60)
 
 if data then
-	data = cjson.decode(data)
+  data = cjson.decode(data)
 end
 
 -- First, let's see if the worker still owns this job, and there is a worker
@@ -38,11 +38,11 @@ else
     else
         redis.call('hmset', 'ql:j:' .. jid, 'expires', expires, 'worker', worker)
     end
-	
-	-- Update hwen this job was last updated on that worker
-	-- Add this job to the list of jobs handled by this worker
-	redis.call('zadd', 'ql:w:' .. worker .. ':jobs', expires, jid)
-	
+  
+  -- Update hwen this job was last updated on that worker
+  -- Add this job to the list of jobs handled by this worker
+  redis.call('zadd', 'ql:w:' .. worker .. ':jobs', expires, jid)
+  
     -- And now we should just update the locks
     local queue = redis.call('hget', 'ql:j:' .. jid, 'queue')
     redis.call('zadd', 'ql:q:'.. queue .. '-locks', expires, jid)
