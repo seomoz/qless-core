@@ -70,7 +70,7 @@ for index, jid in ipairs(redis.call('zrangebyscore', key .. '-locks', 0, now, 'L
 		redis.call('hmset', 'ql:j:' .. jid, 'state', 'failed', 'worker', '',
 			'expires', '', 'history', cjson.encode(history), 'failure', cjson.encode({
 				['group']   = group,
-				['message'] = 'Job exhuasted retries in queue "' .. queue .. '"',
+				['message'] = 'Job exhausted retries in queue "' .. queue .. '"',
 				['when']    = now,
 				['worker']  = history[#history]['worker']
 			}))
