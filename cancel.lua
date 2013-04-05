@@ -9,64 +9,67 @@
 
 if #KEYS > 0 then error('Cancel(): No Keys should be provided') end
 
-local jid    = assert(ARGV[1], 'Cancel(): Arg "jid" missing.')
+function cancel(jid)
+  -- Find any stage it's associated with and remove its from that stage
+  local state, queue, failure, worker = unpack(redis.call('hmget', 'ql:j:' .. jid, 'state', 'queue', 'failure', 'worker'))
 
--- Find any stage it's associated with and remove its from that stage
-local state, queue, failure, worker = unpack(redis.call('hmget', 'ql:j:' .. jid, 'state', 'queue', 'failure', 'worker'))
-
-if state == 'complete' then
-  return false
-else
-  -- If this job has dependents, then we should probably fail
-  if redis.call('scard', 'ql:j:' .. jid .. '-dependents') > 0 then
-    error('Cancel(): ' .. jid .. ' has un-canceled jobs that depend on it')
-  end
-
-  -- Remove this job from whatever worker has it, if any
-  if worker then
-    redis.call('zrem', 'ql:w:' .. worker .. ':jobs', jid)
-  end
-
-  -- Remove it from that queue
-  if queue then
-    redis.call('zrem', 'ql:q:' .. queue .. '-work', jid)
-    redis.call('zrem', 'ql:q:' .. queue .. '-locks', jid)
-    redis.call('zrem', 'ql:q:' .. queue .. '-scheduled', jid)
-    redis.call('zrem', 'ql:q:' .. queue .. '-depends', jid)
-  end
-
-  -- We should probably go through all our dependencies and remove ourselves
-  -- from the list of dependents
-  for i, j in ipairs(redis.call('smembers', 'ql:j:' .. jid .. '-dependencies')) do
-    redis.call('srem', 'ql:j:' .. j .. '-dependents', jid)
-  end
-
-  -- Delete any notion of dependencies it has
-  redis.call('del', 'ql:j:' .. jid .. '-dependencies')
-
-  -- If we're in the failed state, remove all of our data
-  if state == 'failed' then
-    failure = cjson.decode(failure)
-    -- We need to make this remove it from the failed queues
-    redis.call('lrem', 'ql:f:' .. failure.group, 0, jid)
-    if redis.call('llen', 'ql:f:' .. failure.group) == 0 then
-      redis.call('srem', 'ql:failures', failure.group)
+  if state == 'complete' then
+    return false
+  else
+    -- If this job has dependents, then we should probably fail
+    if redis.call('scard', 'ql:j:' .. jid .. '-dependents') > 0 then
+      error('Cancel(): ' .. jid .. ' has un-canceled jobs that depend on it')
     end
-  end
 
-  -- Remove it as a job that's tagged with this particular tag
-  local tags = cjson.decode(redis.call('hget', 'ql:j:' .. jid, 'tags') or '{}')
-  for i, tag in ipairs(tags) do
-    redis.call('zrem', 'ql:t:' .. tag, jid)
-    redis.call('zincrby', 'ql:tags', -1, tag)
-  end
+    -- Remove this job from whatever worker has it, if any
+    if worker then
+      redis.call('zrem', 'ql:w:' .. worker .. ':jobs', jid)
+    end
 
-  -- If the job was being tracked, we should notify
-  if redis.call('zscore', 'ql:tracked', jid) ~= false then
-    redis.call('publish', 'canceled', jid)
-  end
+    -- Remove it from that queue
+    if queue then
+      redis.call('zrem', 'ql:q:' .. queue .. '-work', jid)
+      redis.call('zrem', 'ql:q:' .. queue .. '-locks', jid)
+      redis.call('zrem', 'ql:q:' .. queue .. '-scheduled', jid)
+      redis.call('zrem', 'ql:q:' .. queue .. '-depends', jid)
+    end
 
-  -- Just go ahead and delete our data
-  redis.call('del', 'ql:j:' .. jid)
+    -- We should probably go through all our dependencies and remove ourselves
+    -- from the list of dependents
+    for i, j in ipairs(redis.call('smembers', 'ql:j:' .. jid .. '-dependencies')) do
+      redis.call('srem', 'ql:j:' .. j .. '-dependents', jid)
+    end
+
+    -- Delete any notion of dependencies it has
+    redis.call('del', 'ql:j:' .. jid .. '-dependencies')
+
+    -- If we're in the failed state, remove all of our data
+    if state == 'failed' then
+      failure = cjson.decode(failure)
+      -- We need to make this remove it from the failed queues
+      redis.call('lrem', 'ql:f:' .. failure.group, 0, jid)
+      if redis.call('llen', 'ql:f:' .. failure.group) == 0 then
+        redis.call('srem', 'ql:failures', failure.group)
+      end
+    end
+
+    -- Remove it as a job that's tagged with this particular tag
+    local tags = cjson.decode(redis.call('hget', 'ql:j:' .. jid, 'tags') or '{}')
+    for i, tag in ipairs(tags) do
+      redis.call('zrem', 'ql:t:' .. tag, jid)
+      redis.call('zincrby', 'ql:tags', -1, tag)
+    end
+
+    -- If the job was being tracked, we should notify
+    if redis.call('zscore', 'ql:tracked', jid) ~= false then
+      redis.call('publish', 'canceled', jid)
+    end
+
+    -- Just go ahead and delete our data
+    redis.call('del', 'ql:j:' .. jid)
+  end
 end
+
+local jid    = assert(ARGV[1], 'Cancel(): Arg "jid" missing.')
+cancel(jid)
 
