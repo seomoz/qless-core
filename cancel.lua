@@ -9,7 +9,11 @@
 
 if #KEYS > 0 then error('Cancel(): No Keys should be provided') end
 
-function cancel(jid)
+function cancel(jid, jid_set)
+  if not jid_set[jid] then
+    error('Cancel(): ' .. jid .. ' is a dependency of one of the jobs but is not in the provided jid set')
+  end
+
   -- Find any stage it's associated with and remove its from that stage
   local state, queue, failure, worker = unpack(redis.call('hmget', 'ql:j:' .. jid, 'state', 'queue', 'failure', 'worker'))
 
@@ -17,8 +21,9 @@ function cancel(jid)
     return false
   else
     -- If this job has dependents, then we should probably fail
-    if redis.call('scard', 'ql:j:' .. jid .. '-dependents') > 0 then
-      error('Cancel(): ' .. jid .. ' has un-canceled jobs that depend on it')
+    local dependents = redis.call('smembers', 'ql:j:' .. jid .. '-dependents')
+    for _, dependent_jid in ipairs(dependents) do
+      cancel(dependent_jid, jid_set)
     end
 
     -- Remove this job from whatever worker has it, if any
@@ -70,6 +75,17 @@ function cancel(jid)
   end
 end
 
-local jid    = assert(ARGV[1], 'Cancel(): Arg "jid" missing.')
-cancel(jid)
+-- Taken from: http://www.lua.org/pil/11.5.html
+function to_set(list)
+  local set = {}
+  for _, l in ipairs(list) do set[l] = true end
+  return set
+end
+
+local jids    = assert(ARGV, 'Cancel(): Arg "jid" missing.')
+local jid_set = to_set(jids)
+
+for _, jid in ipairs(jids) do
+  cancel(jid, jid_set)
+end
 
