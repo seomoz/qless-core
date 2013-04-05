@@ -9,7 +9,7 @@
 
 if #KEYS > 0 then error('Cancel(): No Keys should be provided') end
 
-function cancel(jid, jid_set)
+local function cancel(jid, jid_set)
   if not jid_set[jid] then
     error('Cancel(): ' .. jid .. ' is a dependency of one of the jobs but is not in the provided jid set')
   end
@@ -76,7 +76,7 @@ function cancel(jid, jid_set)
 end
 
 -- Taken from: http://www.lua.org/pil/11.5.html
-function to_set(list)
+local function to_set(list)
   local set = {}
   for _, l in ipairs(list) do set[l] = true end
   return set
