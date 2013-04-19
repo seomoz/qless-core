@@ -55,7 +55,7 @@ if delay > 0 and #depends > 0 then
 end
 
 -- Send out a log message
-redis.call('publish', 'log', cjson.encode({
+redis.call('publish', 'ql:log', cjson.encode({
 	jid   = jid,
 	event = 'put',
 	queue = queue
@@ -81,7 +81,7 @@ end
 if worker then
 	redis.call('zrem', 'ql:w:' .. worker .. ':jobs', jid)
 	-- We need to inform whatever worker had that job
-	redis.call('publish', worker, cjson.encode({
+	redis.call('publish', 'ql:w:' .. worker, cjson.encode({
 		jid   = jid,
 		event = 'put',
 		queue = queue

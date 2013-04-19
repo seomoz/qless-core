@@ -33,13 +33,13 @@ local function cancel(jid, jid_set)
       event  = 'canceled',
       queue  = queue
     })
-    redis.call('publish', 'log', encoded)
+    redis.call('publish', 'ql:log', encoded)
 
     -- Remove this job from whatever worker has it, if any
     if worker then
       redis.call('zrem', 'ql:w:' .. worker .. ':jobs', jid)
       -- If necessary, send a message to the appropriate worker, too
-      redis.call('publish', worker, encoded)
+      redis.call('publish', 'ql:w:' .. worker, encoded)
     end
 
     -- Remove it from that queue

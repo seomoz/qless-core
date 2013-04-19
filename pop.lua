@@ -56,8 +56,8 @@ for index, jid in ipairs(redis.call('zrangebyscore', key .. '-locks', 0, now, 'L
 		event  = 'lock lost',
 		worker = w
 	})
-	redis.call('publish', w, encoded)
-	redis.call('publish', 'log', encoded)
+	redis.call('publish', 'ql:w:' .. w, encoded)
+	redis.call('publish', 'ql:log', encoded)
 	
 	-- For each of these, decrement their retries. If any of them
 	-- have exhausted their retries, then we should mark them as

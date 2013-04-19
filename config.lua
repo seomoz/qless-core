@@ -34,7 +34,7 @@ elseif command == 'set' then
 	local option = assert(ARGV[2], 'Config(): Arg "option" missing')
 	local value  = assert(ARGV[3], 'Config(): Arg "value" missing')
 	-- Send out a log message
-	redis.call('publish', 'log', cjson.encode({
+	redis.call('publish', 'ql:log', cjson.encode({
 		event  = 'config set',
 		option = option
 	}))
@@ -43,7 +43,7 @@ elseif command == 'set' then
 elseif command == 'unset' then
 	local option = assert(ARGV[2], 'Config(): Arg "option" missing')
 	-- Send out a log message
-	redis.call('publish', 'log', cjson.encode({
+	redis.call('publish', 'ql:log', cjson.encode({
 		event  = 'config unset',
 		option = option
 	}))

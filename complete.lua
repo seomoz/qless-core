@@ -119,7 +119,7 @@ end
 
 if nextq then
 	-- Send a message out to log
-	redis.call('publish', 'log', cjson.encode({
+	redis.call('publish', 'ql:log', cjson.encode({
 		jid   = jid,
 		event = 'advanced',
 		queue = queue,
@@ -167,7 +167,7 @@ if nextq then
 	end
 else
 	-- Send a message out to log
-	redis.call('publish', 'log', cjson.encode({
+	redis.call('publish', 'ql:log', cjson.encode({
 		jid   = jid,
 		event = 'completed',
 		queue = queue

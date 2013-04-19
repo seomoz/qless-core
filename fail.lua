@@ -51,7 +51,7 @@ if state ~= 'running' then
 end
 
 -- Send out a log message
-redis.call('publish', 'log', cjson.encode({
+redis.call('publish', 'ql:log', cjson.encode({
 	jid     = jid,
 	event   = 'failed',
 	worker  = worker,
