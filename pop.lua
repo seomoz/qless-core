@@ -53,7 +53,7 @@ for index, jid in ipairs(redis.call('zrangebyscore', key .. '-locks', 0, now, 'L
 	-- Send a message to let the worker know that its lost its lock on the job
 	local encoded = cjson.encode({
 		jid    = jid,
-		event  = 'lock lost',
+		event  = 'lock_lost',
 		worker = w
 	})
 	redis.call('publish', 'ql:w:' .. w, encoded)
