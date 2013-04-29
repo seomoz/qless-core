@@ -236,13 +236,7 @@ function QlessQueue:peek(now, count)
     -- reflect which worker they're on, when the lock expires, 
     -- etc., add them to the locks queue and then we have to 
     -- finally return a list of json blobs
-
-    local response = {}
-    for index, jid in ipairs(keys) do
-        table.insert(response, Qless.job(jid):data())
-    end
-
-    return response
+    return keys
 end
 
 -- This script takes the name of the queue and then checks
@@ -456,7 +450,7 @@ function QlessQueue:pop(now, worker, count)
             redis.call('publish', 'popped', jid)
         end
         
-        table.insert(response, Qless.job(jid):data())
+        table.insert(response, jid)
     end
 
     if #keys > 0 then

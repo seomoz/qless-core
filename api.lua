@@ -82,11 +82,21 @@ QlessAPI.priority = function(now, jid, priority)
 end
 
 QlessAPI.peek = function(now, queue, count)
-    return cjson.encode(Qless.queue(queue):peek(now, count))
+    local jids = Qless.queue(queue):peek(now, count)
+    local response = {}
+    for i, jid in ipairs(jids) do
+        table.insert(response, Qless.job(jid):data())
+    end
+    return cjson.encode(response)
 end
 
 QlessAPI.pop = function(now, queue, worker, count)
-    return cjson.encode(Qless.queue(queue):pop(now, worker, count))
+    local jids = Qless.queue(queue):pop(now, worker, count)
+    local response = {}
+    for i, jid in ipairs(jids) do
+        table.insert(response, Qless.job(jid):data())
+    end
+    return cjson.encode(response)
 end
 
 QlessAPI.pause = function(now, ...)

@@ -77,20 +77,7 @@ function Qless.queues(now, queue)
         local queues = redis.call('zrange', 'ql:queues', 0, -1)
         local response = {}
         for index, qname in ipairs(queues) do
-            local stalled = redis.call(
-                'zcount', 'ql:q:' .. qname .. '-locks', 0, now)
-            table.insert(response, {
-                name      = qname,
-                waiting   = redis.call('zcard', 'ql:q:' .. qname .. '-work'),
-                stalled   = stalled,
-                running   = redis.call(
-                    'zcard', 'ql:q:' .. qname .. '-locks') - stalled,
-                scheduled = redis.call(
-                    'zcard', 'ql:q:' .. qname .. '-scheduled'),
-                depends   = redis.call(
-                    'zcard', 'ql:q:' .. qname .. '-depends'),
-                recurring = redis.call('zcard', 'ql:q:' .. qname .. '-recur')
-            })
+            table.insert(response, Qless.queues(now, qname))
         end
         return response
     end
