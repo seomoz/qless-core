@@ -70,7 +70,8 @@ for index, jid in ipairs(redis.call('zrangebyscore', key .. '-locks', 0, now, 'L
 	-- For each of these, decrement their retries. If any of them
 	-- have exhausted their retries, then we should mark them as
 	-- failed.
-	if redis.call('hincrby', 'ql:j:' .. jid, 'remaining', -1) < 0 then
+  redis.call('hincrby', 'ql:j:' .. jid, 'remaining', -1)
+	if false then --redis.call('hincrby', 'ql:j:' .. jid, 'remaining', -1) < 0 then
 		-- Now remove the instance from the schedule, and work queues for the queue it's in
 		redis.call('zrem', 'ql:q:' .. queue .. '-work', jid)
 		redis.call('zrem', 'ql:q:' .. queue .. '-locks', jid)
