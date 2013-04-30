@@ -7,37 +7,50 @@
 -- This gets all the data associated with the job with the provided id. If the
 -- job is not found, it returns nil. If found, it returns an object with the
 -- appropriate properties
-function QlessJob:data()
+function QlessJob:data(...)
     local job = redis.call(
-        'hmget', 'ql:j:' .. self.jid, 'jid', 'klass', 'state', 'queue',
-        'worker', 'priority', 'expires', 'retries', 'remaining', 'data',
-        'tags', 'history', 'failure')
+            'hmget', 'ql:j:' .. self.jid, 'jid', 'klass', 'state', 'queue',
+            'worker', 'priority', 'expires', 'retries', 'remaining', 'data',
+            'tags', 'history', 'failure')
 
     -- Return nil if we haven't found it
     if not job[1] then
         return nil
     end
 
-    return {
+    local data = {
         jid          = job[1],
         klass        = job[2],
         state        = job[3],
         queue        = job[4],
         worker       = job[5] or '',
-        tracked      = redis.call('zscore', 'ql:tracked', self.jid) ~= false,
+        tracked      = redis.call(
+            'zscore', 'ql:tracked', self.jid) ~= false,
         priority     = tonumber(job[6]),
         expires      = tonumber(job[7]) or 0,
         retries      = tonumber(job[8]),
         remaining    = tonumber(job[9]),
         data         = cjson.decode(job[10]),
         tags         = cjson.decode(job[11]),
-        history      = cjson.decode(job[12]),
+        history      = cjson.decode(job[12] or '{}'),
         failure      = cjson.decode(job[13] or '{}'),
         dependents   = redis.call(
             'smembers', 'ql:j:' .. self.jid .. '-dependents'),
         dependencies = redis.call(
             'smembers', 'ql:j:' .. self.jid .. '-dependencies')
     }
+
+    if #arg > 0 then
+        -- This section could probably be optimized, but I wanted the interface
+        -- in place first
+        local response = {}
+        for index, key in ipairs(arg) do
+            table.insert(response, data[key])
+        end
+        return response
+    else
+        return data
+    end
 end
 
 -- Complete a job and optionally put it in another queue, either scheduled or
@@ -123,36 +136,7 @@ function QlessJob:complete(now, worker, queue, data, ...)
     ----------------------------------------------------------
     -- This is how long we've been waiting to get popped
     local waiting = math.floor(now) - history[#history]['popped']
-    -- Now we'll go through the apparently long and arduous process of update
-    local count, mean, vk = unpack(redis.call('hmget', 'ql:s:run:' .. bin .. ':' .. queue, 'total', 'mean', 'vk'))
-    count = count or 0
-    if count == 0 then
-        mean  = waiting
-        vk    = 0
-        count = 1
-    else
-        count = count + 1
-        local oldmean = mean
-        mean  = mean + (waiting - mean) / count
-        vk    = vk + (waiting - mean) * (waiting - oldmean)
-    end
-    -- Now, update the histogram
-    -- - `s1`, `s2`, ..., -- second-resolution histogram counts
-    -- - `m1`, `m2`, ..., -- minute-resolution
-    -- - `h1`, `h2`, ..., -- hour-resolution
-    -- - `d1`, `d2`, ..., -- day-resolution
-    waiting = math.floor(waiting)
-    if waiting < 60 then -- seconds
-        redis.call('hincrby', 'ql:s:run:' .. bin .. ':' .. queue, 's' .. waiting, 1)
-    elseif waiting < 3600 then -- minutes
-        redis.call('hincrby', 'ql:s:run:' .. bin .. ':' .. queue, 'm' .. math.floor(waiting / 60), 1)
-    elseif waiting < 86400 then -- hours
-        redis.call('hincrby', 'ql:s:run:' .. bin .. ':' .. queue, 'h' .. math.floor(waiting / 3600), 1)
-    else -- days
-        redis.call('hincrby', 'ql:s:run:' .. bin .. ':' .. queue, 'd' .. math.floor(waiting / 86400), 1)
-    end     
-    redis.call('hmset', 'ql:s:run:' .. bin .. ':' .. queue, 'total', count, 'mean', mean, 'vk', vk)
-    ----------------------------------------------------------
+    Qless.queue(queue):stat(now, 'run', waiting)
 
     -- Remove this job from the jobs that the worker that was running it has
     redis.call('zrem', 'ql:w:' .. worker .. ':jobs', self.jid)
@@ -609,4 +593,14 @@ function QlessJob:priority(priority)
         redis.call('hset', 'ql:j:' .. self.jid, 'priority', priority)
         return priority
     end
+end
+
+-- Update the jobs' attributes with the provided dictionary
+function QlessJob:update(data)
+    local tmp = {}
+    for k, v in pairs(data) do
+        table.insert(tmp, k)
+        table.insert(tmp, v)
+    end
+    redis.call('hmset', 'ql:j:' .. self.jid, unpack(tmp))
 end

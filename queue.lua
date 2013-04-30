@@ -95,8 +95,8 @@ function QlessQueue:stats(now, date)
     }
 end
 
--- Instantiate any recurring jobs that are ready
-function QlessQueue:update_recurring_jobs(now, count)
+--! @brief Instantiate any recurring jobs that are ready
+function QlessQueue:check_recurring(now, count)
     local key = 'ql:q:' .. self.name
     -- This is how many jobs we've moved so far
     local moved = 0
@@ -154,19 +154,25 @@ function QlessQueue:update_recurring_jobs(now, count)
     end
 end
 
-function QlessQueue:check_lost_locks(now, count, execute)
+--! @brief Check for any jobs that have been scheduled, and shovel them onto
+--!     the work queue. Returns nothing, but afterwards, up to `count`
+--!     scheduled jobs will be moved into the work queue
+function QlessQueue:check_scheduled(now, count, execute)
     local key = 'ql:q:' .. self.name
     -- zadd is a list of arguments that we'll be able to use to
     -- insert into the work queue
     local zadd = {}
-    local r = redis.call('zrangebyscore', key .. '-scheduled', 0, now, 'LIMIT', 0, count)
-    for index, jid in ipairs(r) do
+    local scheduled = redis.call(
+        'zrangebyscore', key .. '-scheduled', 0, now, 'LIMIT', 0, count)
+    for index, jid in ipairs(scheduled) do
         -- With these in hand, we'll have to go out and find the 
         -- priorities of these jobs, and then we'll insert them
         -- into the work queue and then when that's complete, we'll
         -- remove them from the scheduled queue
-        table.insert(zadd, tonumber(redis.call('hget', 'ql:j:' .. jid, 'priority') or 0))
+        table.insert(zadd,
+            tonumber(redis.call('hget', 'ql:j:' .. jid, 'priority') or 0))
         table.insert(zadd, jid)
+
         -- We should also update them to have the state 'waiting'
         -- instead of 'scheduled'
         redis.call('hset', 'ql:j:' .. jid, 'state', 'waiting')
@@ -176,16 +182,93 @@ function QlessQueue:check_lost_locks(now, count, execute)
         -- Now add these to the work list, and then remove them
         -- from the scheduled list
         redis.call('zadd', key .. '-work', unpack(zadd))
-        redis.call('zrem', key .. '-scheduled', unpack(r))
+        redis.call('zrem', key .. '-scheduled', unpack(scheduled))
     end
-    
-    -- And now we should get up to the maximum number of requested
-    -- work items from the work queue.
-    local keys = {}
-    for index, jid in ipairs(redis.call('zrevrange', key .. '-work', 0, count - 1)) do
-        table.insert(keys, jid)
+end
+
+--! @brief Check for any locks that have been lost
+function QlessQueue:check_locks(now, count)
+    -- Iterate through all the expired locks and add them to the list
+    -- of keys that we'll return
+    return redis.call('zrangebyscore', 'ql:q:' .. self.name .. '-locks', 0, now, 'LIMIT', 0, count)
+end
+
+--! @brief Check for and invalidate any locks that have been lost. Returns the
+--!     list of jids that have been invalidated
+function QlessQueue:invalidate_locks(now, count)
+    local jids = {}
+    -- Iterate through all the expired locks and add them to the list
+    -- of keys that we'll return
+    for index, jid in ipairs(self:check_locks(now, count)) do
+        -- Remove this job from the jobs that the worker that was running it
+        -- has
+        local worker = redis.call('hget', 'ql:j:' .. jid, 'worker')
+        redis.call('zrem', 'ql:w:' .. worker .. ':jobs', jid)
+
+        -- Send a message to let the worker know that its lost its lock on the
+        -- job
+        local encoded = cjson.encode({
+            jid    = jid,
+            event  = 'lock lost',
+            worker = worker
+        })
+        redis.call('publish', worker, encoded)
+        redis.call('publish', 'log', encoded)
+        
+        -- For each of these, decrement their retries. If any of them
+        -- have exhausted their retries, then we should mark them as
+        -- failed.
+        if redis.call('hincrby', 'ql:j:' .. jid, 'remaining', -1) < 0 then
+            -- Now remove the instance from the schedule, and work queues for
+            -- the queue it's in
+            redis.call('zrem', 'ql:q:' .. self.name .. '-work', jid)
+            redis.call('zrem', 'ql:q:' .. self.name .. '-locks', jid)
+            redis.call('zrem', 'ql:q:' .. self.name .. '-scheduled', jid)
+            
+            local group = 'failed-retries-' .. self.name
+            -- First things first, we should get the history
+            local history = redis.call('hget', 'ql:j:' .. jid, 'history')
+            
+            -- Now, take the element of the history for which our provided
+            -- worker is the worker, and update 'failed'
+            history = cjson.decode(history or '[]')
+            history[#history]['failed'] = now
+            
+            redis.call('hmset', 'ql:j:' .. jid, 'state', 'failed', 'worker',
+                '', 'expires', '', 'history', cjson.encode(history),
+                'failure', cjson.encode({
+                    ['group']   = group,
+                    ['message'] =
+                        'Job exhausted retries in queue "' .. self.name .. '"',
+                    ['when']    = now,
+                    ['worker']  = history[#history]['worker']
+                }))
+            
+            -- Add this type of failure to the list of failures
+            redis.call('sadd', 'ql:failures', group)
+            -- And add this particular instance to the failed types
+            redis.call('lpush', 'ql:f:' .. group, jid)
+            
+            if redis.call('zscore', 'ql:tracked', jid) ~= false then
+                redis.call('publish', 'failed', jid)
+            end
+        else
+            table.insert(jids, jid)
+            
+            if redis.call('zscore', 'ql:tracked', jid) ~= false then
+                redis.call('publish', 'stalled', jid)
+            end
+        end
     end
-    return keys
+
+    -- If we got any expired locks, then we should increment the number of
+    -- retries for this stage for this bin. The bin is midnight of the
+    -- provided day
+    local bin = now - (now % 86400)
+    redis.call('hincrby',
+        'ql:s:stats:' .. bin .. ':' .. self.name, 'retries', #jids)
+
+    return jids
 end
 
 -- This script takes the name of the queue and then checks
@@ -200,24 +283,16 @@ end
 --    2) the current time
 function QlessQueue:peek(now, count)
     count = assert(tonumber(count),
-        'Peek(): Arg "count" missing or not a number: ' .. (count or 'nil'))
-    local key     = 'ql:q:' .. self.name
-    local count   = assert(tonumber(count) , 'Peek(): Arg "count" missing or not a number: ' .. (count or 'nil'))
+        'Peek(): Arg "count" missing or not a number: ' .. tostring(count))
+    local key = 'ql:q:' .. self.name
 
-    -- These are the ids that we're going to return
-    local keys = {}
-
-    -- Iterate through all the expired locks and add them to the list
-    -- of keys that we'll return
-    for index, jid in ipairs(redis.call('zrangebyscore', key .. '-locks', 0, now, 'LIMIT', 0, count)) do
-        table.insert(keys, jid)
-    end
+    -- These are the ids that we're going to return. We'll begin with any jobs
+    -- that have lost their locks
+    local jids = self:check_locks()
 
     -- If we still need jobs in order to meet demand, then we should
     -- look for all the recurring jobs that need jobs run
-    if #keys < count then
-        self:update_recurring_jobs(now, count - #keys)
-    end
+    self:check_recurring(now, count - #jids)
 
     -- Now we've checked __all__ the locks for this queue the could
     -- have expired, and are no more than the number requested. If
@@ -225,18 +300,21 @@ function QlessQueue:peek(now, count)
     -- should check if any scheduled items, and if so, we should 
     -- insert them to ensure correctness when pulling off the next
     -- unit of work.
-    if #keys < count then
-        local locks = self:check_lost_locks(now, count - #keys)
-        for k, v in ipairs(locks) do table.insert(keys, v) end
+    self:check_scheduled(now, count - #jids)
+
+    -- With these in place, we can expand this list of jids based on the work
+    -- queue itself and the priorities therein
+    for index, jid in ipairs(redis.call(
+        'zrevrange', key .. '-work', 0, (count - #jids) - 1)) do
+        table.insert(jids, jid)
     end
 
-    -- Alright, now the `keys` table is filled with all the job
-    -- ids which we'll be returning. Now we need to get the 
-    -- metadeata about each of these, update their metadata to
-    -- reflect which worker they're on, when the lock expires, 
-    -- etc., add them to the locks queue and then we have to 
-    -- finally return a list of json blobs
-    return keys
+    return jids
+end
+
+--! @brief Return true if this queue is paused
+function QlessQueue:paused()
+    return redis.call('sismember', 'ql:paused_queues', self.name) == 1
 end
 
 -- This script takes the name of the queue and then checks
@@ -251,144 +329,49 @@ end
 --    2) the number of items to return
 --    3) the current time
 function QlessQueue:pop(now, worker, count)
-    local key     = 'ql:q:' .. self.name
     assert(worker, 'Pop(): Arg "worker" missing')
     count = assert(tonumber(count),
-        'Pop(): Arg "count" missing or not a number: ' .. (count or 'nil'))
+        'Pop(): Arg "count" missing or not a number: ' .. tostring(count))
+    local key = 'ql:q:' .. self.name
 
-    -- We should find the heartbeat interval for this queue
-    -- heartbeat
-    local expires   = now + tonumber(
+    -- We should find the heartbeat interval for this queue heartbeat
+    local expires = now + tonumber(
         Qless.config.get(self.name .. '-heartbeat') or
         Qless.config.get('heartbeat', 60))
 
-    -- The bin is midnight of the provided day
-    -- 24 * 60 * 60 = 86400
-    local bin = now - (now % 86400)
-
-    -- These are the ids that we're going to return
-    local keys = {}
+    -- If this queue is paused, then return no jobs
+    if self:paused() then
+      return {}
+    end
 
     -- Make sure we this worker to the list of seen workers
     redis.call('zadd', 'ql:workers', now, worker)
 
-    if redis.call('sismember', 'ql:paused_queues', self.name) == 1 then
-      return {}
-    end
-
-    -- Iterate through all the expired locks and add them to the list
-    -- of keys that we'll return
-    for index, jid in ipairs(redis.call('zrangebyscore', key .. '-locks', 0, now, 'LIMIT', 0, count)) do
-        -- Remove this job from the jobs that the worker that was running it has
-        local w = redis.call('hget', 'ql:j:' .. jid, 'worker')
-        redis.call('zrem', 'ql:w:' .. w .. ':jobs', jid)
-
-        -- Send a message to let the worker know that its lost its lock on the job
-        local encoded = cjson.encode({
-            jid    = jid,
-            event  = 'lock lost',
-            worker = w
-        })
-        redis.call('publish', w, encoded)
-        redis.call('publish', 'log', encoded)
-        
-        -- For each of these, decrement their retries. If any of them
-        -- have exhausted their retries, then we should mark them as
-        -- failed.
-        if redis.call('hincrby', 'ql:j:' .. jid, 'remaining', -1) < 0 then
-            -- Now remove the instance from the schedule, and work queues for the queue it's in
-            redis.call('zrem', 'ql:q:' .. self.name .. '-work', jid)
-            redis.call('zrem', 'ql:q:' .. self.name .. '-locks', jid)
-            redis.call('zrem', 'ql:q:' .. self.name .. '-scheduled', jid)
-            
-            local group = 'failed-retries-' .. self.name
-            -- First things first, we should get the history
-            local history = redis.call('hget', 'ql:j:' .. jid, 'history')
-            
-            -- Now, take the element of the history for which our provided worker is the worker, and update 'failed'
-            history = cjson.decode(history or '[]')
-            history[#history]['failed'] = now
-            
-            redis.call('hmset', 'ql:j:' .. jid, 'state', 'failed', 'worker', '',
-                'expires', '', 'history', cjson.encode(history), 'failure', cjson.encode({
-                    ['group']   = group,
-                    ['message'] = 'Job exhausted retries in queue "' .. self.name .. '"',
-                    ['when']    = now,
-                    ['worker']  = history[#history]['worker']
-                }))
-            
-            -- Add this type of failure to the list of failures
-            redis.call('sadd', 'ql:failures', group)
-            -- And add this particular instance to the failed types
-            redis.call('lpush', 'ql:f:' .. group, jid)
-            
-            if redis.call('zscore', 'ql:tracked', jid) ~= false then
-                redis.call('publish', 'failed', jid)
-            end
-        else
-            table.insert(keys, jid)
-            
-            if redis.call('zscore', 'ql:tracked', jid) ~= false then
-                redis.call('publish', 'stalled', jid)
-            end
-        end
-    end
+    local jids = self:invalidate_locks(now, count)
     -- Now we've checked __all__ the locks for this queue the could
     -- have expired, and are no more than the number requested.
 
-    -- If we got any expired locks, then we should increment the
-    -- number of retries for this stage for this bin
-    redis.call('hincrby', 'ql:s:stats:' .. bin .. ':' .. self.name, 'retries', #keys)
-
     -- If we still need jobs in order to meet demand, then we should
     -- look for all the recurring jobs that need jobs run
-    if #keys < count then
-        self:update_recurring_jobs(now, count - #keys)
-    end
+    self:check_recurring(now, count - #jids)
 
     -- If we still need values in order to meet the demand, then we 
     -- should check if any scheduled items, and if so, we should 
     -- insert them to ensure correctness when pulling off the next
     -- unit of work.
-    if #keys < count then    
-        -- zadd is a list of arguments that we'll be able to use to
-        -- insert into the work queue
-        local zadd = {}
-        local r = redis.call('zrangebyscore', key .. '-scheduled', 0, now, 'LIMIT', 0, (count - #keys))
-        for index, jid in ipairs(r) do
-            -- With these in hand, we'll have to go out and find the 
-            -- priorities of these jobs, and then we'll insert them
-            -- into the work queue and then when that's complete, we'll
-            -- remove them from the scheduled queue
-            table.insert(zadd, tonumber(redis.call('hget', 'ql:j:' .. jid, 'priority') or 0))
-            table.insert(zadd, jid)
-        end
-        
-        -- Now add these to the work list, and then remove them
-        -- from the scheduled list
-        if #zadd > 0 then
-            redis.call('zadd', key .. '-work', unpack(zadd))
-            redis.call('zrem', key .. '-scheduled', unpack(r))
-        end
-        
-        -- And now we should get up to the maximum number of requested
-        -- work items from the work queue.
-        for index, jid in ipairs(redis.call('zrevrange', key .. '-work', 0, (count - #keys) - 1)) do
-            table.insert(keys, jid)
-        end
+    self:check_scheduled(now, count - #jids)
+
+    -- With these in place, we can expand this list of jids based on the work
+    -- queue itself and the priorities therein
+    for index, jid in ipairs(redis.call(
+        'zrevrange', key .. '-work', 0, (count - #jids) - 1)) do
+        table.insert(jids, jid)
     end
 
-    -- Alright, now the `keys` table is filled with all the job
-    -- ids which we'll be returning. Now we need to get the 
-    -- metadeata about each of these, update their metadata to
-    -- reflect which worker they're on, when the lock expires, 
-    -- etc., add them to the locks queue and then we have to 
-    -- finally return a list of json blobs
-
-    local response = {}
     local state
     local history
-    for index, jid in ipairs(keys) do
+    for index, jid in ipairs(jids) do
+        local job = Qless.job(jid)
         -- First, we should get the state and history of the item
         state, history = unpack(redis.call('hmget', 'ql:j:' .. jid, 'state', 'history'))
         
@@ -396,68 +379,79 @@ function QlessQueue:pop(now, worker, count)
         history[#history]['worker'] = worker
         history[#history]['popped'] = math.floor(now)
         
-        ----------------------------------------------------------
-        -- This is the massive stats update that we have to do
-        ----------------------------------------------------------
-        -- This is how long we've been waiting to get popped
+        -- Update the wait time statistics
         local waiting = math.floor(now) - history[#history]['put']
-        -- Now we'll go through the apparently long and arduous process of update
-        local count, mean, vk = unpack(redis.call('hmget', 'ql:s:wait:' .. bin .. ':' .. self.name, 'total', 'mean', 'vk'))
-        count = count or 0
-        if count == 0 then
-            mean  = waiting
-            vk    = 0
-            count = 1
-        else
-            count = count + 1
-            local oldmean = mean
-            mean  = mean + (waiting - mean) / count
-            vk    = vk + (waiting - mean) * (waiting - oldmean)
-        end
-        -- Now, update the histogram
-        -- - `s1`, `s2`, ..., -- second-resolution histogram counts
-        -- - `m1`, `m2`, ..., -- minute-resolution
-        -- - `h1`, `h2`, ..., -- hour-resolution
-        -- - `d1`, `d2`, ..., -- day-resolution
-        waiting = math.floor(waiting)
-        if waiting < 60 then -- seconds
-            redis.call('hincrby', 'ql:s:wait:' .. bin .. ':' .. self.name, 's' .. waiting, 1)
-        elseif waiting < 3600 then -- minutes
-            redis.call('hincrby', 'ql:s:wait:' .. bin .. ':' .. self.name, 'm' .. math.floor(waiting / 60), 1)
-        elseif waiting < 86400 then -- hours
-            redis.call('hincrby', 'ql:s:wait:' .. bin .. ':' .. self.name, 'h' .. math.floor(waiting / 3600), 1)
-        else -- days
-            redis.call('hincrby', 'ql:s:wait:' .. bin .. ':' .. self.name, 'd' .. math.floor(waiting / 86400), 1)
-        end     
-        redis.call('hmset', 'ql:s:wait:' .. bin .. ':' .. self.name, 'total', count, 'mean', mean, 'vk', vk)
-        ----------------------------------------------------------
+        self:stat(now, 'wait', waiting)
         
         -- Add this job to the list of jobs handled by this worker
         redis.call('zadd', 'ql:w:' .. worker .. ':jobs', expires, jid)
         
         -- Update the jobs data, and add its locks, and return the job
-        redis.call(
-            'hmset', 'ql:j:' .. jid, 'worker', worker, 'expires', expires,
-            'state', 'running', 'history', cjson.encode(history))
+        job:update({
+            worker  = worker,
+            expires = expires,
+            state   = 'running',
+            history = cjson.encode(history)
+        })
         
         redis.call('zadd', key .. '-locks', expires, jid)
-        local job = redis.call(
-            'hmget', 'ql:j:' .. jid, 'jid', 'klass', 'state', 'queue', 'worker', 'priority',
-            'expires', 'retries', 'remaining', 'data', 'tags', 'history', 'failure')
         
         local tracked = redis.call('zscore', 'ql:tracked', jid) ~= false
         if tracked then
             redis.call('publish', 'popped', jid)
         end
-        
-        table.insert(response, jid)
     end
 
-    if #keys > 0 then
-        redis.call('zrem', key .. '-work', unpack(keys))
+    -- If we are returning any jobs, then we should remove them from the work
+    -- queue
+    if #jids > 0 then
+        redis.call('zrem', key .. '-work', unpack(jids))
     end
 
-    return response
+    return jids
+end
+
+--! @brief Update the stats for this queue
+--! @param stat - name of the statistic to be updated ('wait', 'run', etc.)
+--! @param val - the value to update the statistics with
+function QlessQueue:stat(now, stat, val)
+    -- The bin is midnight of the provided day
+    local bin = now - (now % 86400)
+    local key = 'ql:s:' .. stat .. ':' .. bin .. ':' .. self.name
+
+    -- Get the current data
+    local count, mean, vk = unpack(
+        redis.call('hmget', key, 'total', 'mean', 'vk'))
+
+    -- If there isn't any data there presently, then we must initialize it
+    count = count or 0
+    if count == 0 then
+        mean  = val
+        vk    = 0
+        count = 1
+    else
+        count = count + 1
+        local oldmean = mean
+        mean  = mean + (val - mean) / count
+        vk    = vk + (val - mean) * (val - oldmean)
+    end
+
+    -- Now, update the histogram
+    -- - `s1`, `s2`, ..., -- second-resolution histogram counts
+    -- - `m1`, `m2`, ..., -- minute-resolution
+    -- - `h1`, `h2`, ..., -- hour-resolution
+    -- - `d1`, `d2`, ..., -- day-resolution
+    val = math.floor(val)
+    if val < 60 then -- seconds
+        redis.call('hincrby', key, 's' .. val, 1)
+    elseif val < 3600 then -- minutes
+        redis.call('hincrby', key, 'm' .. math.floor(val / 60), 1)
+    elseif val < 86400 then -- hours
+        redis.call('hincrby', key, 'h' .. math.floor(val / 3600), 1)
+    else -- days
+        redis.call('hincrby', key, 'd' .. math.floor(val / 86400), 1)
+    end     
+    redis.call('hmset', key, 'total', count, 'mean', mean, 'vk', vk)
 end
 
 -- Put(1, jid, klass, data, now, delay, [priority, p], [tags, t], [retries, r], [depends, '[...]'])
