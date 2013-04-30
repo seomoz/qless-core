@@ -55,11 +55,11 @@ function QlessRecurringJob:update(...)
             elseif key == 'klass' then
                 redis.call('hset', 'ql:r:' .. self.jid, 'klass', value)
             elseif key == 'queue' then
-                local queue = redis.call('hget', 'ql:r:' .. self.jid, 'queue')
-                local queue_obj = Qless.queue(queue)
-                local score = queue_obj.recur.score(self.jid)
-                queue_obj.remove(self.jid)
-                Qless.queue(value).recur.add(score)
+                local queue_obj = Qless.queue(
+                    redis.call('hget', 'ql:r:' .. self.jid, 'queue'))
+                local score = queue_obj.recurring.score(self.jid)
+                queue_obj.recurring.remove(self.jid)
+                Qless.queue(value).recurring.add(score, self.jid)
                 redis.call('hset', 'ql:r:' .. self.jid, 'queue', value)
             else
                 error('Recur(): Unrecognized option "' .. key .. '"')
@@ -121,7 +121,7 @@ function QlessRecurringJob:unrecur()
     if queue then
         -- Now, delete it from the queue it was attached to, and delete the
         -- thing itself
-        Qless.queue(queue).recur.remove(self.jid)
+        Qless.queue(queue).recurring.remove(self.jid)
         redis.call('del', 'ql:r:' .. self.jid)
         return true
     else

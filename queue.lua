@@ -77,6 +77,9 @@ function Qless.queue(name)
         peek = function(now, offset, count)
             return redis.call('zrange',
                 queue:prefix('scheduled'), offset, offset + count - 1)
+        end, ready = function(now, offset, count)
+            return redis.call('zrangebyscore',
+                queue:prefix('scheduled'), 0, now, 'LIMIT', offset, count)
         end, add = function(when, jid)
             redis.call('zadd', queue:prefix('scheduled'), when, jid)
         end, remove = function(...)
@@ -93,6 +96,13 @@ function Qless.queue(name)
         peek = function(now, offset, count)
             return redis.call('zrangebyscore', queue:prefix('recur'),
                 0, now, 'LIMIT', offset, count)
+        end, ready = function(now, offset, count)
+        end, add = function(when, jid)
+            redis.call('zadd', queue:prefix('recur'), when, jid)
+        end, remove = function(...)
+            if #arg > 0 then
+                return redis.call('zrem', queue:prefix('recur'), unpack(arg))
+            end
         end, update = function(increment, jid)
             redis.call('zincrby', queue:prefix('recur'), increment, jid)
         end, score = function(jid)
@@ -443,10 +453,10 @@ function QlessQueue:put(now, jid, klass, data, delay, ...)
     -- If this item was previously in another queue, then we should remove it from there
     if oldqueue then
         local queue_obj = Qless.queue(oldqueue)
-        queue_obj.work.locks(jid)
         queue_obj.work.remove(jid)
-        queue_obj.work.depends(jid)
-        queue_obj.work.scheduled(jid)
+        queue_obj.locks.remove(jid)
+        queue_obj.depends.remove(jid)
+        queue_obj.scheduled.remove(jid)
     end
 
     -- If this had previously been given out to a worker,
@@ -518,7 +528,7 @@ function QlessQueue:put(now, jid, klass, data, delay, ...)
     -- then we'll have to schedule it. Otherwise, we're just
     -- going to add it to the work queue.
     if delay > 0 then
-        redis.call('zadd', self:prefix('scheduled'), now + delay, jid)
+        self.scheduled.add(now + delay, jid)
     else
         if redis.call('scard', 'ql:j:' .. jid .. '-dependencies') > 0 then
             self.depends.add(now, jid)
@@ -626,7 +636,7 @@ function QlessQueue:recur(now, jid, klass, data, spec, ...)
         -- If it has previously been in another queue, then we should remove 
         -- some information about it
         if old_queue then
-            Qless.queue(old_queue).recurring.remove('jid')
+            Qless.queue(old_queue).recurring.remove(jid)
         end
         
         -- Do some insertions
@@ -683,8 +693,7 @@ function QlessQueue:check_recurring(now, count)
         
         -- We're saving this value so that in the history, we can accurately 
         -- reflect when the job would normally have been scheduled
-        local score = math.floor(tonumber(
-            redis.call('zscore', self:prefix('recur'), jid)))
+        local score = math.floor(tonumber(self.recurring.score(jid)))
         while (score <= now) and (moved < count) do
             local count = redis.call('hincrby', 'ql:r:' .. jid, 'count', 1)
             moved = moved + 1
@@ -720,7 +729,7 @@ function QlessQueue:check_recurring(now, count)
             -- going to add it to the work queue.
             self.work.add(score, priority, jid .. '-' .. count)
             
-            redis.call('zincrby', self:prefix('recur'), interval, jid)
+            self.recurring.update(interval, jid)
             score = score + interval
         end
     end
@@ -733,8 +742,7 @@ function QlessQueue:check_scheduled(now, count, execute)
     -- zadd is a list of arguments that we'll be able to use to
     -- insert into the work queue
     local zadd = {}
-    local scheduled = redis.call(
-        'zrangebyscore', self:prefix('scheduled'), 0, now, 'LIMIT', 0, count)
+    local scheduled = self.scheduled.ready(now, 0, count)
     for index, jid in ipairs(scheduled) do
         -- With these in hand, we'll have to go out and find the 
         -- priorities of these jobs, and then we'll insert them
@@ -752,7 +760,7 @@ function QlessQueue:check_scheduled(now, count, execute)
     if #zadd > 0 then
         -- Now add these to the work list, and then remove them
         -- from the scheduled list
-        redis.call('zrem', self:prefix('scheduled'), unpack(scheduled))
+        self.scheduled.remove(unpack(scheduled))
     end
 end
 
@@ -786,7 +794,7 @@ function QlessQueue:invalidate_locks(now, count)
             -- the queue it's in
             self.work.remove(jid)
             self.locks.remove(jid)
-            redis.call('zrem', self:prefix('scheduled'), jid)
+            self.scheduled.remove(jid)
             
             local group = 'failed-retries-' .. self.name
             -- First things first, we should get the history
