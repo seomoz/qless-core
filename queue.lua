@@ -24,6 +24,8 @@ function Qless.queue(name)
         end, add = function(now, priority, jid)
             return redis.call('zadd',
                 queue:prefix('work'), priority - (now / 10000000000), jid)
+        end, score = function(jid)
+            return redis.call('zscore', queue:prefix('work'), jid)
         end, length = function()
             return redis.call('zcard', queue:prefix('work'))
         end
@@ -61,6 +63,10 @@ function Qless.queue(name)
                 queue:prefix('depends'), offset, offset + count - 1)
         end, add = function(now, jid)
             redis.call('zadd', queue:prefix('depends'), now, jid)
+        end, remove = function(...)
+            if #arg > 0 then
+                return redis.call('zrem', queue:prefix('depends'), unpack(arg))
+            end
         end, length = function()
             return redis.call('zcard', queue:prefix('depends'))
         end
@@ -71,6 +77,12 @@ function Qless.queue(name)
         peek = function(now, offset, count)
             return redis.call('zrange',
                 queue:prefix('scheduled'), offset, offset + count - 1)
+        end, add = function(when, jid)
+            redis.call('zadd', queue:prefix('scheduled'), when, jid)
+        end, remove = function(...)
+            if #arg > 0 then
+                return redis.call('zrem', queue:prefix('scheduled'), unpack(arg))
+            end
         end, length = function()
             return redis.call('zcard', queue:prefix('scheduled'))
         end
@@ -79,8 +91,12 @@ function Qless.queue(name)
     -- Access to our recurring jobs
     queue.recurring = {
         peek = function(now, offset, count)
-            return redis.call('zrange',
-                queue:prefix('recur'), offset, offset + count - 1)
+            return redis.call('zrangebyscore', queue:prefix('recur'),
+                0, now, 'LIMIT', offset, count)
+        end, update = function(increment, jid)
+            redis.call('zincrby', queue:prefix('recur'), increment, jid)
+        end, score = function(jid)
+            return redis.call('zscore', queue:prefix('recur'), jid)
         end, length = function()
             return redis.call('zcard', queue:prefix('recur'))
         end
@@ -426,10 +442,11 @@ function QlessQueue:put(now, jid, klass, data, delay, ...)
 
     -- If this item was previously in another queue, then we should remove it from there
     if oldqueue then
-        redis.call('zrem', 'ql:q:' .. oldqueue .. '-work', jid)
-        redis.call('zrem', 'ql:q:' .. oldqueue .. '-locks', jid)
-        redis.call('zrem', 'ql:q:' .. oldqueue .. '-scheduled', jid)
-        redis.call('zrem', 'ql:q:' .. oldqueue .. '-depends', jid)
+        local queue_obj = Qless.queue(oldqueue)
+        queue_obj.work.locks(jid)
+        queue_obj.work.remove(jid)
+        queue_obj.work.depends(jid)
+        queue_obj.work.scheduled(jid)
     end
 
     -- If this had previously been given out to a worker,
@@ -609,7 +626,7 @@ function QlessQueue:recur(now, jid, klass, data, spec, ...)
         -- If it has previously been in another queue, then we should remove 
         -- some information about it
         if old_queue then
-            redis.call('zrem', 'ql:q:' .. old_queue .. '-recur', jid)
+            Qless.queue(old_queue).recurring.remove('jid')
         end
         
         -- Do some insertions
@@ -627,7 +644,7 @@ function QlessQueue:recur(now, jid, klass, data, spec, ...)
             'interval', interval,
             'retries' , options.retries)
         -- Now, we should schedule the next run of the job
-        redis.call('zadd', self:prefix('recur'), now + offset, jid)
+        self.recurring.add(now + offset, jid)
         
         -- Lastly, we're going to make sure that this item is in the
         -- set of known queues. We should keep this sorted by the 
@@ -642,10 +659,9 @@ function QlessQueue:recur(now, jid, klass, data, spec, ...)
     end
 end
 
+-- Return the length of the queue
 function QlessQueue:length()
-    return  self.locks.length() +
-            self.work.length() + 
-            redis.call('zcard', self:prefix('scheduled'))
+    return  self.locks.length() + self.work.length() + self.scheduled.length()
 end
 
 -------------------------------------------------------------------------------
@@ -656,7 +672,7 @@ function QlessQueue:check_recurring(now, count)
     -- This is how many jobs we've moved so far
     local moved = 0
     -- These are the recurring jobs that need work
-    local r = redis.call('zrangebyscore', self:prefix('recur'), 0, now, 'LIMIT', 0, count)
+    local r = self.recurring.peek(now, 0, count)
     for index, jid in ipairs(r) do
         -- For each of the jids that need jobs scheduled, first
         -- get the last time each of them was run, and then increment

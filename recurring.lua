@@ -41,11 +41,12 @@ function QlessRecurringJob:update(...)
             local value = arg[i+1]
             if key == 'priority' or key == 'interval' or key == 'retries' then
                 value = assert(tonumber(value), 'Recur(): Arg "' .. key .. '" must be a number: ' .. tostring(value))
-                -- If the command is 'interval', then we need to update the time
-                -- when it should next be scheduled
+                -- If the command is 'interval', then we need to update the
+                -- time when it should next be scheduled
                 if key == 'interval' then
                     local queue, interval = unpack(redis.call('hmget', 'ql:r:' .. self.jid, 'queue', 'interval'))
-                    redis.call('zincrby', 'ql:q:' .. queue .. '-recur', value - tonumber(interval), self.jid)
+                    Qless.queue(queue).recurring.update(
+                        value - tonumber(interval), self.jid)
                 end
                 redis.call('hset', 'ql:r:' .. self.jid, key, value)
             elseif key == 'data' then
@@ -55,9 +56,10 @@ function QlessRecurringJob:update(...)
                 redis.call('hset', 'ql:r:' .. self.jid, 'klass', value)
             elseif key == 'queue' then
                 local queue = redis.call('hget', 'ql:r:' .. self.jid, 'queue')
-                local score = redis.call('zscore', 'ql:q:' .. queue .. '-recur', self.jid)
-                redis.call('zrem', 'ql:q:' .. queue .. '-recur', self.jid)
-                redis.call('zadd', 'ql:q:' .. value .. '-recur', score, self.jid)
+                local queue_obj = Qless.queue(queue)
+                local score = queue_obj.recur.score(self.jid)
+                queue_obj.remove(self.jid)
+                Qless.queue(value).recur.add(score)
                 redis.call('hset', 'ql:r:' .. self.jid, 'queue', value)
             else
                 error('Recur(): Unrecognized option "' .. key .. '"')
@@ -117,8 +119,9 @@ function QlessRecurringJob:unrecur()
     -- First, find out what queue it was attached to
     local queue = redis.call('hget', 'ql:r:' .. self.jid, 'queue')
     if queue then
-        -- Now, delete it from the queue it was attached to, and delete the thing itself
-        redis.call('zrem', 'ql:q:' .. queue .. '-recur', self.jid)
+        -- Now, delete it from the queue it was attached to, and delete the
+        -- thing itself
+        Qless.queue(queue).recur.remove(self.jid)
         redis.call('del', 'ql:r:' .. self.jid)
         return true
     else

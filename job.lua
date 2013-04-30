@@ -127,9 +127,10 @@ function QlessJob:complete(now, worker, queue, data, ...)
     end
 
     -- Remove the job from the previous queue
-    redis.call('zrem', 'ql:q:' .. queue .. '-work', self.jid)
-    redis.call('zrem', 'ql:q:' .. queue .. '-locks', self.jid)
-    redis.call('zrem', 'ql:q:' .. queue .. '-scheduled', self.jid)
+    local queue_obj = Qless.queue(queue)
+    queue_obj.work.remove(self.jid)
+    queue_obj.locks.remove(self.jid)
+    queue_obj.scheduled.remove(self.jid)
 
     ----------------------------------------------------------
     -- This is the massive stats update that we have to do
@@ -146,6 +147,7 @@ function QlessJob:complete(now, worker, queue, data, ...)
     end
 
     if nextq then
+        queue_obj = Qless.queue(nextq)
         -- Send a message out to log
         redis.call('publish', 'log', cjson.encode({
             jid   = self.jid,
@@ -171,8 +173,7 @@ function QlessJob:complete(now, worker, queue, data, ...)
             cjson.encode(history), 'remaining', tonumber(retries))
         
         if delay > 0 then
-            redis.call('zadd', 'ql:q:' .. nextq .. '-scheduled', now + delay,
-                self.jid)
+            queue_obj.scheduled.add(now + delay, self.jid)
             return 'scheduled'
         else
             -- These are the jids we legitimately have to wait on
@@ -189,12 +190,11 @@ function QlessJob:complete(now, worker, queue, data, ...)
                 end
             end
             if count > 0 then
-                redis.call(
-                    'zadd', 'ql:q:' .. nextq .. '-depends', now, self.jid)
+                queue_obj.depends.add(now, self.jid)
                 redis.call('hset', 'ql:j:' .. self.jid, 'state', 'depends')
                 return 'depends'
             else
-                redis.call('zadd', 'ql:q:' .. nextq .. '-work', priority - (now / 10000000000), self.jid)
+                queue_obj.work.add(now, priority, self.jid)
                 return 'waiting'
             end
         end
@@ -253,8 +253,9 @@ function QlessJob:complete(now, worker, queue, data, ...)
             if redis.call('scard', 'ql:j:' .. j .. '-dependencies') == 0 then
                 local q, p = unpack(redis.call('hmget', 'ql:j:' .. j, 'queue', 'priority'))
                 if q then
-                    redis.call('zrem', 'ql:q:' .. q .. '-depends', j)
-                    redis.call('zadd', 'ql:q:' .. q .. '-work', p, j)
+                    local queue = Qless.queue(q)
+                    queue.depends.remove(j)
+                    queue.work.add(now, p, j)
                     redis.call('hset', 'ql:j:' .. j, 'state', 'waiting')
                 end
             end
@@ -353,9 +354,10 @@ function QlessJob:fail(now, worker, group, message, data)
     redis.call('hincrby', 'ql:s:stats:' .. bin .. ':' .. queue, 'failed'  , 1)
 
     -- Now remove the instance from the schedule, and work queues for the queue it's in
-    redis.call('zrem', 'ql:q:' .. queue .. '-work', self.jid)
-    redis.call('zrem', 'ql:q:' .. queue .. '-locks', self.jid)
-    redis.call('zrem', 'ql:q:' .. queue .. '-scheduled', self.jid)
+    local queue_obj = Qless.queue(queue)
+    queue_obj.work.remove(self.jid)
+    queue_obj.locks.remove(self.jid)
+    queue_obj.scheduled.remove(self.jid)
 
     -- The reason that this appears here is that the above will fail if the job doesn't exist
     if data then
@@ -411,7 +413,7 @@ function QlessJob:retry(now, queue, worker, delay)
     end
 
     -- Remove it from the locks key of the old queue
-    redis.call('zrem', 'ql:q:' .. oldqueue .. '-locks', self.jid)
+    Qless.queue(oldqueue).locks.remove(self.jid)
 
     local remaining = redis.call('hincrby', 'ql:j:' .. self.jid, 'remaining', -1)
 
@@ -441,11 +443,12 @@ function QlessJob:retry(now, queue, worker, delay)
         redis.call('lpush', 'ql:f:' .. group, self.jid)
     else
         -- Put it in the queue again with a delay. Like put()
+        local queue_obj = Qless.queue(queue)
         if delay > 0 then
-            redis.call('zadd', 'ql:q:' .. queue .. '-scheduled', now + delay, self.jid)
+            queue_obj.scheduled.add(now + delay, self.jid)
             redis.call('hset', 'ql:j:' .. self.jid, 'state', 'scheduled')
         else
-            redis.call('zadd', 'ql:q:' .. queue .. '-work', priority - (now / 10000000000), self.jid)
+            queue_obj.work.add(now, priority, self.jid)
             redis.call('hset', 'ql:j:' .. self.jid, 'state', 'waiting')
         end
     end
@@ -468,7 +471,7 @@ end
 --
 -- Args:
 --    1) jid
-function QlessJob:depends(command, ...)
+function QlessJob:depends(now, command, ...)
     assert(command, 'Depends(): Arg "command" missing')
     if redis.call('hget', 'ql:j:' .. self.jid, 'state') ~= 'depends' then
         return false
@@ -493,8 +496,9 @@ function QlessJob:depends(command, ...)
             redis.call('del', 'ql:j:' .. self.jid .. '-dependencies')
             local q, p = unpack(redis.call('hmget', 'ql:j:' .. self.jid, 'queue', 'priority'))
             if q then
-                redis.call('zrem', 'ql:q:' .. q .. '-depends', self.jid)
-                redis.call('zadd', 'ql:q:' .. q .. '-work', p, self.jid)
+                local queue_obj = Qless.queue(q)
+                queue_obj.depends.remove(self.jid)
+                queue_obj.work.add(now, p, self.jid)
                 redis.call('hset', 'ql:j:' .. self.jid, 'state', 'waiting')
             end
         else
@@ -504,8 +508,9 @@ function QlessJob:depends(command, ...)
                 if redis.call('scard', 'ql:j:' .. self.jid .. '-dependencies') == 0 then
                     local q, p = unpack(redis.call('hmget', 'ql:j:' .. self.jid, 'queue', 'priority'))
                     if q then
-                        redis.call('zrem', 'ql:q:' .. q .. '-depends', self.jid)
-                        redis.call('zadd', 'ql:q:' .. q .. '-work', p, self.jid)
+                        local queue_obj = Qless.queue(q)
+                        queue_obj.depends.remove(self.jid)
+                        queue_obj.work.add(now, p, self.jid)
                         redis.call('hset', 'ql:j:' .. self.jid, 'state', 'waiting')
                     end
                 end
@@ -559,8 +564,8 @@ function QlessJob:heartbeat(now, worker, data)
         redis.call('zadd', 'ql:w:' .. worker .. ':jobs', expires, self.jid)
         
         -- And now we should just update the locks
-        local queue = redis.call('hget', 'ql:j:' .. self.jid, 'queue')
-        redis.call('zadd', 'ql:q:'.. queue .. '-locks', expires, self.jid)
+        local queue = Qless.queue(redis.call('hget', 'ql:j:' .. self.jid, 'queue'))
+        queue.locks.add(expires, self.jid)
         return expires
     end
 end
@@ -587,8 +592,9 @@ function QlessJob:priority(priority)
     else
         -- Adjust the priority and see if it's a candidate for updating
         -- its priority in the queue it's currently in
-        if redis.call('zscore', 'ql:q:' .. queue .. '-work', self.jid) then
-            redis.call('zadd', 'ql:q:' .. queue .. '-work', priority, self.jid)
+        local queue_obj = Qless.queue(queue)
+        if queue_obj.work.score(self.jid) then
+            queue_obj.work.add(0, priority, self.jid)
         end
         redis.call('hset', 'ql:j:' .. self.jid, 'priority', priority)
         return priority

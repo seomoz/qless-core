@@ -471,10 +471,11 @@ function Qless.cancel(...)
 
         -- Remove it from that queue
         if queue then
-          redis.call('zrem', 'ql:q:' .. queue .. '-work', jid)
-          redis.call('zrem', 'ql:q:' .. queue .. '-locks', jid)
-          redis.call('zrem', 'ql:q:' .. queue .. '-scheduled', jid)
-          redis.call('zrem', 'ql:q:' .. queue .. '-depends', jid)
+            local queue = Qless.queue(queue)
+            queue.work.remove(jid)
+            queue.locks.remove(jid)
+            queue.scheduled.remove(jid)
+            queue.depends.remove(jid)
         end
 
         -- We should probably go through all our dependencies and remove ourselves

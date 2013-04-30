@@ -54,7 +54,7 @@ QlessAPI.retry = function(now, jid, queue, worker, delay)
 end
 
 QlessAPI.depends = function(now, jid, command, ...)
-    return Qless.job(jid):depends(command, unpack(arg))
+    return Qless.job(jid):depends(now, command, unpack(arg))
 end
 
 QlessAPI.heartbeat = function(now, jid, worker, data)
