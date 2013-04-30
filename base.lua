@@ -1,10 +1,14 @@
 -------------------------------------------------------------------------------
 -- Forward declarations to make everything happy
 -------------------------------------------------------------------------------
-local Qless = {}
+local Qless = {
+    ns = 'ql:'
+}
 
 -- Queue forward delcaration
-local QlessQueue = {}
+local QlessQueue = {
+    ns = Qless.ns .. 'q:'
+}
 QlessQueue.__index = QlessQueue
 
 -- Job forward declaration
@@ -18,6 +22,17 @@ QlessRecurringJob.__index = QlessRecurringJob
 -- Config forward declaration
 Qless.config = {}
 
+-- Extend a table. This comes up quite frequently
+function table.extend(self, other)
+    for i, v in ipairs(other) do
+        table.insert(self, v)
+    end
+end
+
+function Qless.debug(message)
+    redis.call('publish', 'debug', tostring(message))
+end
+
 -- Return a job object
 function Qless.job(jid)
     assert(jid, 'Job(): no jid provided')
@@ -25,15 +40,6 @@ function Qless.job(jid)
     setmetatable(job, QlessJob)
     job.jid = jid
     return job
-end
-
--- Return a queue object
-function Qless.queue(name)
-    assert(name, 'Queue(): no queue name provided')
-    local queue = {}
-    setmetatable(queue, QlessQueue)
-    queue.name = name
-    return queue
 end
 
 -- Return a recurring job object
