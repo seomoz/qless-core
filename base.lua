@@ -65,19 +65,18 @@ end
 --          ...
 --      }
 --  ]
-function Qless.queues(now, queue)
-    if queue then
-        local stalled = redis.call(
-            'zcount', 'ql:q:' .. queue .. '-locks', 0, now)
+function Qless.queues(now, name)
+    if name then
+        local queue = Qless.queue(name)
+        local stalled = queue.locks.length(now)
         return {
-            name      = queue,
-            waiting   = redis.call('zcard', 'ql:q:' .. queue .. '-work'),
+            name      = name,
+            waiting   = queue.work.length(),
             stalled   = stalled,
-            running   = 
-                redis.call('zcard', 'ql:q:' .. queue .. '-locks') - stalled,
-            scheduled = redis.call('zcard', 'ql:q:' .. queue .. '-scheduled'),
-            depends   = redis.call('zcard', 'ql:q:' .. queue .. '-depends'),
-            recurring = redis.call('zcard', 'ql:q:' .. queue .. '-recur')
+            running   = queue.locks.length() - stalled,
+            scheduled = queue.scheduled.length(),
+            depends   = queue.depends.length(),
+            recurring = queue.recurring.length()
         }
     else
         local queues = redis.call('zrange', 'ql:queues', 0, -1)
@@ -170,22 +169,23 @@ function Qless.jobs(now, state, ...)
         return redis.call('zrevrange', 'ql:completed', offset,
             offset + count - 1)
     else
-        local queue  = assert(arg[1], 'Jobs(): Arg "queue" missing')
+        local name  = assert(arg[1], 'Jobs(): Arg "queue" missing')
         local offset = assert(tonumber(arg[2] or 0),
             'Jobs(): Arg "offset" not a number: ' .. tostring(arg[2]))
         local count  = assert(tonumber(arg[3] or 25),
             'Jobs(): Arg "count" not a number: ' .. tostring(arg[3]))
 
+        local queue = Qless.queue(name)
         if state == 'running' then
-            return redis.call('zrangebyscore', 'ql:q:' .. queue .. '-locks', now, 133389432700, 'limit', offset, count)
+            return queue.locks.peek(now, offset, count)
         elseif state == 'stalled' then
-            return redis.call('zrangebyscore', 'ql:q:' .. queue .. '-locks', 0, now, 'limit', offset, count)
+            return queue.locks.expired(now, offset, count)
         elseif state == 'scheduled' then
-            return redis.call('zrange', 'ql:q:' .. queue .. '-scheduled', offset, offset + count - 1)
+            return queue.scheduled.peek(now, offset, count)
         elseif state == 'depends' then
-            return redis.call('zrange', 'ql:q:' .. queue .. '-depends', offset, offset + count - 1)
+            return queue.depends.peek(now, offset, count)
         elseif state == 'recurring' then
-            return redis.call('zrange', 'ql:q:' .. queue .. '-recur', offset, offset + count - 1)
+            return queue.recurring.peek(now, offset, count)
         else
             error('Jobs(): Unknown type "' .. state .. '"')
         end
