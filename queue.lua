@@ -45,6 +45,8 @@ function Qless.queue(name)
             if #arg > 0 then
                 return redis.call('zrem', queue:prefix('locks'), unpack(arg))
             end
+        end, running = function(now)
+            return redis.call('zcount', queue:prefix('locks'), now, 133389432700)
         end, length = function(now)
             -- If a 'now' is provided, we're interested in how many are before
             -- that time
