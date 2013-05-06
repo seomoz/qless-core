@@ -31,7 +31,7 @@ if command == 'on' then
 		-- Read in all the optional parameters
 		local options = {}
 		for i = 10, #ARGV, 2 do options[ARGV[i]] = ARGV[i + 1] end
-		options.tags     = assert(cjson.decode(options.tags or {}), 'Recur(): Arg "tags" must be JSON-encoded array of string. Got: ' .. tostring(options.tags))
+		options.tags     = assert(cjson.decode(options.tags or '{}'), 'Recur(): Arg "tags" must be JSON-encoded array of string. Got: ' .. tostring(options.tags))
 		options.priority = assert(tonumber(options.priority or 0) , 'Recur(): Arg "priority" must be a number. Got: ' .. tostring(options.priority))
 		options.retries  = assert(tonumber(options.retries  or 0) , 'Recur(): Arg "retries" must be a number. Got: ' .. tostring(options.retries))
 

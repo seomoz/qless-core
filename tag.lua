@@ -89,12 +89,12 @@ elseif command == 'get' then
 	local count  = assert(tonumber(ARGV[4] or 25), 'Tag(): Arg "count" not a number: ' .. tostring(ARGV[4]))
 	return cjson.encode({
 		total = redis.call('zcard', 'ql:t:' .. tag),
-		jobs  = redis.call('zrange', 'ql:t:' .. tag, offset, count)
+		jobs  = redis.call('zrange', 'ql:t:' .. tag, offset, offset+count-1)
 	})
 elseif command == 'top' then
 	local offset = assert(tonumber(ARGV[2] or 0) , 'Tag(): Arg "offset" not a number: ' .. tostring(ARGV[2]))
 	local count  = assert(tonumber(ARGV[3] or 25), 'Tag(): Arg "count" not a number: ' .. tostring(ARGV[3]))
-	return cjson.encode(redis.call('zrevrangebyscore', 'ql:tags', '+inf', 2, 'limit', offset, count))
+	return cjson.encode(redis.call('zrevrangebyscore', 'ql:tags', '+inf', '-inf', 'limit', offset, count))
 else
 	error('Tag(): First argument must be "add", "remove" or "get"')
 end
