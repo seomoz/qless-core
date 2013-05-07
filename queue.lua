@@ -798,7 +798,7 @@ function QlessQueue:invalidate_locks(now, count)
             self.locks.remove(jid)
             self.scheduled.remove(jid)
             
-            local group = 'failed-retries-' .. self.name
+            local group = 'failed-retries-' .. Qless.job(jid):data()['queue']
             -- First things first, we should get the history
             local history = redis.call('hget', 'ql:j:' .. jid, 'history')
             

@@ -124,15 +124,10 @@ function Qless.failed(group, start, limit)
 
     if group then
         -- If a group was provided, then we should do paginated lookup
-        local response = {
+        return {
             total = redis.call('llen', 'ql:f:' .. group),
-            jobs  = {}
+            jobs  = redis.call('lrange', 'ql:f:' .. group, start, limit - 1)
         }
-        local jids = redis.call('lrange', 'ql:f:' .. group, start, limit - 1)
-        for index, jid in ipairs(jids) do
-            table.insert(response.jobs, Qless.job(jid):data())
-        end
-        return response
     else
         -- Otherwise, we should just list all the known failure groups we have
         local response = {}
