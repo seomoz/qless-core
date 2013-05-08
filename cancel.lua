@@ -26,9 +26,20 @@ local function cancel(jid, jid_set)
       cancel(dependent_jid, jid_set)
     end
 
+    -- Send a message out on the appropriate channels
+    local encoded = cjson.encode({
+      jid    = jid,
+      worker = worker,
+      event  = 'canceled',
+      queue  = queue
+    })
+    redis.call('publish', 'ql:log', encoded)
+
     -- Remove this job from whatever worker has it, if any
     if worker then
       redis.call('zrem', 'ql:w:' .. worker .. ':jobs', jid)
+      -- If necessary, send a message to the appropriate worker, too
+      redis.call('publish', 'ql:w:' .. worker, encoded)
     end
 
     -- Remove it from that queue
@@ -88,4 +99,3 @@ local jid_set = to_set(jids)
 for _, jid in ipairs(jids) do
   cancel(jid, jid_set)
 end
-

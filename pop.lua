@@ -49,6 +49,15 @@ for index, jid in ipairs(redis.call('zrangebyscore', key .. '-locks', 0, now, 'L
 	-- Remove this job from the jobs that the worker that was running it has
 	local w = redis.call('hget', 'ql:j:' .. jid, 'worker')
 	redis.call('zrem', 'ql:w:' .. w .. ':jobs', jid)
+
+	-- Send a message to let the worker know that its lost its lock on the job
+	local encoded = cjson.encode({
+		jid    = jid,
+		event  = 'lock_lost',
+		worker = w
+	})
+	redis.call('publish', 'ql:w:' .. w, encoded)
+	redis.call('publish', 'ql:log', encoded)
 	
 	-- For each of these, decrement their retries. If any of them
 	-- have exhausted their retries, then we should mark them as
