@@ -26,8 +26,16 @@ local now     = assert(tonumber(ARGV[3]) , 'Pop(): Arg "now" missing or not a nu
 
 -- We should find the heartbeat interval for this queue
 -- heartbeat
-local _hb, _qhb = unpack(redis.call('hmget', 'ql:config', 'heartbeat', queue .. '-heartbeat'))
+local _hb, _qhb, _mc = unpack(redis.call('hmget', 'ql:config', 'heartbeat', queue .. '-heartbeat', queue .. '-max-concurrency'))
 local expires = now + tonumber(_qhb or _hb or 60)
+local max_concurrency = tonumber(_mc or 0)
+
+if max_concurrency > 0 then
+  -- We need to find out how many locks are still valid.
+  local num_still_locked = redis.call('zcount', key .. '-locks', now, '+inf')
+  -- Only allow the minimum of the two through
+  count = math.min(max_concurrency - num_still_locked, count)
+end
 
 -- The bin is midnight of the provided day
 -- 24 * 60 * 60 = 86400
