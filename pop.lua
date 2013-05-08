@@ -30,6 +30,13 @@ local _hb, _qhb, _mc = unpack(redis.call('hmget', 'ql:config', 'heartbeat', queu
 local expires = now + tonumber(_qhb or _hb or 60)
 local max_concurrency = tonumber(_mc or 0)
 
+if max_concurrency > 0 then
+  -- We need to find out how many locks are still valid.
+  local num_still_locked = redis.call('zcount', key .. '-locks', now, '+inf')
+  -- Only allow the minimum of the two through
+  count = math.min(max_concurrency - num_still_locked, count)
+end
+
 -- The bin is midnight of the provided day
 -- 24 * 60 * 60 = 86400
 local bin = now - (now % 86400)
@@ -202,33 +209,6 @@ if #keys < count then
     for index, jid in ipairs(redis.call('zrevrange', key .. '-work', 0, (count - #keys) - 1)) do
         table.insert(keys, jid)
     end
-end
-
-if max_concurrency > 0 then
-  -- this count includes the jids in our keys table that were
-  -- chosen above...
-  local num_still_locked = redis.call('zcard', key .. '-locks')
-
-  -- ...so we need to not include them in the count, since
-  -- we really just want the count of the ones that are remaining locked.
-  for index, jid in ipairs(keys) do
-    if redis.call('zscore', key .. '-locks', jid) then
-      num_still_locked = num_still_locked - 1
-    end
-  end
-
-  local num_allowed_keys = max_concurrency - num_still_locked
-
-  -- Limit the number of jobs we are popping based on the number
-  -- of keys we allowing. There's probably a more efficient way
-  -- of doing this.
-  local old_keys = keys
-  keys = {}
-  for index, jid in ipairs(old_keys) do
-    if index <= num_allowed_keys then
-      table.insert(keys, jid)
-    end
-  end
 end
 
 -- Alright, now the `keys` table is filled with all the job
