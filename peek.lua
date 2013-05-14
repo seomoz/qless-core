@@ -19,8 +19,8 @@ end
 
 local queue   = assert(KEYS[1]           , 'Peek(): Key "queue" missing')
 local key     = 'ql:q:' .. queue
-local count   = assert(tonumber(ARGV[1]) , 'Peek(): Arg "count" missing or not a number: ' .. (ARGV[2] or 'nil'))
-local now     = assert(tonumber(ARGV[2]) , 'Peek(): Arg "now" missing or not a number: ' .. (ARGV[3] or 'nil'))
+local count   = assert(tonumber(ARGV[1]) , 'Peek(): Arg "count" missing or not a number: ' .. (ARGV[1] or 'nil'))
+local now     = assert(tonumber(ARGV[2]) , 'Peek(): Arg "now" missing or not a number: ' .. (ARGV[2] or 'nil'))
 
 -- These are the ids that we're going to return
 local keys = {}

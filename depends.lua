@@ -14,26 +14,31 @@
 if #KEYS > 0 then error('Depends(): No Keys should be provided') end
 
 local jid     = assert(ARGV[1], 'Depends(): Arg "jid" missing.')
-local command = assert(ARGV[2], 'Depends(): Arg 2 missing')
+local now     = assert(tonumber(ARGV[2])     , 'Depends(): Arg "now" missing or not a number: ' .. (ARGV[2] or 'nil'))
+local command = assert(ARGV[3], 'Depends(): Arg "command" missing')
 
-if redis.call('hget', 'ql:j:' .. jid, 'state') ~= 'depends' then
-	return false
-end
-
-if ARGV[2] == 'on' then
+if ARGV[3] == 'on' then
 	-- These are the jids we legitimately have to wait on
-	for i=3,#ARGV do
+	for i=4,#ARGV do
 		local j = ARGV[i]
 		-- Make sure it's something other than 'nil' or complete.
 		local state = redis.call('hget', 'ql:j:' .. j, 'state')
+		local q = redis.call('hget', 'ql:j:' .. jid, 'queue')
 		if (state and state ~= 'complete') then
 			redis.call('sadd', 'ql:j:' .. j .. '-dependents'  , jid)
 			redis.call('sadd', 'ql:j:' .. jid .. '-dependencies', j)
+			-- Added to correctly support newly dependent jobs	
+			redis.call('zadd', 'ql:q:' .. q .. '-depends', now, jid)
+			redis.call('hset', 'ql:j:' .. jid, 'state', 'depends')
 		end
 	end
 	return true
-elseif ARGV[2] == 'off' then
-	if ARGV[3] == 'all' then
+elseif ARGV[3] == 'off' then
+	if redis.call('hget', 'ql:j:' .. jid, 'state') ~= 'depends' then
+		return false
+	end
+
+	if ARGV[4] == 'all' then
 		for i, j in ipairs(redis.call('smembers', 'ql:j:' .. jid .. '-dependencies')) do
 			redis.call('srem', 'ql:j:' .. j .. '-dependents', jid)
 		end
@@ -45,7 +50,7 @@ elseif ARGV[2] == 'off' then
 			redis.call('hset', 'ql:j:' .. jid, 'state', 'waiting')
 		end
 	else
-		for i=3,#ARGV do
+		for i=4,#ARGV do
 			local j = ARGV[i]
 			redis.call('srem', 'ql:j:' .. j .. '-dependents', jid)
 			redis.call('srem', 'ql:j:' .. jid .. '-dependencies', j)
@@ -61,5 +66,5 @@ elseif ARGV[2] == 'off' then
 	end
 	return true
 else
-	error('Depends(): Second arg must be "on" or "off"')
+	error('Depends(): Arg "command" must be "on" or "off"')
 end

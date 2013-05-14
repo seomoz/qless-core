@@ -17,6 +17,8 @@ local queue = redis.call('hget', 'ql:j:' .. jid, 'queue')
 
 if queue == nil then
 	return false
+elseif queue == false then
+	return false
 elseif queue == '' then
 	-- Just adjust the priority
 	redis.call('hset', 'ql:j:' .. jid, 'priority', priority)
