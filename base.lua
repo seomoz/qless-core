@@ -12,7 +12,9 @@ local QlessQueue = {
 QlessQueue.__index = QlessQueue
 
 -- Job forward declaration
-local QlessJob = {}
+local QlessJob = {
+    ns = Qless.ns .. 'j:'
+}
 QlessJob.__index = QlessJob
 
 -- RecurringJob forward declaration
