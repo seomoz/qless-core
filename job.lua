@@ -107,7 +107,7 @@ function QlessJob:complete(now, worker, queue, data, ...)
 
     if lastworker ~= worker then
         error('Complete(): Job has been handed out to another worker: ' ..
-            lastworker)
+            tostring(lastworker))
     elseif (state ~= 'running') then
         error('Complete(): Job is not currently running: ' .. state)
     end

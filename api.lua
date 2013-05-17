@@ -16,7 +16,11 @@ end
 
 -- Public access
 QlessAPI['config.get'] = function(now, key)
-    return cjson.encode(Qless.config.get(key))
+    if not key then
+        return cjson.encode(Qless.config.get(key))
+    else
+        return Qless.config.get(key)
+    end
 end
 
 QlessAPI['config.set'] = function(now, key, value)
@@ -146,6 +150,10 @@ end
 
 QlessAPI.length = function(now, queue)
     return Qless.queue(queue):length()
+end
+
+QlessAPI.deregister = function(now, ...)
+    return Qless.deregister(unpack(arg))
 end
 
 -------------------------------------------------------------------------------
