@@ -14,7 +14,7 @@ function QlessRecurringJob:data()
         'priority', 'interval', 'retries', 'count', 'data', 'tags')
     
     if not job[1] then
-        return false
+        return nil
     end
     
     return {

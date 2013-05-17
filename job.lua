@@ -105,11 +105,13 @@ function QlessJob:complete(now, worker, queue, data, ...)
         redis.call('hmget', 'ql:j:' .. self.jid, 'worker', 'history', 'state',
             'priority', 'retries', 'dependents'))
 
-    if lastworker ~= worker then
-        error('Complete(): Job has been handed out to another worker: ' ..
-            tostring(lastworker))
+    if lastworker == false then
+        error('Complete(): Job does not exist')
     elseif (state ~= 'running') then
         error('Complete(): Job is not currently running: ' .. state)
+    elseif lastworker ~= worker then
+        error('Complete(): Job has been handed out to another worker: ' ..
+            tostring(lastworker))
     end
 
     -- Now we can assume that the worker does own the job. We need to
@@ -406,10 +408,12 @@ function QlessJob:retry(now, queue, worker, delay)
     local oldqueue, state, retries, oldworker, priority = unpack(redis.call('hmget', 'ql:j:' .. self.jid, 'queue', 'state', 'retries', 'worker', 'priority'))
 
     -- If this isn't the worker that owns
-    if oldworker ~= worker then
-        error('Retry(): Job has been handed out to another worker: ' .. oldworker)
+    if oldworker == false then
+        error('Retry(): Job does not exist')
     elseif state ~= 'running' then
         error('Retry(): Job is not currently running: ' .. state)
+    elseif oldworker ~= worker then
+        error('Retry(): Job has been handed out to another worker: ' .. oldworker)
     end
 
     -- Remove it from the locks key of the old queue
@@ -546,8 +550,13 @@ function QlessJob:heartbeat(now, worker, data)
     end
 
     -- First, let's see if the worker still owns this job, and there is a worker
-    local job_worker = redis.call('hget', 'ql:j:' .. self.jid, 'worker')
-    if job_worker ~= worker or #job_worker == 0 then
+    local job_worker, state = unpack(redis.call('hmget', 'ql:j:' .. self.jid, 'worker', 'state'))
+    if job_worker == false then
+        -- This means the job doesn't exist
+        error('Heartbeat(): Job does not exist')
+    elseif state ~= 'running' then
+        error('Heartbeat(): Job not currently running: ' .. state)
+    elseif job_worker ~= worker or #job_worker == 0 then
         error('Heartbeat(): Job has been handed out to another worker: ' .. job_worker)
     else
         -- Otherwise, optionally update the user data, and the heartbeat

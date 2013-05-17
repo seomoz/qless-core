@@ -14,6 +14,15 @@ function QlessAPI.get(now, jid)
     return cjson.encode(data)
 end
 
+-- Return json blob of data or nil for each jid provided
+function QlessAPI.multiget(now, ...)
+    local results = {}
+    for i, jid in ipairs(arg) do
+        table.insert(results, Qless.job(jid):data())
+    end
+    return cjson.encode(results)
+end
+
 -- Public access
 QlessAPI['config.get'] = function(now, key)
     if not key then
@@ -133,7 +142,11 @@ QlessAPI.unrecur = function(now, jid)
 end
 
 QlessAPI['recur.get'] = function(now, jid)
-    return cjson.encode(Qless.recurring(jid):data())
+    local data = Qless.recurring(jid):data()
+    if not data then
+        return nil
+    end
+    return cjson.encode(data)
 end
 
 QlessAPI['recur.update'] = function(now, jid, ...)
