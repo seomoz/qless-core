@@ -6,6 +6,7 @@
 Qless.config.defaults = {
     ['application']        = 'qless',
     ['heartbeat']          = 60,
+    ['grace-period']       = 10,
     ['stats-history']      = 30,
     ['histogram-history']  = 7,
     ['jobs-history-count'] = 50000,
@@ -33,7 +34,7 @@ Qless.config.set = function(option, value)
     assert(value , 'config.set(): Arg "value" missing')
     -- Send out a log message
     Qless.publish('log', cjson.encode({
-        event  = 'config.set',
+        event  = 'config_set',
         option = option,
         value  = value
     }))
@@ -46,7 +47,7 @@ Qless.config.unset = function(option)
     assert(option, 'config.unset(): Arg "option" missing')
     -- Send out a log message
     Qless.publish('log', cjson.encode({
-        event  = 'config.unset',
+        event  = 'config_unset',
         option = option
     }))
 

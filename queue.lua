@@ -810,67 +810,102 @@ function QlessQueue:invalidate_locks(now, count)
     for index, jid in ipairs(self.locks.expired(now, 0, count)) do
         -- Remove this job from the jobs that the worker that was running it
         -- has
-        local worker = redis.call('hget', QlessJob.ns .. jid, 'worker')
+        local worker, failure = unpack(
+            redis.call('hmget', QlessJob.ns .. jid, 'worker', 'failure'))
         redis.call('zrem', 'ql:w:' .. worker .. ':jobs', jid)
 
-        -- Send a message to let the worker know that its lost its lock on the
-        -- job
-        local encoded = cjson.encode({
-            jid    = jid,
-            event  = 'lock lost',
-            worker = worker
-        })
-        Qless.publish('w:' .. worker, encoded)
-        Qless.publish('log', encoded)
+        -- We'll provide a grace period after jobs time out for them to give
+        -- some indication of the failure mode. After that time, however, we'll
+        -- consider the worker dust in the wind
+        local grace_period = tonumber(Qless.config.get('grace-period'))
         
         -- For each of these, decrement their retries. If any of them
         -- have exhausted their retries, then we should mark them as
         -- failed.
-        if redis.call('hincrby', QlessJob.ns .. jid, 'remaining', -1) < 0 then
-            -- Now remove the instance from the schedule, and work queues for
-            -- the queue it's in
-            self.work.remove(jid)
-            self.locks.remove(jid)
-            self.scheduled.remove(jid)
-            
-            local group = 'failed-retries-' .. Qless.job(jid):data()['queue']
-            local job = Qless.job(jid)
-            job:history(now, 'failed', {group = group})
-            redis.call('hmset', QlessJob.ns .. jid, 'state', 'failed',
-                'worker', '',
-                'expires', '',
-                'failure', cjson.encode({
-                    ['group']   = group,
-                    ['message'] =
-                        'Job exhausted retries in queue "' .. self.name .. '"',
-                    ['when']    = now,
-                    ['worker']  = unpack(job:data('worker'))
-                }))
-            
-            -- Add this type of failure to the list of failures
-            redis.call('sadd', 'ql:failures', group)
-            -- And add this particular instance to the failed types
-            redis.call('lpush', 'ql:f:' .. group, jid)
-            
-            if redis.call('zscore', 'ql:tracked', jid) ~= false then
-                Qless.publish('failed', jid)
-            end
-        else
-            table.insert(jids, jid)
-            
+        local remaining = tonumber(redis.call(
+            'hincrbyfloat', QlessJob.ns .. jid, 'remaining', -0.5))
+
+        -- If the remaining value is an odd multiple of 0.5, then we'll assume
+        -- that we're just sending the message. Otherwise, it's time to
+        -- actually hand out the work to another worker
+        local send_message = ((remaining * 2) % 2 == 1)
+        local invalidate   = not send_message
+
+        -- If the grace period has been disabled, then we'll do both.
+        if grace_period <= 0 then
+            remaining = tonumber(redis.call(
+                'hincrbyfloat', QlessJob.ns .. jid, 'remaining', -0.5))
+            send_message = true
+            invalidate   = true
+        end
+
+        if send_message then
+            -- This is where we supply a courtesy message and give the worker
+            -- time to provide a failure message
             if redis.call('zscore', 'ql:tracked', jid) ~= false then
                 Qless.publish('stalled', jid)
             end
             Qless.job(jid):history(now, 'timed-out')
+
+            -- Send a message to let the worker know that its lost its lock on
+            -- the job
+            local encoded = cjson.encode({
+                jid    = jid,
+                event  = 'lock_lost',
+                worker = worker
+            })
+            Qless.publish('w:' .. worker, encoded)
+            Qless.publish('log', encoded)
+            self.locks.add(now + grace_period, jid)
+
+            -- If we got any expired locks, then we should increment the
+            -- number of retries for this stage for this bin. The bin is
+            -- midnight of the provided day
+            local bin = now - (now % 86400)
+            redis.call('hincrby',
+                'ql:s:stats:' .. bin .. ':' .. self.name, 'retries', 1)
+        end
+
+        if invalidate then
+            -- This is where we actually have to time out the work
+            if remaining < 0 then
+                -- Now remove the instance from the schedule, and work queues
+                -- for the queue it's in
+                self.work.remove(jid)
+                self.locks.remove(jid)
+                self.scheduled.remove(jid)
+                
+                local group = 'failed-retries-' .. Qless.job(jid):data()['queue']
+                local job = Qless.job(jid)
+                job:history(now, 'failed', {group = group})
+                redis.call('hmset', QlessJob.ns .. jid, 'state', 'failed',
+                    'worker', '',
+                    'expires', '')
+                -- If the failure has not already been set, then set it
+                if failure == {} then
+                    redis.call('hset', QlessJob.ns .. jid,
+                    'failure', cjson.encode({
+                        ['group']   = group,
+                        ['message'] =
+                            'Job exhausted retries in queue "' .. self.name .. '"',
+                        ['when']    = now,
+                        ['worker']  = unpack(job:data('worker'))
+                    }))
+                end
+                
+                -- Add this type of failure to the list of failures
+                redis.call('sadd', 'ql:failures', group)
+                -- And add this particular instance to the failed types
+                redis.call('lpush', 'ql:f:' .. group, jid)
+                
+                if redis.call('zscore', 'ql:tracked', jid) ~= false then
+                    Qless.publish('failed', jid)
+                end
+            else
+                table.insert(jids, jid)
+            end
         end
     end
-
-    -- If we got any expired locks, then we should increment the number of
-    -- retries for this stage for this bin. The bin is midnight of the
-    -- provided day
-    local bin = now - (now % 86400)
-    redis.call('hincrby',
-        'ql:s:stats:' .. bin .. ':' .. self.name, 'retries', #jids)
 
     return jids
 end

@@ -62,8 +62,8 @@ QlessAPI.jobs = function(now, state, ...)
     return Qless.jobs(now, state, unpack(arg))
 end
 
-QlessAPI.retry = function(now, jid, queue, worker, delay)
-    return Qless.job(jid):retry(now, queue, worker, delay)
+QlessAPI.retry = function(now, jid, queue, worker, delay, group, message)
+    return Qless.job(jid):retry(now, queue, worker, delay, group, message)
 end
 
 QlessAPI.depends = function(now, jid, command, ...)

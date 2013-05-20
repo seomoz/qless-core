@@ -29,7 +29,7 @@ function QlessJob:data(...)
         priority     = tonumber(job[6]),
         expires      = tonumber(job[7]) or 0,
         retries      = tonumber(job[8]),
-        remaining    = tonumber(job[9]),
+        remaining    = math.floor(tonumber(job[9])),
         data         = cjson.decode(job[10]),
         tags         = cjson.decode(job[11]),
         history      = self:history(),
@@ -395,14 +395,14 @@ end
 -- of retries remaining. If the allowed retries have been
 -- exhausted, then it is automatically failed, and a negative
 -- number is returned.
-function QlessJob:retry(now, queue, worker, delay)
+function QlessJob:retry(now, queue, worker, delay, group, message)
     assert(queue , 'Retry(): Arg "queue" missing')
     assert(worker, 'Retry(): Arg "worker" missing')
     delay = assert(tonumber(delay or 0),
         'Retry(): Arg "delay" not a number: ' .. tostring(delay))
     
     -- Let's see what the old priority, and tags were
-    local oldqueue, state, retries, oldworker, priority = unpack(redis.call('hmget', QlessJob.ns .. self.jid, 'queue', 'state', 'retries', 'worker', 'priority'))
+    local oldqueue, state, retries, oldworker, priority, failure = unpack(redis.call('hmget', QlessJob.ns .. self.jid, 'queue', 'state', 'retries', 'worker', 'priority', 'failure'))
 
     -- If this isn't the worker that owns
     if oldworker == false then
@@ -413,10 +413,18 @@ function QlessJob:retry(now, queue, worker, delay)
         error('Retry(): Job has been handed out to another worker: ' .. oldworker)
     end
 
+    -- For each of these, decrement their retries. If any of them
+    -- have exhausted their retries, then we should mark them as
+    -- failed.
+    local remaining = tonumber(redis.call(
+        'hincrbyfloat', QlessJob.ns .. self.jid, 'remaining', -0.5))
+    if (remaining * 2) % 2 == 1 then
+        local remaining = tonumber(redis.call(
+            'hincrbyfloat', QlessJob.ns .. self.jid, 'remaining', -0.5))
+    end
+
     -- Remove it from the locks key of the old queue
     Qless.queue(oldqueue).locks.remove(self.jid)
-
-    local remaining = redis.call('hincrby', QlessJob.ns .. self.jid, 'remaining', -1)
 
     -- Remove this job from the worker that was previously working it
     redis.call('zrem', 'ql:w:' .. worker .. ':jobs', self.jid)
@@ -426,17 +434,20 @@ function QlessJob:retry(now, queue, worker, delay)
         local group = 'failed-retries-' .. queue
         self:history(now, 'failed', {group = group})
         
-        redis.call('hmset', QlessJob.ns .. self.jid,
-            'state', 'failed',
+        redis.call('hmset', QlessJob.ns .. self.jid, 'state', 'failed',
             'worker', '',
-            'expires', '',
+            'expires', '')
+        -- If the failure has not already been set, then set it
+        if failure == {} then
+            redis.call('hset', QlessJob.ns .. self.jid,
             'failure', cjson.encode({
                 ['group']   = group,
-                ['message'] = 
-                    'Job exhausted retries in queue "' .. queue .. '"',
+                ['message'] =
+                    'Job exhausted retries in queue "' .. self.name .. '"',
                 ['when']    = now,
-                ['worker']  = worker
+                ['worker']  = unpack(job:data('worker'))
             }))
+        end
         
         -- Add this type of failure to the list of failures
         redis.call('sadd', 'ql:failures', group)
@@ -452,9 +463,21 @@ function QlessJob:retry(now, queue, worker, delay)
             queue_obj.work.add(now, priority, self.jid)
             redis.call('hset', QlessJob.ns .. self.jid, 'state', 'waiting')
         end
+
+        -- If a group and a message was provided, then we should save it
+        if group ~= nil and message ~= nil then
+            redis.call('hset', QlessJob.ns .. self.jid,
+                'failure', cjson.encode({
+                    ['group']   = group,
+                    ['message'] = message,
+                    ['when']    = math.floor(now),
+                    ['worker']  = worker
+                })
+            )
+        end
     end
 
-    return remaining
+    return math.floor(remaining)
 end
 
 -- Depends(0, jid,
@@ -635,7 +658,7 @@ function QlessJob:timeout(now)
             'state', 'stalled', 'expires', 0)
         local encoded = cjson.encode({
             jid    = self.jid,
-            event  = 'lock lost',
+            event  = 'lock_lost',
             worker = worker
         })
         Qless.publish('w:' .. worker, encoded)
