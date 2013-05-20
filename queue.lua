@@ -11,6 +11,9 @@ function Qless.queue(name)
     -- Access to our work
     queue.work = {
         peek = function(count)
+            if count == 0 then
+                return {}
+            end
             local jids = {}
             for index, jid in ipairs(redis.call(
                 'zrevrange', queue:prefix('work'), 0, count - 1)) do
@@ -35,7 +38,7 @@ function Qless.queue(name)
     queue.locks = {
         expired = function(now, offset, count)
             return redis.call('zrangebyscore',
-                queue:prefix('locks'), 0, now, 'LIMIT', offset, count)
+                queue:prefix('locks'), -math.huge, now, 'LIMIT', offset, count)
         end, peek = function(now, offset, count)
             return redis.call('zrangebyscore', queue:prefix('locks'),
                 now, math.huge, 'LIMIT', offset, count)
@@ -318,7 +321,8 @@ function QlessQueue:pop(now, worker, count)
 
     if max_concurrency > 0 then
         -- Allow at most max_concurrency - #running
-        count = math.min(max_concurrency - self.locks.running(now), count)
+        local allowed = math.max(0, max_concurrency - self.locks.running(now))
+        count = math.min(allowed, count)
         if count == 0 then
             return {}
         end
@@ -348,7 +352,6 @@ function QlessQueue:pop(now, worker, count)
         state = unpack(job:data('state'))
         job:history(now, 'popped', {worker = worker})
 
-        
         -- Update the wait time statistics
         -- local waiting = math.floor(now) - history[#history]['put']
         local waiting = 0
