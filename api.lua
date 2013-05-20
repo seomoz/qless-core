@@ -43,7 +43,7 @@ end
 
 -- Get information about a queue or queues
 QlessAPI.queues = function(now, queue)
-    return cjson.encode(Qless.queues(now, queue))
+    return cjson.encode(QlessQueue.counts(now, queue))
 end
 
 QlessAPI.complete = function(now, jid, worker, queue, data, ...)
@@ -75,7 +75,7 @@ QlessAPI.heartbeat = function(now, jid, worker, data)
 end
 
 QlessAPI.workers = function(now, worker)
-    return cjson.encode(Qless.workers(now, worker))
+    return cjson.encode(QlessWorker.counts(now, worker))
 end
 
 QlessAPI.track = function(now, command, jid)
@@ -113,15 +113,19 @@ QlessAPI.pop = function(now, queue, worker, count)
 end
 
 QlessAPI.pause = function(now, ...)
-    return Qless.pause(unpack(arg))
+    return QlessQueue.pause(unpack(arg))
 end
 
 QlessAPI.unpause = function(now, ...)
-    return Qless.unpause(unpack(arg))
+    return QlessQueue.unpause(unpack(arg))
 end
 
 QlessAPI.cancel = function(now, ...)
     return Qless.cancel(unpack(arg))
+end
+
+QlessAPI.timeout = function(now, jid)
+    return Qless.job(jid):timeout(now)
 end
 
 QlessAPI.put = function(now, queue, jid, klass, data, delay, ...)
@@ -165,8 +169,12 @@ QlessAPI.length = function(now, queue)
     return Qless.queue(queue):length()
 end
 
-QlessAPI.deregister = function(now, ...)
-    return Qless.deregister(unpack(arg))
+QlessAPI['worker.deregister'] = function(now, ...)
+    return QlessWorker.deregister(unpack(arg))
+end
+
+QlessAPI['queue.forget'] = function(now, ...)
+    QlessQueue.deregister(unpack(arg))
 end
 
 -------------------------------------------------------------------------------

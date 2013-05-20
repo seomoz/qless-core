@@ -11,6 +11,12 @@ local QlessQueue = {
 }
 QlessQueue.__index = QlessQueue
 
+-- Worker forward declaration
+local QlessWorker = {
+    ns = Qless.ns .. 'w:'
+}
+QlessWorker.__index = QlessWorker
+
 -- Job forward declaration
 local QlessJob = {
     ns = Qless.ns .. 'j:'
@@ -35,6 +41,10 @@ function Qless.debug(message)
     redis.call('publish', 'debug', tostring(message))
 end
 
+function Qless.publish(channel, message)
+    redis.call('publish', Qless.ns .. channel, message)
+end
+
 -- Return a job object
 function Qless.job(jid)
     assert(jid, 'Job(): no jid provided')
@@ -51,43 +61,6 @@ function Qless.recurring(jid)
     setmetatable(job, QlessRecurringJob)
     job.jid = jid
     return job
-end
-
--- Return information about a particular queue, or all queues
---  [
---      {
---          'name': 'testing',
---          'stalled': 2,
---          'waiting': 5,
---          'running': 5,
---          'scheduled': 10,
---          'depends': 5,
---          'recurring': 0
---      }, {
---          ...
---      }
---  ]
-function Qless.queues(now, name)
-    if name then
-        local queue = Qless.queue(name)
-        local stalled = queue.locks.length(now)
-        return {
-            name      = name,
-            waiting   = queue.work.length(),
-            stalled   = stalled,
-            running   = queue.locks.length() - stalled,
-            scheduled = queue.scheduled.length(),
-            depends   = queue.depends.length(),
-            recurring = queue.recurring.length()
-        }
-    else
-        local queues = redis.call('zrange', 'ql:queues', 0, -1)
-        local response = {}
-        for index, qname in ipairs(queues) do
-            table.insert(response, Qless.queues(now, qname))
-        end
-        return response
-    end
 end
 
 -- Failed([group, [start, [limit]]])
@@ -189,69 +162,6 @@ function Qless.jobs(now, state, ...)
     end
 end
 
--- Workers(0, now, [worker])
-----------------------------
--- Provide data about all the workers, or if a specific worker is provided,
--- then which jobs that worker is responsible for. If no worker is provided,
--- expect a response of the form:
--- 
---  [
---      # This is sorted by the recency of activity from that worker
---      {
---          'name'   : 'hostname1-pid1',
---          'jobs'   : 20,
---          'stalled': 0
---      }, {
---          ...
---      }
---  ]
--- 
--- If a worker id is provided, then expect a response of the form:
--- 
---  {
---      'jobs': [
---          jid1,
---          jid2,
---          ...
---      ], 'stalled': [
---          jid1,
---          ...
---      ]
---  }
---
-function Qless.workers(now, worker)
-    -- Clean up all the workers' job lists if they're too old. This is
-    -- determined by the `max-worker-age` configuration, defaulting to the
-    -- last day. Seems like a 'reasonable' default
-    local interval = tonumber(Qless.config.get('max-worker-age', 86400))
-
-    local workers  = redis.call('zrangebyscore', 'ql:workers', 0, now - interval)
-    for index, worker in ipairs(workers) do
-        redis.call('del', 'ql:w:' .. worker .. ':jobs')
-    end
-
-    -- And now remove them from the list of known workers
-    redis.call('zremrangebyscore', 'ql:workers', 0, now - interval)
-
-    if worker then
-        return {
-            jobs    = redis.call('zrevrangebyscore', 'ql:w:' .. worker .. ':jobs', now + 8640000, now),
-            stalled = redis.call('zrevrangebyscore', 'ql:w:' .. worker .. ':jobs', now, 0)
-        }
-    else
-        local response = {}
-        local workers = redis.call('zrevrange', 'ql:workers', 0, -1)
-        for index, worker in ipairs(workers) do
-            table.insert(response, {
-                name    = worker,
-                jobs    = redis.call('zcount', 'ql:w:' .. worker .. ':jobs', now, now + 8640000),
-                stalled = redis.call('zcount', 'ql:w:' .. worker .. ':jobs', 0, now)
-            })
-        end
-        return response
-    end
-end
-
 -- Track(0)
 -- Track(0, ('track' | 'untrack'), jid, now)
 -- ------------------------------------------
@@ -281,10 +191,10 @@ function Qless.track(now, command, jid)
     if command ~= nil then
         assert(jid, 'Track(): Arg "jid" missing')
         if string.lower(ARGV[1]) == 'track' then
-            redis.call('publish', 'track', jid)
+            Qless.publish('track', jid)
             return redis.call('zadd', 'ql:tracked', now, jid)
         elseif string.lower(ARGV[1]) == 'untrack' then
-            redis.call('publish', 'untrack', jid)
+            Qless.publish('untrack', jid)
             return redis.call('zrem', 'ql:tracked', jid)
         else
             error('Track(): Unknown action "' .. command .. '"')
@@ -335,7 +245,7 @@ function Qless.tag(now, command, ...)
 
     if command == 'add' then
         local jid  = assert(arg[1], 'Tag(): Arg "jid" missing')
-        local tags = redis.call('hget', 'ql:j:' .. jid, 'tags')
+        local tags = redis.call('hget', QlessJob.ns .. jid, 'tags')
         -- If the job has been canceled / deleted, then return false
         if tags then
             -- Decode the json blob, convert to dictionary
@@ -354,14 +264,14 @@ function Qless.tag(now, command, ...)
             end
         
             tags = cjson.encode(tags)
-            redis.call('hset', 'ql:j:' .. jid, 'tags', tags)
+            redis.call('hset', QlessJob.ns .. jid, 'tags', tags)
             return tags
         else
             return false
         end
     elseif command == 'remove' then
         local jid  = assert(arg[1], 'Tag(): Arg "jid" missing')
-        local tags = redis.call('hget', 'ql:j:' .. jid, 'tags')
+        local tags = redis.call('hget', QlessJob.ns .. jid, 'tags')
         -- If the job has been canceled / deleted, then return false
         if tags then
             -- Decode the json blob, convert to dictionary
@@ -381,7 +291,7 @@ function Qless.tag(now, command, ...)
             for i,tag in ipairs(tags) do if _tags[tag] then table.insert(results, tag) end end
         
             tags = cjson.encode(results)
-            redis.call('hset', 'ql:j:' .. jid, 'tags', tags)
+            redis.call('hset', QlessJob.ns .. jid, 'tags', tags)
             return results
         else
             return false
@@ -405,28 +315,6 @@ function Qless.tag(now, command, ...)
     end
 end
 
--- This script takes the name of the queue(s) and removes it
--- from the ql:paused_queues set.
---
--- Args: The list of queues to pause.
-function Qless.unpause(...)
-    redis.call('srem', 'ql:paused_queues', unpack(arg))
-end
-
--- This script takes the name of the queue(s) and adds it
--- to the ql:paused_queues set.
---
--- Args: The list of queues to pause.
---
--- Note: long term, we have discussed adding a rate-limiting
--- feature to qless-core, which would be more flexible and
--- could be used for pausing (i.e. pause = set the rate to 0).
--- For now, this is far simpler, but we should rewrite this
--- in terms of the rate limiting feature if/when that is added.
-function Qless.pause(...)
-    redis.call('sadd', 'ql:paused_queues', unpack(arg))
-end
-
 -- Cancel(0)
 -- --------------
 -- Cancel a job from taking place. It will be deleted from the system, and any
@@ -437,7 +325,7 @@ function Qless.cancel(...)
     local dependents = {}
     for _, jid in ipairs(arg) do
         dependents[jid] = redis.call(
-            'smembers', 'ql:j:' .. jid .. '-dependents') or {}
+            'smembers', QlessJob.ns .. jid .. '-dependents') or {}
     end
 
     -- Now, we'll loop through every jid we intend to cancel, and we'll go
@@ -456,7 +344,7 @@ function Qless.cancel(...)
     for _, jid in ipairs(arg) do
         -- Find any stage it's associated with and remove its from that stage
         local state, queue, failure, worker = unpack(redis.call(
-            'hmget', 'ql:j:' .. jid, 'state', 'queue', 'failure', 'worker'))
+            'hmget', QlessJob.ns .. jid, 'state', 'queue', 'failure', 'worker'))
 
         if state ~= 'complete' then
             -- Send a message out on the appropriate channels
@@ -466,13 +354,13 @@ function Qless.cancel(...)
                 event  = 'canceled',
                 queue  = queue
             })
-            redis.call('publish', 'log', encoded)
+            Qless.publish('log', encoded)
 
             -- Remove this job from whatever worker has it, if any
-            if worker then
+            if worker and (worker ~= '') then
                 redis.call('zrem', 'ql:w:' .. worker .. ':jobs', jid)
                 -- If necessary, send a message to the appropriate worker, too
-                redis.call('publish', worker, encoded)
+                Qless.publish('w:', worker, encoded)
             end
 
             -- Remove it from that queue
@@ -487,12 +375,12 @@ function Qless.cancel(...)
             -- We should probably go through all our dependencies and remove
             -- ourselves from the list of dependents
             for i, j in ipairs(redis.call(
-                'smembers', 'ql:j:' .. jid .. '-dependencies')) do
-                redis.call('srem', 'ql:j:' .. j .. '-dependents', jid)
+                'smembers', QlessJob.ns .. jid .. '-dependencies')) do
+                redis.call('srem', QlessJob.ns .. j .. '-dependents', jid)
             end
 
             -- Delete any notion of dependencies it has
-            redis.call('del', 'ql:j:' .. jid .. '-dependencies')
+            redis.call('del', QlessJob.ns .. jid .. '-dependencies')
 
             -- If we're in the failed state, remove all of our data
             if state == 'failed' then
@@ -506,7 +394,7 @@ function Qless.cancel(...)
 
             -- Remove it as a job that's tagged with this particular tag
             local tags = cjson.decode(
-                redis.call('hget', 'ql:j:' .. jid, 'tags') or '{}')
+                redis.call('hget', QlessJob.ns .. jid, 'tags') or '{}')
             for i, tag in ipairs(tags) do
                 redis.call('zrem', 'ql:t:' .. tag, jid)
                 redis.call('zincrby', 'ql:tags', -1, tag)
@@ -514,22 +402,15 @@ function Qless.cancel(...)
 
             -- If the job was being tracked, we should notify
             if redis.call('zscore', 'ql:tracked', jid) ~= false then
-                redis.call('publish', 'canceled', jid)
+                Qless.publish('canceled', jid)
             end
 
             -- Just go ahead and delete our data
-            redis.call('del', 'ql:j:' .. jid)
+            redis.call('del', QlessJob.ns .. jid)
+            redis.call('del', QlessJob.ns .. jid .. '-history')
         end
     end
     
     return arg
 end
 
--- DeregisterWorkers(0, worker)
--- This script takes the name of a worker(s) on removes it/them 
--- from the ql:workers set.
---
--- Args: The list of workers to deregister.
-function Qless.deregister(...)
-    redis.call('zrem', 'ql:workers', unpack(arg))
-end

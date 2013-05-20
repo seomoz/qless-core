@@ -32,9 +32,10 @@ Qless.config.set = function(option, value)
     assert(option, 'config.set(): Arg "option" missing')
     assert(value , 'config.set(): Arg "value" missing')
     -- Send out a log message
-    redis.call('publish', 'ql:log', cjson.encode({
+    Qless.publish('log', cjson.encode({
         event  = 'config.set',
-        option = option
+        option = option,
+        value  = value
     }))
 
     redis.call('hset', 'ql:config', option, value)
@@ -44,7 +45,7 @@ end
 Qless.config.unset = function(option)
     assert(option, 'config.unset(): Arg "option" missing')
     -- Send out a log message
-    redis.call('publish', 'ql:log', cjson.encode({
+    Qless.publish('log', cjson.encode({
         event  = 'config.unset',
         option = option
     }))

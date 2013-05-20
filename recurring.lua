@@ -11,7 +11,7 @@
 function QlessRecurringJob:data()
     local job = redis.call(
         'hmget', 'ql:r:' .. self.jid, 'jid', 'klass', 'state', 'queue',
-        'priority', 'interval', 'retries', 'count', 'data', 'tags')
+        'priority', 'interval', 'retries', 'count', 'data', 'tags', 'backlog')
     
     if not job[1] then
         return nil
@@ -27,7 +27,8 @@ function QlessRecurringJob:data()
         retries      = tonumber(job[7]),
         count        = tonumber(job[8]),
         data         = cjson.decode(job[9]),
-        tags         = cjson.decode(job[10])
+        tags         = cjson.decode(job[10]),
+        backlog      = tonumber(job[11] or 0)
     }
 end
 
@@ -61,6 +62,10 @@ function QlessRecurringJob:update(...)
                 queue_obj.recurring.remove(self.jid)
                 Qless.queue(value).recurring.add(score, self.jid)
                 redis.call('hset', 'ql:r:' .. self.jid, 'queue', value)
+            elseif key == 'backlog' then
+                value = assert(tonumber(value),
+                    'Recur(): Arg "backlog" not a number: ' .. tostring(value))
+                redis.call('hset', 'ql:r:' .. self.jid, 'backlog', value)
             else
                 error('Recur(): Unrecognized option "' .. key .. '"')
             end
