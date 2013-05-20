@@ -353,9 +353,12 @@ function QlessQueue:pop(now, worker, count)
         job:history(now, 'popped', {worker = worker})
 
         -- Update the wait time statistics
-        -- local waiting = math.floor(now) - history[#history]['put']
-        local waiting = 0
+        local time = tonumber(
+            redis.call('hget', QlessJob.ns .. jid, 'time') or now)
+        local waiting = now - time
         self:stat(now, 'wait', waiting)
+        redis.call('hset', QlessJob.ns .. jid,
+            'time', string.format("%.20f", now))
         
         -- Add this job to the list of jobs handled by this worker
         redis.call('zadd', 'ql:w:' .. worker .. ':jobs', expires, jid)
@@ -543,7 +546,8 @@ function QlessQueue:put(now, jid, klass, data, delay, ...)
         'expires'  , 0,
         'queue'    , self.name,
         'retries'  , retries,
-        'remaining', retries)
+        'remaining', retries,
+        'time'     , string.format("%.20f", now))
 
     -- These are the jids we legitimately have to wait on
     for i, j in ipairs(depends) do
@@ -758,7 +762,8 @@ function QlessQueue:check_recurring(now, count)
                 'expires'  , 0,
                 'queue'    , self.name,
                 'retries'  , retries,
-                'remaining', retries)
+                'remaining', retries,
+                'time'     , string.format("%.20f", score))
             Qless.job(child_jid):history(score, 'put', {q = self.name})
             
             -- Now, if a delay was provided, and if it's in the future,

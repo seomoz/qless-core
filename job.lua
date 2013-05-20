@@ -137,8 +137,12 @@ function QlessJob:complete(now, worker, queue, data, ...)
     ----------------------------------------------------------
     -- This is how long we've been waiting to get popped
     -- local waiting = math.floor(now) - history[#history]['popped']
-    local waiting = 0
+    local time = tonumber(
+        redis.call('hget', QlessJob.ns .. self.jid, 'time') or now)
+    local waiting = now - time
     Qless.queue(queue):stat(now, 'run', waiting)
+    redis.call('hset', QlessJob.ns .. self.jid,
+        'time', string.format("%.20f", now))
 
     -- Remove this job from the jobs that the worker that was running it has
     redis.call('zrem', 'ql:w:' .. worker .. ':jobs', self.jid)
