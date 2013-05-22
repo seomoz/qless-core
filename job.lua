@@ -325,7 +325,9 @@ function QlessJob:fail(now, worker, group, message, data)
         'queue', 'state'))
 
     -- If the job has been completed, we cannot fail it
-    if state ~= 'running' then
+    if not state then
+        error('Fail(): Job does not exist')
+    elseif state ~= 'running' then
         error('Fail(): Job not currently running: ' .. state)
     end
 
