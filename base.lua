@@ -155,7 +155,7 @@ function Qless.jobs(now, state, ...)
         elseif state == 'depends' then
             return queue.depends.peek(now, offset, count)
         elseif state == 'recurring' then
-            return queue.recurring.peek(now, offset, count)
+            return queue.recurring.peek(math.huge, offset, count)
         else
             error('Jobs(): Unknown type "' .. state .. '"')
         end

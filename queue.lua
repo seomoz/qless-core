@@ -780,10 +780,9 @@ end
 --! @brief Check for any jobs that have been scheduled, and shovel them onto
 --!     the work queue. Returns nothing, but afterwards, up to `count`
 --!     scheduled jobs will be moved into the work queue
-function QlessQueue:check_scheduled(now, count, execute)
+function QlessQueue:check_scheduled(now, count)
     -- zadd is a list of arguments that we'll be able to use to
     -- insert into the work queue
-    local zadd = {}
     local scheduled = self.scheduled.ready(now, 0, count)
     for index, jid in ipairs(scheduled) do
         -- With these in hand, we'll have to go out and find the 
@@ -793,16 +792,11 @@ function QlessQueue:check_scheduled(now, count, execute)
         local priority = tonumber(
             redis.call('hget', QlessJob.ns .. jid, 'priority') or 0)
         self.work.add(now, priority, jid)
+        self.scheduled.remove(jid)
 
         -- We should also update them to have the state 'waiting'
         -- instead of 'scheduled'
         redis.call('hset', QlessJob.ns .. jid, 'state', 'waiting')
-    end
-    
-    if #zadd > 0 then
-        -- Now add these to the work list, and then remove them
-        -- from the scheduled list
-        self.scheduled.remove(unpack(scheduled))
     end
 end
 
