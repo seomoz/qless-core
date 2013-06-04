@@ -423,11 +423,8 @@ function QlessJob:retry(now, queue, worker, delay, group, message)
     -- have exhausted their retries, then we should mark them as
     -- failed.
     local remaining = tonumber(redis.call(
-        'hincrbyfloat', QlessJob.ns .. self.jid, 'remaining', -0.5))
-    if (remaining * 2) % 2 == 1 then
-        local remaining = tonumber(redis.call(
-            'hincrbyfloat', QlessJob.ns .. self.jid, 'remaining', -0.5))
-    end
+        'hincrby', QlessJob.ns .. self.jid, 'remaining', -1))
+    redis.call('hdel', QlessJob.ns .. self.jid, 'grace')
 
     -- Remove it from the locks key of the old queue
     Qless.queue(oldqueue).locks.remove(self.jid)
