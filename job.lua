@@ -650,7 +650,7 @@ function QlessJob:timeout(now)
     if queue_name == nil then
         error('Timeout(): Job does not exist')
     elseif state ~= 'running' then
-        error('Timeout(): Job not running')
+        error('Timeout(): Job ' .. self.jid .. ' not running')
     else
         -- Time out the job
         self:history(now, 'timed-out')
@@ -666,7 +666,7 @@ function QlessJob:timeout(now)
         })
         Qless.publish('w:' .. worker, encoded)
         Qless.publish('log', encoded)
-        return queue
+        return queue_name
     end
 end
 

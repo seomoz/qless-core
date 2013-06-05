@@ -113,7 +113,7 @@ QlessAPI.pop = function(now, queue, worker, count)
 end
 
 QlessAPI.pause = function(now, ...)
-    return QlessQueue.pause(unpack(arg))
+    return QlessQueue.pause(now, unpack(arg))
 end
 
 QlessAPI.unpause = function(now, ...)
@@ -124,8 +124,10 @@ QlessAPI.cancel = function(now, ...)
     return Qless.cancel(unpack(arg))
 end
 
-QlessAPI.timeout = function(now, jid)
-    return Qless.job(jid):timeout(now)
+QlessAPI.timeout = function(now, ...)
+    for _, jid in ipairs(arg) do
+        Qless.job(jid):timeout(now)
+    end
 end
 
 QlessAPI.put = function(now, queue, jid, klass, data, delay, ...)

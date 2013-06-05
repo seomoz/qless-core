@@ -274,7 +274,7 @@ end
 -- could be used for pausing (i.e. pause = set the rate to 0).
 -- For now, this is far simpler, but we should rewrite this
 -- in terms of the rate limiting feature if/when that is added.
-function QlessQueue.pause(...)
+function QlessQueue.pause(now, ...)
     redis.call('sadd', 'ql:paused_queues', unpack(arg))
 end
 
