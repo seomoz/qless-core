@@ -448,11 +448,11 @@ end
 --    4) now
 --    5) delay
 --    *) [priority, p], [tags, t], [retries, r], [depends, '[...]']
-function QlessQueue:put(now, jid, klass, data, delay, ...)
+function QlessQueue:put(now, jid, klass, raw_data, delay, ...)
     assert(jid  , 'Put(): Arg "jid" missing')
     assert(klass, 'Put(): Arg "klass" missing')
-    data  = assert(cjson.decode(data),
-        'Put(): Arg "data" missing or not JSON: ' .. tostring(data))
+    local data = assert(cjson.decode(raw_data),
+        'Put(): Arg "data" missing or not JSON: ' .. tostring(raw_data))
     delay = assert(tonumber(delay),
         'Put(): Arg "delay" not a number: ' .. tostring(delay))
 
@@ -538,7 +538,7 @@ function QlessQueue:put(now, jid, klass, data, delay, ...)
     redis.call('hmset', QlessJob.ns .. jid,
         'jid'      , jid,
         'klass'    , klass,
-        'data'     , cjson.encode(data),
+        'data'     , raw_data,
         'priority' , priority,
         'tags'     , cjson.encode(tags),
         'state'    , ((delay > 0) and 'scheduled') or 'waiting',
@@ -622,12 +622,12 @@ function QlessQueue:unfail(now, group, count)
     return #jids
 end
 
-function QlessQueue:recur(now, jid, klass, data, spec, ...)
+function QlessQueue:recur(now, jid, klass, raw_data, spec, ...)
     assert(jid  , 'RecurringJob On(): Arg "jid" missing')
     assert(klass, 'RecurringJob On(): Arg "klass" missing')
     assert(spec , 'RecurringJob On(): Arg "spec" missing')
-    data = assert(cjson.decode(data),
-        'RecurringJob On(): Arg "data" not JSON: ' .. tostring(data))
+    local data = assert(cjson.decode(raw_data),
+        'RecurringJob On(): Arg "data" not JSON: ' .. tostring(raw_data))
 
     -- At some point in the future, we may have different types of recurring
     -- jobs, but for the time being, we only have 'interval'-type jobs
@@ -669,7 +669,7 @@ function QlessQueue:recur(now, jid, klass, data, spec, ...)
         redis.call('hmset', 'ql:r:' .. jid,
             'jid'     , jid,
             'klass'   , klass,
-            'data'    , cjson.encode(data),
+            'data'    , raw_data,
             'priority', options.priority,
             'tags'    , cjson.encode(options.tags or {}),
             'state'   , 'recur',

@@ -30,7 +30,7 @@ function QlessJob:data(...)
         expires      = tonumber(job[7]) or 0,
         retries      = tonumber(job[8]),
         remaining    = math.floor(tonumber(job[9])),
-        data         = cjson.decode(job[10]),
+        data         = job[10],
         tags         = cjson.decode(job[11]),
         history      = self:history(),
         failure      = cjson.decode(job[12] or '{}'),

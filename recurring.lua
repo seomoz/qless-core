@@ -26,7 +26,7 @@ function QlessRecurringJob:data()
         interval     = tonumber(job[6]),
         retries      = tonumber(job[7]),
         count        = tonumber(job[8]),
-        data         = cjson.decode(job[9]),
+        data         = job[9],
         tags         = cjson.decode(job[10]),
         backlog      = tonumber(job[11] or 0)
     }
@@ -51,8 +51,8 @@ function QlessRecurringJob:update(...)
                 end
                 redis.call('hset', 'ql:r:' .. self.jid, key, value)
             elseif key == 'data' then
-                value = assert(cjson.decode(value), 'Recur(): Arg "data" is not JSON-encoded: ' .. tostring(value))
-                redis.call('hset', 'ql:r:' .. self.jid, 'data', cjson.encode(value))
+                assert(cjson.decode(value), 'Recur(): Arg "data" is not JSON-encoded: ' .. tostring(value))
+                redis.call('hset', 'ql:r:' .. self.jid, 'data', value)
             elseif key == 'klass' then
                 redis.call('hset', 'ql:r:' .. self.jid, 'klass', value)
             elseif key == 'queue' then
