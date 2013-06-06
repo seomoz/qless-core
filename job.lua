@@ -500,8 +500,10 @@ end
 --    1) jid
 function QlessJob:depends(now, command, ...)
     assert(command, 'Depends(): Arg "command" missing')
-    if redis.call('hget', QlessJob.ns .. self.jid, 'state') ~= 'depends' then
-        return false
+    local state = redis.call('hget', QlessJob.ns .. self.jid, 'state')
+    if state ~= 'depends' then
+        error('Depends(): Job ' .. self.jid ..
+            ' not in the depends state: ' .. state)
     end
 
     if command == 'on' then
@@ -605,7 +607,7 @@ end
 -- priority(0, jid, priority)
 -- --------------------------
 -- Accepts a jid, and a new priority for the job. If the job 
--- doesn't exist, then return false. Otherwise, return the 
+-- doesn't exist, raise an error. Otherwise, return the 
 -- updated priority. If the job is waiting, then the change
 -- will be reflected in the order in which it's popped
 function QlessJob:priority(priority)
@@ -616,7 +618,8 @@ function QlessJob:priority(priority)
     local queue = redis.call('hget', QlessJob.ns .. self.jid, 'queue')
 
     if queue == nil then
-        return false
+        -- If the job doesn't exist, throw an error
+        error('Priority(): Job ' .. self.jid .. ' does not exist')
     elseif queue == '' then
         -- Just adjust the priority
         redis.call('hset', QlessJob.ns .. self.jid, 'priority', priority)

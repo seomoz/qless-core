@@ -92,7 +92,7 @@ function QlessRecurringJob:tag(...)
         redis.call('hset', 'ql:r:' .. self.jid, 'tags', tags)
         return tags
     else
-        return false
+        error('Tag(): Job ' .. self.jid .. ' does not exist')
     end
 end
 
@@ -116,7 +116,7 @@ function QlessRecurringJob:untag(...)
         redis.call('hset', 'ql:r:' .. self.jid, 'tags', tags)
         return tags
     else
-        return false
+        error('Untag(): Job ' .. self.jid .. ' does not exist')
     end
 end
 

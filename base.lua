@@ -267,7 +267,7 @@ function Qless.tag(now, command, ...)
             redis.call('hset', QlessJob.ns .. jid, 'tags', tags)
             return tags
         else
-            return false
+            error('Tag(): Job ' .. jid .. ' does not exist')
         end
     elseif command == 'remove' then
         local jid  = assert(arg[1], 'Tag(): Arg "jid" missing')
@@ -294,7 +294,7 @@ function Qless.tag(now, command, ...)
             redis.call('hset', QlessJob.ns .. jid, 'tags', tags)
             return results
         else
-            return false
+            error('Tag(): Job ' .. jid .. ' does not exist')
         end
     elseif command == 'get' then
         local tag    = assert(arg[1], 'Tag(): Arg "tag" missing')
