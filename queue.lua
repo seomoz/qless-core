@@ -464,6 +464,11 @@ function QlessQueue:put(now, jid, klass, raw_data, delay, ...)
     local job = Qless.job(jid)
     local priority, tags, oldqueue, state, failure, retries, worker = unpack(redis.call('hmget', QlessJob.ns .. jid, 'priority', 'tags', 'queue', 'state', 'failure', 'retries', 'worker'))
 
+    -- If there are old tags, then we should remove the tags this job has
+    if tags then
+        Qless.tag(now, 'remove', jid, unpack(cjson.decode(tags)))
+    end
+
     -- Sanity check on optional args
     retries  = assert(tonumber(options['retries']  or retries or 5) , 'Put(): Arg "retries" not a number: ' .. tostring(options['retries']))
     tags     = assert(cjson.decode(options['tags'] or tags or '[]' ), 'Put(): Arg "tags" not JSON'          .. tostring(options['tags']))
