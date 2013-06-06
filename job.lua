@@ -673,6 +673,11 @@ function QlessJob:timeout(now)
     end
 end
 
+-- Return whethere or not this job exists
+function QlessJob:exists()
+    return redis.call('exists', QlessJob.ns .. self.jid) == 1
+end
+
 -- Get or append to history
 function QlessJob:history(now, what, item)
     -- First, check if there's an old-style history, and update it if there is

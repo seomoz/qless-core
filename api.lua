@@ -94,6 +94,20 @@ QlessAPI.priority = function(now, jid, priority)
     return Qless.job(jid):priority(priority)
 end
 
+-- Add logging to a particular jid
+QlessAPI.log = function(now, jid, message, data)
+    assert(jid, "Log(): Argument 'jid' missing")
+    assert(message, "Log(): Argument 'message' missing")
+    if data then
+        data = assert(cjson.decode(data),
+            "Log(): Argument 'data' not cjson: " .. tostring(data))
+    end
+
+    local job = Qless.job(jid)
+    assert(job:exists(), 'Log(): Job ' .. jid .. ' does not exist')
+    job:history(now, message, data)
+end
+
 QlessAPI.peek = function(now, queue, count)
     local jids = Qless.queue(queue):peek(now, count)
     local response = {}
