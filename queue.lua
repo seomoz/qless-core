@@ -868,8 +868,14 @@ function QlessQueue:invalidate_locks(now, count)
         end
 
         if invalidate then
+            -- Unset the grace period attribute so that next time we'll send
+            -- the grace period
+            redis.call('hdel', QlessJob.ns .. jid, 'grace', 0)
+
+            -- See how many remaining retries the job has
             local remaining = tonumber(redis.call(
                 'hincrby', QlessJob.ns .. jid, 'remaining', -1))
+            
             -- This is where we actually have to time out the work
             if remaining < 0 then
                 -- Now remove the instance from the schedule, and work queues
@@ -877,8 +883,6 @@ function QlessQueue:invalidate_locks(now, count)
                 self.work.remove(jid)
                 self.locks.remove(jid)
                 self.scheduled.remove(jid)
-
-                redis.call('hdel', QlessJob.ns .. jid, 'grace', 0)
                 
                 local group = 'failed-retries-' .. Qless.job(jid):data()['queue']
                 local job = Qless.job(jid)
