@@ -434,21 +434,30 @@ function QlessJob:retry(now, queue, worker, delay, group, message)
 
     if remaining < 0 then
         -- Now remove the instance from the schedule, and work queues for the queue it's in
-        local group = 'failed-retries-' .. queue
-        self:history(now, 'failed', {group = group})
+        local group = group or 'failed-retries-' .. queue
+        self:history(now, 'failed', {['group'] = group})
         
         redis.call('hmset', QlessJob.ns .. self.jid, 'state', 'failed',
             'worker', '',
             'expires', '')
         -- If the failure has not already been set, then set it
-        if failure == {} then
+        if group ~= nil and message ~= nil then
+            redis.call('hset', QlessJob.ns .. self.jid,
+                'failure', cjson.encode({
+                    ['group']   = group,
+                    ['message'] = message,
+                    ['when']    = math.floor(now),
+                    ['worker']  = worker
+                })
+            )
+        else
             redis.call('hset', QlessJob.ns .. self.jid,
             'failure', cjson.encode({
                 ['group']   = group,
                 ['message'] =
-                    'Job exhausted retries in queue "' .. self.name .. '"',
+                    'Job exhausted retries in queue "' .. oldqueue .. '"',
                 ['when']    = now,
-                ['worker']  = unpack(job:data('worker'))
+                ['worker']  = unpack(self:data('worker'))
             }))
         end
         
