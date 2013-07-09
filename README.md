@@ -1,302 +1,68 @@
-API
-===
-Here is some brief documentation of how the lua scripts work and what they 
-expect. Each invocation begins with a number, which describes how many of the
-provided values are considered `KEYS`, as they refer in some sense to a Redis 
-key. The remaining values are considered `ARGV`. This is a distinction that 
-Redis makes internally, and should be considered a magic number.
+Qless Core
+==========
+This is the set of all the lua scripts that comprise the qless library. We've
+begun migrating away from the system of having one lua script per command to
+a more object-oriented approach where all code is contained in a single unified
+lua script.
 
-Common Arguments
-----------------
-All times are specified as UTC timestamps. I imagine this is something that 
-might become somewhat contentious. Lua scripts are not allowed access to the 
-system clock. They actually have a pretty good reason for that, but it also 
-means that each client must provide their own times. This has the side effect 
-of requiring that all clients have relatively __synchronized clocks__.
+There are a few reasons for making this choice, but essentially it was getting
+too difficult to maintain and there was a lot of duplicated code in different
+sections. This also happens to have the added benefit of allowing you to build
+on top of the qless core library __within your own lua scripts__ through
+composition.
 
-- `id` -- the id of the job, a hexadecimal uuid
-- `data` -- a JSON blob representing the user data associated with a job
-- `queue` -- the name of a queue
-- `worker` -- a unique string identifying a process on a host
+Building
+========
+For ease of development, we've broken this unified file into several smaller
+submodules that are concatenated together into a `qless.lua` script. These are:
 
-Cancel(0, id)
--------------
-Cancel a job from taking place. It will be deleted from the system, and any
-attempts to renew a heartbeat will fail, and any attempts to complete it
-will fail. If you try to get the data on the object, you will get nothing.
+- `base.lua` -- forward declarations and some uncategorized functions
+- `config.lua` -- all configuration interactions
+- `job.lua` -- the regular job class
+- `recurring.lua` -- the recurring job class
+- `queue.lua` -- the queue class
+- `api.lua` -- exposing the interfaces that the clients invoke, it's a very
+	thin wrapper around these classes
 
-Complete(0, jid, worker, queue, now, data, ['next', n, [('delay', d) | ('depends', '["jid1","jid2",...]')])
-------------------------------------------------------------
-Complete a job and optionally put it in another queue, either scheduled or to
-be considered waiting immediately. Job dependencies can also be injected at
-this time. __Returns__: The updated state, or False on error
+In order to build up the `qless.lua` script, we've included a simple `Makefile`
+though all it does is cat these files out in a particular order:
 
-Depends(0, jid, ('on', [jid, [jid, [...]]]) | ('off', ('all' | [jid, [jid, [...]]]))
--------------------------------------------------------------------------------
-Add or remove dependencies a job has. If 'on' is provided, the provided jids
-are added as dependencies. If 'off' and 'all' are provided, then all the 
-current dependencies are removed. If 'off' is provided and the next argument 
-is not 'all', then those jids are removed as dependencies.
+```bash
+make qless.lua
+```
 
-If a job is not already in the 'depends' state, then this call will return 
-false. Otherwise, it will return true
+If you'd like to use _just_ the core library within your lua script, you can
+get lua script that contains all the classes, but none of the wrapping layer
+that the qless clients use:
 
-Fail(0, id, worker, type, message, now, [data])
------------------------------------------------
-Mark the particular job as failed, with the provided type, and a more specific
-message. By `type`, we mean some phrase that might be one of several
-categorical modes of failure. The `message` is something more job-specific,
-like perhaps a traceback.
+```bash
+make qless-lib.lua
+```
 
-This method should __not__ be used to note that a job has been dropped or has 
-failed in a transient way. This method __should__ be used to note that a job
-has something really wrong with it that must be remedied.
+Conventions
+===========
 
-The motivation behind the `type` is so that similar errors can be grouped
-together. Optionally, updated data can be provided for the job. A job in any 
-state can be marked as failed. If it has been given to a worker as a job, then
-its subsequent requests to heartbeat or complete that job will fail. Failed
-jobs are kept until they are canceled or completed. __Returns__ the id of the
-failed job if successful, or `False` on failure.
+No more `KEYS`
+--------------
+When originally developing this, I wrote some functions using the `KEYS`
+portion of the lua scripts, but eventually realized that to do so didn't make
+any sense. For just about all operations there's no way to determine a priori
+which Redis keys would be touched, and so I abandoned that idea. However, in
+many cases there were vestigial `KEYS` in use, but that has now changed. No
+more `KEYS`!
 
-Failed(0, [type, [start, [limit]]])
------------------------------------
-If no type is provided, this returns a JSON blob of the counts of the various
-types of failures known. If a type is provided, it will report up to `limit`
-from `start` of the jobs affected by that issue. __Returns__ a JSON blob.
-
-	# If no type, then...
-	{
-		'type1': 1,
-		'type2': 5,
-		...
-	}
-	
-	# If a type is provided, then...
-	{
-		'total': 100,
-		'jobs': [
-			{
-				# All the normal keys for a job
-				'jid': ...,
-				'data': ...
-				# The message for this particular instance
-				'message': ...,
-				'type': ...,
-			}, ...
-		]
-	}
-
-Get(0, id)
-----------
-Get the data associated with a job. __Returns__: JSON blob describing the
-job.
-
-GetConfig(0, [option])
-----------------------
-Get the current configuration value for that option, or if option is omitted,
-then get all the configuration values. __Returns__: The value of the option
-
-Heartbeat(0, id, worker, now, [data])
--------------------------------------
-Renew the heartbeat, if possible, and optionally update the job's user data.
-__Returns__: a JSON blob with `False` if the job was not renewed, or the
-updated expiration time
-
-Jobs(0, ('stalled' | 'running' | 'scheduled' | 'depends'), now, queue)
-----------------------------------------------------------
-Return all the job ids currently considered to be in the provided state
-in a particular queue. The response is a list of job ids:
-
-	[
-		jid1, 
-		jid2,
-		...
-	]
-
-Peek(1, queue, count, now)
---------------------------
-Similar to the `Pop` command, except that it merely peeks at the next items
-in the queue.
-
-Pop(1, queue, worker, count, now)
----------------------------------
-Passing in the queue from which to pull items, the current time, when the locks
-for these returned items should expire, and the number of items to be popped
-off.
-
-Priority(0, jid, priority)
---------------------------
-Accepts a jid, and a new priority for the job. If the job doesn't exist, then
-return false. Otherwise, return the updated priority. If the job is waiting,
-then the change will be reflected in the order in which it's popped
-
-Put(1, queue, jid, klass, data, now, delay, [priority, p], [tags, t], [retries, r], [depends, '[...]'])
---------------------------------------------------------------------------
-Either create a new job in the provided queue with the provided attributes,
-or move that job into that queue. If the job is being serviced by a worker,
-subsequent attempts by that worker to either `heartbeat` or `complete` the
-job should fail and return `false`.
-
-The `priority` argument should be negative to be run sooner rather than 
-later, and positive if it's less important. The `tags` argument should be
-a JSON array of the tags associated with the instance and the `delay`
-argument should be in how many seconds the instance should be considered 
-actionable. The `retries` argument describes the maximum number of retries
-that should be permitted for a job before it is considered automatically
-failed.
-
-The `depends` argument is an optional JSON array of job ids on which this
-job depends. See the section on dependency for more.
-
-__Returns__: The id of the put job, or raises an error on failure
-
-Queues(0, now, [queue])
------------------------
-Return all the queues we know about, with how many jobs are scheduled, waiting,
-and running in that queue. If a queue name is provided, then only the
-appropriate response hash should be returned. The response is JSON:
-
-	[
-		{
-			'name': 'testing',
-			'stalled': 2,
-			'waiting': 5,
-			'running': 5,
-			'scheduled': 10
-		}, {
-			...
-		}
-	]
-
-Retry(0, jid, queue, worker, now, [delay])
-------------------------------------------
-This script accepts jid, queue, worker and delay for retrying a job. This is
-similar in functionality to `put`, except that this counts against the retries 
-a job has for a stage.
-
-If the worker is not the worker with a lock on the job, then it returns false.
-If the job is not actually running, then it returns false. Otherwise, it
-returns the number of retries remaining. If the allowed retries have been
-exhausted, then it is automatically failed, and a negative number is returned.
-
-SetConfig(0, option, [value])
------------------------------
-Set the configuration value for the provided option. If `value` is omitted,
-then it will remove that configuration option. __Returns__: nothing
-
-Stats(0, queue, date)
+Time, Time Everywhere
 ---------------------
-Return the current statistics for a given queue on a given date. The results 
-are returned are a JSON blob:
+To ease the client logic, every command now takes a timestamp with it. In many
+cases this argument is ignored, but it is still required in order to make a
+valid call. This requirement only comes through in the exposed script API, but
+not in the class interface. At the class function level, only the functions
+which require the `now` argument list it.
 
-	{
-		'failed': 3,
-		'retries': 5,
-		'wait' : {
-			'total'    : ...,
-			'mean'     : ...,
-			'variance' : ...,
-			'histogram': [
-				...
-			]
-		}, 'run': {
-			'total'    : ...,
-			'mean'     : ...,
-			'variance' : ...,
-			'histogram': [
-				...
-			]
-		}
-	}
-
-The histogram's data points are at the second resolution for the first minute,
-the minute resolution for the first hour, the 15-minute resolution for the
-first day, the hour resolution for the first 3 days, and then at the day
-resolution from there on out. The `histogram` key is a list of those values.
-
-Tag(0, (('add' | 'remove'), jid, now, tag, [tag, ...]) | 'get', tag, [offset, [count]])
-----------------------------------------------------------------------------------
-Accepts a jid, 'add' or 'remove', and then a list of tags to either add or
-remove from the job. Alternatively, 'get', a tag to get jobs associated with
-that tag, and offset and count.
-
-If 'add' or 'remove', the response is a list of the jobs current tags, or False
-if the job doesn't exist. If 'get', the response is of the form:
-
-	{
-		total: ...,
-		jobs: [
-			jid,
-			...
-		]
-	}
-
-Track(0) | Track(0, 'track', jid, now, tag, ...) | Track(0, 'untrack', jid, now)
--------------------------------------------------------------------------------
-If no arguments are provided, it returns details of all currently-tracked jobs.
-If the first argument is 'track', then it will start tracking the job
-associated with that id, and 'untrack' stops tracking it. In this context,
-tracking is nothing more than saving the job to a list of jobs that are
-considered special.
-__Returns__ JSON:
-
-	{
-		'jobs': [
-			{
-				'jid': ...,
-				# All the other details you'd get from 'get'
-			}, {
-				...
-			}
-		], 'expired': [
-			# These are all the jids that are completed and whose data expired
-			'deadbeef',
-			...,
-			...,
-		]
-	}
-
-Workers(0, now, [worker])
--------------------------
-Provide data about all the workers, or if a specific worker is provided, then
-which jobs that worker is responsible for. If no worker is provided, expect a
-response of the form:
-
-	[
-		# This is sorted by the recency of activity from that worker
-		{
-			'name'   : 'hostname1-pid1',
-			'jobs'   : 20,
-			'stalled': 0
-		}, {
-			...
-		}
-	]
-
-If a worker id is provided, then expect a response of the form:
-
-	{
-		'jobs': [
-			jid1,
-			jid2,
-			...
-		], 'stalled': [
-			jid1,
-			...
-		]
-	}
-
-Unfail(0, now, group, queue, [count])
--------------------------------------
-Move the first `count` jobs from failure `group` to `queue`. This is
-significantly faster than moving each of the jobs individually, so when moving
-lots of failed jobs, use this.
-
-ConsistencyCheck(0, [resolve])
-------------------------------
-__Unimplemented__ This is something I may implement at some point to 
-serve as a method for checking the consistency of qless.
+Documentation
+=============
+The documentation of the code is present in each of the modules, but it is
+excluded from the production code to reduce the weight of it.
 
 Features and Philosophy
 =======================
