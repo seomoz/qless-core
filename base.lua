@@ -37,15 +37,13 @@ function table.extend(self, other)
     end
 end
 
-function Qless.debug(message)
-    redis.call('publish', 'debug', tostring(message))
-end
-
+-- This is essentially the same as redis' publish, but it prefixes the channel
+-- with the Qless namespace
 function Qless.publish(channel, message)
     redis.call('publish', Qless.ns .. channel, message)
 end
 
--- Return a job object
+-- Return a job object given its job id
 function Qless.job(jid)
     assert(jid, 'Job(): no jid provided')
     local job = {}
@@ -114,13 +112,11 @@ function Qless.failed(group, start, limit)
     end
 end
 
--- Jobs(0, now, 'complete' | (
---      (
+-- Jobs(now, 'complete', [offset, [count]])
+-- Jobs(now, (
 --          'stalled' | 'running' | 'scheduled' | 'depends', 'recurring'
---      ), queue)
--- [offset, [count]])
+--      ), queue, [offset, [count]])
 -------------------------------------------------------------------------------
--- 
 -- Return all the job ids currently considered to be in the provided state
 -- in a particular queue. The response is a list of job ids:
 -- 
@@ -162,8 +158,8 @@ function Qless.jobs(now, state, ...)
     end
 end
 
--- Track(0)
--- Track(0, ('track' | 'untrack'), jid, now)
+-- Track()
+-- Track(now, ('track' | 'untrack'), jid)
 -- ------------------------------------------
 -- If no arguments are provided, it returns details of all currently-tracked
 -- jobs. If the first argument is 'track', then it will start tracking the job
@@ -217,9 +213,9 @@ function Qless.track(now, command, jid)
     end
 end
 
--- tag(0, now, ('add' | 'remove'), jid, tag, [tag, ...])
--- tag(0, now, 'get', tag, [offset, [count]])
--- tag(0, now, 'top', [offset, [count]])
+-- tag(now, ('add' | 'remove'), jid, tag, [tag, ...])
+-- tag(now, 'get', tag, [offset, [count]])
+-- tag(now, 'top', [offset, [count]])
 -- ------------------------------------------------------------------------------------------------------------------
 -- Accepts a jid, 'add' or 'remove', and then a list of tags
 -- to either add or remove from the job. Alternatively, 'get',
@@ -315,7 +311,7 @@ function Qless.tag(now, command, ...)
     end
 end
 
--- Cancel(0)
+-- Cancel(...)
 -- --------------
 -- Cancel a job from taking place. It will be deleted from the system, and any
 -- attempts to renew a heartbeat will fail, and any attempts to complete it

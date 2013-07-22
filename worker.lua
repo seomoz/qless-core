@@ -1,14 +1,8 @@
--- DeregisterWorkers(0, worker)
--- This script takes the name of a worker(s) on removes it/them 
--- from the ql:workers set.
---
--- Args: The list of workers to deregister.
+-- Deregisters these workers from the list of known workers
 function QlessWorker.deregister(...)
     redis.call('zrem', 'ql:workers', unpack(arg))
 end
 
--- Workers(0, now, [worker])
-----------------------------
 -- Provide data about all the workers, or if a specific worker is provided,
 -- then which jobs that worker is responsible for. If no worker is provided,
 -- expect a response of the form:
