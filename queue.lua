@@ -119,7 +119,7 @@ function Qless.queue(name)
     return queue
 end
 
---! @brief Return the prefix for this particular queue
+-- Return the prefix for this particular queue
 function QlessQueue:prefix(group)
     if group then
         return QlessQueue.ns..self.name..'-'..group
@@ -128,7 +128,7 @@ function QlessQueue:prefix(group)
     end
 end
 
--- Stats(0, queue, date)
+-- Stats(now, date)
 -- ---------------------
 -- Return the current statistics for a given queue on a given date. The
 -- results are returned are a JSON blob:
@@ -160,10 +160,6 @@ end
 -- for the first day, the hour resolution for the first 3 days, and then at
 -- the day resolution from there on out. The `histogram` key is a list of
 -- those values.
---
--- Args:
---    1) queue
---    2) time
 function QlessQueue:stats(now, date)
     date = assert(tonumber(date),
         'Stats(): Arg "date" missing or not a number: '.. (date or 'nil'))
@@ -222,16 +218,10 @@ function QlessQueue:stats(now, date)
     }
 end
 
--- This script takes the name of the queue and then checks
--- for any expired locks, then inserts any scheduled items
--- that are now valid, and lastly returns any work items 
--- that can be handed over.
---
--- Keys:
---    1) queue name
--- Args:
---    1) the number of items to return
---    2) the current time
+-- Peek
+-------
+-- Examine the next jobs that would be popped from the queue without actually
+-- popping them.
 function QlessQueue:peek(now, count)
     count = assert(tonumber(count),
         'Peek(): Arg "count" missing or not a number: ' .. tostring(count))
@@ -259,15 +249,12 @@ function QlessQueue:peek(now, count)
     return jids
 end
 
---! @brief Return true if this queue is paused
+-- Return true if this queue is paused
 function QlessQueue:paused()
     return redis.call('sismember', 'ql:paused_queues', self.name) == 1
 end
 
--- This script takes the name of the queue(s) and adds it
--- to the ql:paused_queues set.
---
--- Args: The list of queues to pause.
+-- Pause this queue
 --
 -- Note: long term, we have discussed adding a rate-limiting
 -- feature to qless-core, which would be more flexible and
@@ -278,25 +265,13 @@ function QlessQueue.pause(now, ...)
     redis.call('sadd', 'ql:paused_queues', unpack(arg))
 end
 
--- This script takes the name of the queue(s) and removes it
--- from the ql:paused_queues set.
---
--- Args: The list of queues to pause.
+-- Unpause this queue
 function QlessQueue.unpause(...)
     redis.call('srem', 'ql:paused_queues', unpack(arg))
 end
 
--- This script takes the name of the queue and then checks
--- for any expired locks, then inserts any scheduled items
--- that are now valid, and lastly returns any work items 
--- that can be handed over.
---
--- Keys:
---    1) queue name
--- Args:
---    1) worker name
---    2) the number of items to return
---    3) the current time
+-- Checks for expired locks, scheduled and recurring jobs, returning any
+-- jobs that are ready to be processes
 function QlessQueue:pop(now, worker, count)
     assert(worker, 'Pop(): Arg "worker" missing')
     count = assert(tonumber(count),
@@ -385,9 +360,7 @@ function QlessQueue:pop(now, worker, count)
     return jids
 end
 
---! @brief Update the stats for this queue
---! @param stat - name of the statistic to be updated ('wait', 'run', etc.)
---! @param val - the value to update the statistics with
+-- Update the stats for this queue
 function QlessQueue:stat(now, stat, val)
     -- The bin is midnight of the provided day
     local bin = now - (now % 86400)
@@ -428,26 +401,14 @@ function QlessQueue:stat(now, stat, val)
     redis.call('hmset', key, 'total', count, 'mean', mean, 'vk', vk)
 end
 
--- Put(1, jid, klass, data, now, delay, [priority, p], [tags, t], [retries, r], [depends, '[...]'])
--- ----------------------------------------------------------------------------
--- This script takes the name of the queue and then the 
--- info about the work item, and makes sure that it's 
--- enqueued.
---
--- At some point, I'd like to able to provide functionality
--- that enables this to generate a unique ID for this piece
--- of work. As such, client libraries should not expose 
--- setting the id from the user, as this is an implementation
--- detail that's likely to change and users should not grow
--- to depend on it.
---
--- Args:
---    1) jid
---    2) klass
---    3) data
---    4) now
---    5) delay
---    *) [priority, p], [tags, t], [retries, r], [depends, '[...]']
+-- Put(now, jid, klass, data, delay,
+--     [priority, p],
+--     [tags, t],
+--     [retries, r],
+--     [depends, '[...]'])
+-- -----------------------
+-- Insert a job into the queue with the given priority, tags, delay, klass and
+-- data.
 function QlessQueue:put(now, jid, klass, raw_data, delay, ...)
     assert(jid  , 'Put(): Arg "jid" missing')
     assert(klass, 'Put(): Arg "klass" missing')
@@ -592,9 +553,7 @@ function QlessQueue:put(now, jid, klass, raw_data, delay, ...)
     return jid
 end
 
--- Unfail(0, now, group, queue, [count])
---
--- Move `count` jobs out of the failed state and into the provided queue
+-- Move `count` jobs out of the failed state and into this queue
 function QlessQueue:unfail(now, group, count)
     assert(group, 'Unfail(): Arg "group" missing')
     count = assert(tonumber(count or 25),
@@ -627,6 +586,7 @@ function QlessQueue:unfail(now, group, count)
     return #jids
 end
 
+-- Recur a job of type klass in this queue
 function QlessQueue:recur(now, jid, klass, raw_data, spec, ...)
     assert(jid  , 'RecurringJob On(): Arg "jid" missing')
     assert(klass, 'RecurringJob On(): Arg "klass" missing')
@@ -709,7 +669,7 @@ end
 -------------------------------------------------------------------------------
 -- Housekeeping methods
 -------------------------------------------------------------------------------
---! @brief Instantiate any recurring jobs that are ready
+-- Instantiate any recurring jobs that are ready
 function QlessQueue:check_recurring(now, count)
     -- This is how many jobs we've moved so far
     local moved = 0
@@ -782,9 +742,9 @@ function QlessQueue:check_recurring(now, count)
     end
 end
 
---! @brief Check for any jobs that have been scheduled, and shovel them onto
---!     the work queue. Returns nothing, but afterwards, up to `count`
---!     scheduled jobs will be moved into the work queue
+-- Check for any jobs that have been scheduled, and shovel them onto
+-- the work queue. Returns nothing, but afterwards, up to `count`
+-- scheduled jobs will be moved into the work queue
 function QlessQueue:check_scheduled(now, count)
     -- zadd is a list of arguments that we'll be able to use to
     -- insert into the work queue
@@ -805,8 +765,8 @@ function QlessQueue:check_scheduled(now, count)
     end
 end
 
---! @brief Check for and invalidate any locks that have been lost. Returns the
---!     list of jids that have been invalidated
+-- Check for and invalidate any locks that have been lost. Returns the
+-- list of jids that have been invalidated
 function QlessQueue:invalidate_locks(now, count)
     local jids = {}
     -- Iterate through all the expired locks and add them to the list

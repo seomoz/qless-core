@@ -80,7 +80,7 @@ the heartbeat should return `false` and the worker should yield.
 When a node attempts to heartbeat, the lua script should check to see if the
 node attempting to renew the lock is the same node that currently owns the
 lock. If so, then the lock's expiration should be pushed back accordingly, 
-and the updated expiration returned. If not, it only has to return false.
+and the updated expiration returned. If not, an exception is raised.
 
 Stats
 -----
@@ -216,16 +216,14 @@ job is stored in `ql:j:<jid>-dependents`. For example, `ql:j:<jid>`:
 		# The jids that this job is dependent upon
 		'dependencies': [...],
 		
-		# A list of all the stages that this node has gone through, and
-		# when it was put in that queue, given to a worker, which worker,
-		# and when it was completed. (JSON blob)
+		# A list of all the things that have happened to a job. Each entry has
+		# the keys 'what' and 'when', but it may also have arbitrary keys
+		# associated with it.
 		'history'   : [
 			{
-				'q'     : 'test1',
-				'put'   : 1352075209,
-				'popped': 1352075300,
-				'done'  : 1352076000,
-				'worker': 'some-hostname-pid'
+				'what'  : 'Popped',
+				'when'  : 1352075209,
+				...
 			}, {
 				...
 			}
@@ -239,7 +237,8 @@ A queue is a priority queue and consists of three parts:
 1. `ql:q:<name>-scheduled` -- sorted set of all scheduled job ids
 1. `ql:q:<name>-work` -- sorted set (by priority) of all jobs waiting
 1. `ql:q:<name>-locks` -- sorted set of job locks and expirations
-1. `ql:q:<name>-depends` -- sorted set of jobs in a queue, but waiting on other jobs
+1. `ql:q:<name>-depends` -- sorted set of jobs in a queue, but waiting on
+    other jobs
 
 When looking for a unit of work, the client should first choose from the 
 next expired lock. If none are expired, then we should next make sure that

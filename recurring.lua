@@ -1,13 +1,4 @@
--- Recur(0, 'on', queue, jid, klass, data, now, 'interval', second, offset, [priority p], [tags t], [retries r])
--- Recur(0, 'off', jid)
--- Recur(0, 'get', jid)
--- Recur(0, 'update', jid, ['priority', priority], ['interval', interval], ['retries', retries], ['data', data], ['klass', klass], ['queue', queue])
--- Recur(0, 'tag', jid, tag, [tag, [...]])
--- Recur(0, 'untag', jid, tag, [tag, [...]])
--- -------------------------------------------------------------------------------------------------------
--- This script takes the name of a queue, and then the info
--- info about the work item, and makes sure that jobs matching
--- its criteria are regularly made available.
+-- Get all the attributes of this particular job
 function QlessRecurringJob:data()
     local job = redis.call(
         'hmget', 'ql:r:' .. self.jid, 'jid', 'klass', 'state', 'queue',
@@ -32,7 +23,14 @@ function QlessRecurringJob:data()
     }
 end
 
--- Update the recurring job data
+-- Update the recurring job data. Key can be:
+--      - priority
+--      - interval
+--      - retries
+--      - data
+--      - klass
+--      - queue
+--      - backlog 
 function QlessRecurringJob:update(...)
     local options = {}
     -- Make sure that the job exists
@@ -76,6 +74,7 @@ function QlessRecurringJob:update(...)
     end
 end
 
+-- Tags this recurring job with the provided tags
 function QlessRecurringJob:tag(...)
     local tags = redis.call('hget', 'ql:r:' .. self.jid, 'tags')
     -- If the job has been canceled / deleted, then return false
@@ -96,6 +95,7 @@ function QlessRecurringJob:tag(...)
     end
 end
 
+-- Removes a tag from the recurring job
 function QlessRecurringJob:untag(...)
     -- Get the existing tags
     local tags = redis.call('hget', 'ql:r:' .. self.jid, 'tags')
@@ -120,6 +120,7 @@ function QlessRecurringJob:untag(...)
     end
 end
 
+-- Stop further occurrences of this job
 function QlessRecurringJob:unrecur()
     -- First, find out what queue it was attached to
     local queue = redis.call('hget', 'ql:r:' .. self.jid, 'queue')
