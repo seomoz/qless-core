@@ -1,5 +1,6 @@
 '''Test out dependency-related code'''
 
+import redis
 from common import TestQless
 
 
@@ -63,7 +64,7 @@ class TestDependencies(TestQless):
         self.lua('put', 1, 'queue', 'b', 'klass', {}, 0, 'depends', ['a'])
         self.lua('put', 2, 'queue', 'c', 'klass', {}, 0, 'depends', ['b'])
         # Now, we'll only cancel part of this chain and see that it fails
-        self.assertRaisesRegexp(Exception, r'is a dependency',
+        self.assertRaisesRegexp(redis.ResponseError, r'is a dependency',
             self.lua, 'cancel', 3, 'a', 'b')
 
     def test_multiple_dependency(self):
@@ -121,24 +122,24 @@ class TestDependencies(TestQless):
     def test_depends_waiting(self):
         '''Cannot add or remove dependencies if the job is waiting'''
         self.lua('put', 0, 'queue', 'jid', 'klass', {}, 0)
-        self.assertRaisesRegexp(Exception, r'not in the depends state',
+        self.assertRaisesRegexp(redis.ResponseError, r'in the depends state',
             self.lua, 'depends', 0, 'jid', 'on', 'a')
-        self.assertRaisesRegexp(Exception, r'not in the depends state',
+        self.assertRaisesRegexp(redis.ResponseError, r'in the depends state',
             self.lua, 'depends', 0, 'jid', 'off', 'a')
 
     def test_depends_scheduled(self):
         '''Cannot add or remove dependencies if the job is scheduled'''
         self.lua('put', 0, 'queue', 'jid', 'klass', {}, 1)
-        self.assertRaisesRegexp(Exception, r'not in the depends state',
+        self.assertRaisesRegexp(redis.ResponseError, r'in the depends state',
             self.lua, 'depends', 0, 'jid', 'on', 'a')
-        self.assertRaisesRegexp(Exception, r'not in the depends state',
+        self.assertRaisesRegexp(redis.ResponseError, r'in the depends state',
             self.lua, 'depends', 0, 'jid', 'off', 'a')
 
     def test_depends_nonexistent(self):
         '''Cannot add or remove dependencies if the job doesn't exist'''
-        self.assertRaisesRegexp(Exception, r'not in the depends state',
+        self.assertRaisesRegexp(redis.ResponseError, r'in the depends state',
             self.lua, 'depends', 0, 'jid', 'on', 'a')
-        self.assertRaisesRegexp(Exception, r'not in the depends state',
+        self.assertRaisesRegexp(redis.ResponseError, r'in the depends state',
             self.lua, 'depends', 0, 'jid', 'off', 'a')
 
     def test_depends_failed(self):
@@ -146,16 +147,16 @@ class TestDependencies(TestQless):
         self.lua('put', 0, 'queue', 'jid', 'klass', {}, 0)
         self.lua('pop', 0, 'queue', 'worker', 10)
         self.lua('fail', 1, 'jid', 'worker', 'group', 'message', {})
-        self.assertRaisesRegexp(Exception, r'not in the depends state',
+        self.assertRaisesRegexp(redis.ResponseError, r'in the depends state',
             self.lua, 'depends', 0, 'jid', 'on', 'a')
-        self.assertRaisesRegexp(Exception, r'not in the depends state',
+        self.assertRaisesRegexp(redis.ResponseError, r'in the depends state',
             self.lua, 'depends', 0, 'jid', 'off', 'a')
 
     def test_depends_running(self):
         '''Cannot add or remove dependencies if the job is running'''
         self.lua('put', 0, 'queue', 'jid', 'klass', {}, 0)
         self.lua('pop', 0, 'queue', 'worker', 10)
-        self.assertRaisesRegexp(Exception, r'not in the depends state',
+        self.assertRaisesRegexp(redis.ResponseError, r'in the depends state',
             self.lua, 'depends', 0, 'jid', 'on', 'a')
-        self.assertRaisesRegexp(Exception, r'not in the depends state',
+        self.assertRaisesRegexp(redis.ResponseError, r'in the depends state',
             self.lua, 'depends', 0, 'jid', 'off', 'a')

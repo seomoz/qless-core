@@ -18,9 +18,12 @@ class TestQless(unittest.TestCase):
         '''Ensure that all the example inputs to the function are malformed.'''
         for args in examples:
             try:
+                # The reason that we're not using assertRaises is that the error
+                # message that is produces is unnecessarily vague, and offers no
+                # indication of what arguments actually failed to raise the
+                # exception
                 function(*args)
                 self.assertTrue(False, 'Exception not raised for %s(%s)' % (
                     function.__name__, repr(args)))
-            except redis.ResponseError as exc:
-                print repr(exc)
+            except redis.ResponseError:
                 self.assertTrue(True)

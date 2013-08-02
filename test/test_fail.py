@@ -1,5 +1,6 @@
 '''Tests about failing jobs'''
 
+import redis
 from common import TestQless
 
 
@@ -57,7 +58,7 @@ class TestFail(TestQless):
     def test_fail_waiting(self):
         '''Only popped jobs can be failed'''
         self.lua('put', 0, 'queue', 'jid', 'klass', {}, 0)
-        self.assertRaises(Exception, r'waiting',
+        self.assertRaisesRegexp(redis.ResponseError, r'waiting',
             self.lua, 'fail', 1, 'jid', 'worker', 'group', 'message', {})
         # Pop is and it should work
         self.lua('pop', 2, 'queue', 'worker', 10)
@@ -67,18 +68,18 @@ class TestFail(TestQless):
         '''Cannot fail a dependent job'''
         self.lua('put', 0, 'queue', 'a', 'klass', {}, 0)
         self.lua('put', 0, 'queue', 'b', 'klass', {}, 0, 'depends', ['a'])
-        self.assertRaisesRegexp(Exception, r'depends',
+        self.assertRaisesRegexp(redis.ResponseError, r'depends',
             self.lua, 'fail', 1, 'b', 'worker', 'group', 'message', {})
 
     def test_fail_scheduled(self):
         '''Cannot fail a scheduled job'''
         self.lua('put', 0, 'queue', 'jid', 'klass', {}, 1)
-        self.assertRaisesRegexp(Exception, r'scheduled',
+        self.assertRaisesRegexp(redis.ResponseError, r'scheduled',
             self.lua, 'fail', 1, 'jid', 'worker', 'group', 'message', {})
 
     def test_fail_nonexistent(self):
         '''Cannot fail a job that doesn't exist'''
-        self.assertRaisesRegexp(Exception, r'does not exist',
+        self.assertRaisesRegexp(redis.ResponseError, r'does not exist',
             self.lua, 'fail', 1, 'jid', 'worker', 'group', 'message', {})
         self.lua('put', 0, 'queue', 'jid', 'klass', {}, 0)
         self.lua('pop', 0, 'queue', 'worker', 10)
@@ -89,7 +90,7 @@ class TestFail(TestQless):
         self.lua('put', 0, 'queue', 'jid', 'klass', {}, 0)
         self.lua('pop', 0, 'queue', 'worker', 10)
         self.lua('complete', 0, 'jid', 'worker', 'queue', {})
-        self.assertRaisesRegexp(Exception, r'complete',
+        self.assertRaisesRegexp(redis.ResponseError, r'complete',
             self.lua, 'fail', 1, 'jid', 'worker', 'group', 'message', {})
 
 
