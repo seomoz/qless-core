@@ -597,7 +597,7 @@ function QlessQueue:unfail(now, group, count)
     -- And now set each job's state, and put it into the appropriate queue
     local toinsert = {}
     for index, jid in ipairs(jids) do
-        local job = Qless.job(job)
+        local job = Qless.job(jid)
         local data = job:data()
         job:history(now, 'put', {q = self.name})
         redis.call('hmset', QlessJob.ns .. data.jid,

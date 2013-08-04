@@ -129,3 +129,18 @@ class TestFailed(TestQless):
             'total': 1,
             'jobs': ['jid']
         })
+
+
+class TestUnfailed(TestQless):
+    '''Test access to unfailed'''
+    def test_basic(self):
+        '''We can unfail in a basic way'''
+        jids = map(str, range(10))
+        for jid in jids:
+            self.lua('put', 0, 'queue', jid, 'klass', {}, 0)
+            self.lua('pop', 0, 'queue', 'worker', 10)
+            self.lua('fail', 0, jid, 'worker', 'group', 'message')
+            self.assertEqual(self.lua('get', 0, jid)['state'], 'failed')
+        self.lua('unfail', 0, 'queue', 'group', 100)
+        for jid in jids:
+            self.assertEqual(self.lua('get', 0, jid)['state'], 'waiting')
