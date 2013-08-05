@@ -5,6 +5,7 @@ try:
     import simplejson as json
 except ImportError:
     import json
+    json.JSONDecodeError = ValueError
 
 
 class QlessRecorder(object):

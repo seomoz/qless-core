@@ -1,5 +1,7 @@
 Qless Core
 ==========
+[![Build Status](https://travis-ci.org/seomoz/qless-core.png)](https://travis-ci.org/seomoz/qless-core)
+
 This is the set of all the lua scripts that comprise the qless library. We've
 begun migrating away from the system of having one lua script per command to
 a more object-oriented approach where all code is contained in a single unified
