@@ -1,5 +1,6 @@
 '''Base class for all of our tests'''
 
+import re
 import redis
 import qless
 import unittest
@@ -27,3 +28,15 @@ class TestQless(unittest.TestCase):
                     function.__name__, repr(args)))
             except redis.ResponseError:
                 self.assertTrue(True)
+
+    def assertRaisesRegexp(self, typ, regex, func, *args, **kwargs):
+        '''Python 2.6 doesn't include this method'''
+        try:
+            func(*args, **kwargs)
+            self.assertFalse(True, 'No exception raised')
+        except typ as exc:
+            self.assertTrue(re.search(regex, str(exc)),
+                '%s does not match %s' % (str(exc), regex))
+        except Exception as exc:
+            self.assertFalse(True,
+                '%s raised, expected %s' % (type(exc).__name__, typ.__name__))

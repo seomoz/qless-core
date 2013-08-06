@@ -71,8 +71,8 @@ class TestLocks(TestQless):
         # No jobs should be available since the lock is still valid
         self.assertEqual(self.lua('pop', 2, 'queue', 'worker', 10), {})
         # We should see our expiration update after a heartbeat
-        self.assertGreater(
-            self.lua('heartbeat', 3, 'jid', 'worker', {}), job['expires'])
+        self.assertTrue(
+            self.lua('heartbeat', 3, 'jid', 'worker', {}) > job['expires'])
 
     def test_heartbeat_waiting(self):
         '''Only popped jobs can be heartbeated'''

@@ -146,10 +146,10 @@ class TestWorker(TestQless):
         # indeed removed from our list
         for worker in workers:
             found = [w['name'] for w in self.lua('workers', 2)]
-            self.assertIn(worker, found)
+            self.assertTrue(worker in found)
             self.lua('worker.deregister', 2, worker)
             found = [w['name'] for w in self.lua('workers', 2)]
-            self.assertNotIn(worker, found)
+            self.assertFalse(worker in found)
 
     def test_expiration(self):
         '''After a certain amount of time, inactive workers expire'''
