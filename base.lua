@@ -99,7 +99,7 @@ function Qless.failed(group, start, limit)
     -- If a group was provided, then we should do paginated lookup
     return {
       total = redis.call('llen', 'ql:f:' .. group),
-      jobs  = redis.call('lrange', 'ql:f:' .. group, start, limit - 1)
+      jobs  = redis.call('lrange', 'ql:f:' .. group, start, start + limit - 1)
     }
   else
     -- Otherwise, we should just list all the known failure groups we have
@@ -219,7 +219,7 @@ end
 -- tag(now, ('add' | 'remove'), jid, tag, [tag, ...])
 -- tag(now, 'get', tag, [offset, [count]])
 -- tag(now, 'top', [offset, [count]])
--- ------------------------------------------------------------------------------------------------------------------
+-- -----------------------------------------------------------------------------
 -- Accepts a jid, 'add' or 'remove', and then a list of tags
 -- to either add or remove from the job. Alternatively, 'get',
 -- a tag to get jobs associated with that tag, and offset and
@@ -240,7 +240,8 @@ end
 -- If 'top' is supplied, it returns the most commonly-used tags
 -- in a paginated fashion.
 function Qless.tag(now, command, ...)
-  assert(command, 'Tag(): Arg "command" must be "add", "remove", "get" or "top"')
+  assert(command,
+    'Tag(): Arg "command" must be "add", "remove", "get" or "top"')
 
   if command == 'add' then
     local jid  = assert(arg[1], 'Tag(): Arg "jid" missing')
@@ -304,7 +305,7 @@ function Qless.tag(now, command, ...)
       'Tag(): Arg "count" not a number: ' .. tostring(arg[3]))
     return {
       total = redis.call('zcard', 'ql:t:' .. tag),
-      jobs  = redis.call('zrange', 'ql:t:' .. tag, offset, count)
+      jobs  = redis.call('zrange', 'ql:t:' .. tag, offset, offset + count - 1)
     }
   elseif command == 'top' then
     local offset = assert(tonumber(arg[1] or 0) , 'Tag(): Arg "offset" not a number: ' .. tostring(arg[1]))

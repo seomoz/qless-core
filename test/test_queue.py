@@ -105,6 +105,33 @@ class TestJobs(TestQless):
         self.lua('put', 0, 'queue', 'jid', 'klass', {}, 10)
         self.assertEqual(len(self.lua('jobs', 20, 'scheduled', 'queue')), 0)
 
+    def test_pagination_complete(self):
+        '''Jobs should be able to provide paginated results for complete'''
+        jids = map(str, range(100))
+        for jid in jids:
+            self.lua('put', jid, 'queue', jid, 'klass', {}, 0)
+            self.lua('pop', jid, 'queue', 'worker', 10)
+            self.lua('complete', jid, jid, 'worker', 'queue', {})
+        # Get two pages and ensure they're what we expect
+        jids = list(reversed(jids))
+        self.assertEqual(
+            self.lua('jobs', 0, 'complete',  0, 50), jids[:50])
+        self.assertEqual(
+            self.lua('jobs', 0, 'complete', 50, 50), jids[50:])
+
+    def test_pagination_running(self):
+        '''Jobs should be able to provide paginated result for running'''
+        jids = map(str, range(100))
+        self.lua('config.set', 0, 'heartbeat', 1000)
+        for jid in jids:
+            self.lua('put', jid, 'queue', jid, 'klass', {}, 0)
+            self.lua('pop', jid, 'queue', 'worker', 10)
+        # Get two pages and ensure they're what we expect
+        self.assertEqual(
+            self.lua('jobs', 100, 'running', 'queue',  0, 50), jids[:50])
+        self.assertEqual(
+            self.lua('jobs', 100, 'running', 'queue', 50, 50), jids[50:])
+
 
 class TestQueue(TestQless):
     '''Test queue info tests'''

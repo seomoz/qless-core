@@ -130,6 +130,20 @@ class TestFailed(TestQless):
             'jobs': ['jid']
         })
 
+    def test_failed_pagination(self):
+        '''Failed provides paginated access'''
+        jids = map(str, range(100))
+        for jid in jids:
+            self.lua('put', jid, 'queue', jid, 'klass', {}, 0)
+            self.lua('pop', jid, 'queue', 'worker', 10)
+            self.lua('fail', jid, jid, 'worker', 'group', 'message')
+        # Get two pages of 50 and make sure they're what we expect
+        jids = list(reversed(jids))
+        self.assertEqual(
+            self.lua('failed', 0, 'group',  0, 50)['jobs'], jids[:50])
+        self.assertEqual(
+            self.lua('failed', 0, 'group', 50, 50)['jobs'], jids[50:])
+
 
 class TestUnfailed(TestQless):
     '''Test access to unfailed'''
