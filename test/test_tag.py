@@ -144,3 +144,28 @@ class TestTag(TestQless):
         self.lua('pop', 0, 'queue', 'worker', 10)
         self.assertEqual(
             self.lua('tag', 0, 'get', 'foo', 0, 10)['jobs'], ['jid-1'])
+
+    def test_pagination_get(self):
+        '''Pagination should work for tag.get'''
+        jids = map(str, range(100))
+        for jid in jids:
+            self.lua('put', jid, 'queue', jid, 'klass', {}, 0, 'tags', ['foo'])
+        # Get two pages and ensure they're what we expect
+        self.assertEqual(
+            self.lua('tag', 100, 'get', 'foo',  0, 50)['jobs'], jids[:50])
+        self.assertEqual(
+            self.lua('tag', 100, 'get', 'foo', 50, 50)['jobs'], jids[50:])
+
+    def test_pagination_top(self):
+        '''Pagination should work for tag.top'''
+        jids = map(str, range(10))
+        for jid in jids:
+            for suffix in map(str, range(int(jid) + 5)):
+                self.lua('put', jid, 'queue',
+                    jid + '.' + suffix, 'klass', {}, 0, 'tags', [jid])
+        # Get two pages and ensure they're what we expect
+        jids = list(reversed(jids))
+        self.assertEqual(
+            self.lua('tag', 100, 'top', 0, 5), jids[:5])
+        self.assertEqual(
+            self.lua('tag', 100, 'top', 5, 5), jids[5:])
