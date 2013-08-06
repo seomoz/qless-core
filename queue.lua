@@ -417,13 +417,19 @@ function QlessQueue:put(now, jid, klass, raw_data, delay, ...)
     delay = assert(tonumber(delay),
         'Put(): Arg "delay" not a number: ' .. tostring(delay))
 
-    -- Read in all the optional parameters
+    -- Read in all the optional parameters. All of these must come in pairs, so
+    -- if we have an odd number of extra args, raise an error
+    if #arg % 2 == 1 then
+        error('Odd number of additional args: ' .. tostring(arg))
+    end
     local options = {}
     for i = 1, #arg, 2 do options[arg[i]] = arg[i + 1] end
 
     -- Let's see what the old priority and tags were
     local job = Qless.job(jid)
-    local priority, tags, oldqueue, state, failure, retries, worker = unpack(redis.call('hmget', QlessJob.ns .. jid, 'priority', 'tags', 'queue', 'state', 'failure', 'retries', 'worker'))
+    local priority, tags, oldqueue, state, failure, retries, worker =
+        unpack(redis.call('hmget', QlessJob.ns .. jid, 'priority', 'tags',
+            'queue', 'state', 'failure', 'retries', 'worker'))
 
     -- If there are old tags, then we should remove the tags this job has
     if tags then
@@ -431,14 +437,38 @@ function QlessQueue:put(now, jid, klass, raw_data, delay, ...)
     end
 
     -- Sanity check on optional args
-    retries  = assert(tonumber(options['retries']  or retries or 5) , 'Put(): Arg "retries" not a number: ' .. tostring(options['retries']))
-    tags     = assert(cjson.decode(options['tags'] or tags or '[]' ), 'Put(): Arg "tags" not JSON'          .. tostring(options['tags']))
-    priority = assert(tonumber(options['priority'] or priority or 0), 'Put(): Arg "priority" not a number'  .. tostring(options['priority']))
-    local depends = assert(cjson.decode(options['depends'] or '[]') , 'Put(): Arg "depends" not JSON: '     .. tostring(options['depends']))
+    retries  = assert(tonumber(options['retries']  or retries or 5) ,
+        'Put(): Arg "retries" not a number: ' .. tostring(options['retries']))
+    tags     = assert(cjson.decode(options['tags'] or tags or '[]' ),
+        'Put(): Arg "tags" not JSON'          .. tostring(options['tags']))
+    priority = assert(tonumber(options['priority'] or priority or 0),
+        'Put(): Arg "priority" not a number'  .. tostring(options['priority']))
+    local depends = assert(cjson.decode(options['depends'] or '[]') ,
+        'Put(): Arg "depends" not JSON: '     .. tostring(options['depends']))
 
     -- Delay and depends are not allowed together
     if delay > 0 and #depends > 0 then
         error('Put(): "delay" and "depends" are not allowed to be used together')
+    end
+
+    -- If the job has old dependencies, determine which dependencies are
+    -- in the new dependencies but not in the old ones, and which are in the
+    -- old ones but not in the new
+    if #depends > 0 then
+        -- This makes it easier to check if it's in the new list
+        local new = {}
+        for _, d in ipairs(depends) do new[d] = 1 end
+
+        -- Now find what's in the original, but not the new
+        local original = redis.call(
+            'smembers', QlessJob.ns .. jid .. '-dependencies')
+        for _, dep in pairs(original) do 
+            if new[dep] == nil then
+                -- Remove k as a dependency
+                redis.call('srem', QlessJob.ns .. dep .. '-dependents'  , jid)
+                redis.call('srem', QlessJob.ns .. jid .. '-dependencies', dep)
+            end
+        end
     end
 
     -- Send out a log message
@@ -462,18 +492,20 @@ function QlessQueue:put(now, jid, klass, raw_data, delay, ...)
 
     -- If this had previously been given out to a worker,
     -- make sure to remove it from that worker's jobs
-    if worker then
+    if worker and worker ~= '' then
         redis.call('zrem', 'ql:w:' .. worker .. ':jobs', jid)
         -- We need to inform whatever worker had that job
-        Qless.publish('w:' .. worker, cjson.encode({
-            jid   = jid,
-            event = 'put',
-            queue = self.name
-        }))
+        local encoded = cjson.encode({
+            jid    = jid,
+            event  = 'lock_lost',
+            worker = worker
+        })
+        Qless.publish('w:' .. worker, encoded)
+        Qless.publish('log', encoded)
     end
 
-    -- If the job was previously in the 'completed' state, then we should remove
-    -- it from being enqueued for destructination
+    -- If the job was previously in the 'completed' state, then we should
+    -- remove it from being enqueued for destructination
     if state == 'complete' then
         redis.call('zrem', 'ql:completed', jid)
     end
@@ -565,7 +597,7 @@ function QlessQueue:unfail(now, group, count)
     -- And now set each job's state, and put it into the appropriate queue
     local toinsert = {}
     for index, jid in ipairs(jids) do
-        local job = Qless.job(job)
+        local job = Qless.job(jid)
         local data = job:data()
         job:history(now, 'put', {q = self.name})
         redis.call('hmset', QlessJob.ns .. data.jid,
@@ -605,10 +637,16 @@ function QlessQueue:recur(now, jid, klass, raw_data, spec, ...)
             error('Recur(): Arg "interval" must be greater than or equal to 0')
         end
 
+        -- Read in all the optional parameters. All of these must come in
+        -- pairs, so if we have an odd number of extra args, raise an error
+        if #arg % 2 == 1 then
+            error('Odd number of additional args: ' .. tostring(arg))
+        end
+        
         -- Read in all the optional parameters
         local options = {}
         for i = 3, #arg, 2 do options[arg[i]] = arg[i + 1] end
-        options.tags = assert(cjson.decode(options.tags or {}),
+        options.tags = assert(cjson.decode(options.tags or '{}'),
             'Recur(): Arg "tags" must be JSON string array: ' .. tostring(
                 options.tags))
         options.priority = assert(tonumber(options.priority or 0),
@@ -868,6 +906,14 @@ function QlessQueue:invalidate_locks(now, count)
                 if redis.call('zscore', 'ql:tracked', jid) ~= false then
                     Qless.publish('failed', jid)
                 end
+                Qless.publish('log', cjson.encode({
+                    jid     = jid,
+                    event   = 'failed',
+                    group   = group,
+                    worker  = worker,
+                    message =
+                        'Job exhausted retries in queue "' .. self.name .. '"'
+                }))
             else
                 table.insert(jids, jid)
             end
@@ -900,6 +946,8 @@ function QlessQueue.counts(now, name)
     if name then
         local queue = Qless.queue(name)
         local stalled = queue.locks.length(now)
+        -- Check for any scheduled jobs that need to be moved
+        queue:check_scheduled(now, queue.scheduled.length())
         return {
             name      = name,
             waiting   = queue.work.length(),

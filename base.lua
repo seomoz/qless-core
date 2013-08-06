@@ -147,6 +147,7 @@ function Qless.jobs(now, state, ...)
         elseif state == 'stalled' then
             return queue.locks.expired(now, offset, count)
         elseif state == 'scheduled' then
+            queue:check_scheduled(now, queue.scheduled.length())
             return queue.scheduled.peek(now, offset, count)
         elseif state == 'depends' then
             return queue.depends.peek(now, offset, count)
@@ -186,10 +187,12 @@ end
 function Qless.track(now, command, jid)
     if command ~= nil then
         assert(jid, 'Track(): Arg "jid" missing')
-        if string.lower(ARGV[1]) == 'track' then
+        -- Verify that job exists
+        assert(Qless.job(jid):exists(), 'Track(): Job does not exist')
+        if string.lower(command) == 'track' then
             Qless.publish('track', jid)
             return redis.call('zadd', 'ql:tracked', now, jid)
-        elseif string.lower(ARGV[1]) == 'untrack' then
+        elseif string.lower(command) == 'untrack' then
             Qless.publish('untrack', jid)
             return redis.call('zrem', 'ql:tracked', jid)
         else
@@ -253,6 +256,7 @@ function Qless.tag(now, command, ...)
             for i=2,#arg do
                 local tag = arg[i]
                 if _tags[tag] == nil then
+                    _tags[tag] = true
                     table.insert(tags, tag)
                 end
                 redis.call('zadd', 'ql:t:' .. tag, now, jid)
@@ -356,7 +360,7 @@ function Qless.cancel(...)
             if worker and (worker ~= '') then
                 redis.call('zrem', 'ql:w:' .. worker .. ':jobs', jid)
                 -- If necessary, send a message to the appropriate worker, too
-                Qless.publish('w:', worker, encoded)
+                Qless.publish('w:' .. worker, encoded)
             end
 
             -- Remove it from that queue
@@ -386,6 +390,13 @@ function Qless.cancel(...)
                 if redis.call('llen', 'ql:f:' .. failure.group) == 0 then
                     redis.call('srem', 'ql:failures', failure.group)
                 end
+                -- Remove one count from the failed count of the particular
+                -- queue
+                local bin = failure.when - (failure.when % 86400)
+                local failed = redis.call(
+                    'hget', 'ql:s:stats:' .. bin .. ':' .. queue, 'failed')
+                redis.call('hset',
+                    'ql:s:stats:' .. bin .. ':' .. queue, 'failed', failed - 1)
             end
 
             -- Remove it as a job that's tagged with this particular tag

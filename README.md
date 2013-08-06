@@ -1,5 +1,7 @@
 Qless Core
 ==========
+[![Build Status](https://travis-ci.org/seomoz/qless-core.png)](https://travis-ci.org/seomoz/qless-core)
+
 This is the set of all the lua scripts that comprise the qless library. We've
 begun migrating away from the system of having one lua script per command to
 a more object-oriented approach where all code is contained in a single unified
@@ -12,7 +14,7 @@ on top of the qless core library __within your own lua scripts__ through
 composition.
 
 Building
-========
+--------
 For ease of development, we've broken this unified file into several smaller
 submodules that are concatenated together into a `qless.lua` script. These are:
 
@@ -39,6 +41,25 @@ that the qless clients use:
 make qless-lib.lua
 ```
 
+Testing
+-------
+Historically, tests have appeared only in the language-specific bindings of
+qless, but that has become a tedious process. Not to mention the fact that
+it's a steep barrier to entry for writing new clients. In light of that, we
+now include tests directly in `qless-core`, written in python. To run these,
+you will need python and the `nose` and `redis` libraries. If you have `pip`
+installed:
+
+```python
+pip install redis nose
+```
+
+To run the tests, there is a directive included in the makefile:
+
+```bash
+make test
+```
+
 Conventions
 ===========
 
@@ -60,7 +81,7 @@ not in the class interface. At the class function level, only the functions
 which require the `now` argument list it.
 
 Documentation
-=============
+-------------
 The documentation of the code is present in each of the modules, but it is
 excluded from the production code to reduce the weight of it.
 
@@ -288,13 +309,37 @@ that tag was added to that job. When jobs are tagged a second time with an
 existing tag, then it's a no-op.
 
 
-Notes About Implementing Bindings
-=================================
+Implementing Clients
+====================
 There are a few nuanced aspects of implementing bindings for your particular
-language that are worth bringing up.
+language that are worth bringing up. The canonical example for bindings should
+be the [python](https://github.com/seomoz/qless-py) and
+[ruby](https://github.com/seomoz/qless) bindings.
 
-Timestamps and Job Insertion
-----------------------------
+Structure
+---------
+We recommend using
+[git submodules](http://git-scm.com/book/en/Git-Tools-Submodules) to keep
+[qless-core](https://github.com/seomoz/qless-core) in your bindings.
+
+Testing
+-------
+The majority of tests are implemented in `qless-core`, and so your bindings
+should merely test that they provide sensible access to the functionality. This
+should include a notion of `queues`, `workers`, `jobs`, etc.
+
+Running the Worker
+------------------
+If your language supports dynamic importing of code, and in particular if a
+class can be imported deterministically from a string identifier, then you
+should include a worker executable with your release. For example, in Python,
+given the class `foo.Job`, that string is enough to know what module to import.
+As such, a worker binary can just be given a list of queues, a number (and
+perhaps type) of workers, wait intervals, etc., and then can import all the
+code required to perform work.
+
+Timestamps
+----------
 Jobs with identical priorities are popped in the order they were inserted. The
 caveat is that it's only true to the precision of the timestamps your bindings
 provide. For example, if you provide timestamps to the second granularity, then
@@ -309,26 +354,30 @@ It's intended to be a common usecase that bindings provide a worker script or
 binary that runs several worker subprocesses. These should run with their 
 working directory as a sandbox.
 
-Threading or Forking
---------------------
-Resque holds the philosphy that each worker consists of two processes: a master
-process that grabs jobs, and an actual worker, which is a fork of the master
-process and actually does the work associated with the job. The major advantage
-of this as far as we can see it is that it's a good strategy for sandboxing any
-havoc that might occur when processing the job.
+Forking Model
+-------------
+There are a couple of philosophies regarding how to best fork processes to do
+work. Certainly, there should be a parent process that manages child processes,
+if for no other reason than to ensure that child workers are well-behaved. But
+how exactly the child processes work is less clear. We encourage you to make all
+models available in your client:
 
-However, apparently Ruby doesn't handle copy-on-write very well, and so there
-is a lot of overhead in not only system calls to fork a process, but also to
-load modules into memory. Other languages, however, may or may not suffer from
-this problem, but it's important to be aware of.
+- __Fork once for each job__ -- This has the added benefit of containing
+	potential issues like resource leaks, but it comes at the potentially high
+	cost of forking once for each job.
+- __Fork long-running processes__ -- Forking long-running processes means that
+	you will likely to be able to saturate the CPUs on a machine more easily,
+	and reduces the cost per job of forking.
+- __Coroutines in long-running processes__ -- Especially for I/O-bound processes
+	this is handy, since you can keep the number of processes relatively small
+	and still get good I/O parallelism.
 
-Another project in the vein of Resque (in fact, it uses the same job structure)
-is [sidekiq](https://github.com/mperham/sidekiq), which uses threads in a
-master process to do work. The performance boost is substantial, not to
-mention the memory footprint. Most of this performance appears to be gained
-from the memory profile and not constantly allocating memory for every job.
-
-Ultimately, the choice is yours, but we thought it bore mentioning.
+Each style of worker should be able to listen for worker-specific `lock_lost`,
+`canceled` and `put` events, each of which can signal that a worker has lost
+its right to process a job. If that's discovered, a parent process could take
+the opportunity to stop the child worker that's currently running that job (if
+it exists). While `qless` ensures correct behavior when taking action on jobs
+where a lock has been lost, this is an opportunity to gain efficiency.
 
 Queue Popping Order
 -------------------
