@@ -523,7 +523,7 @@ function QlessJob:depends(now, command, ...)
     local state = redis.call('hget', QlessJob.ns .. self.jid, 'state')
     if state ~= 'depends' then
         error('Depends(): Job ' .. self.jid ..
-            ' not in the depends state: ' .. state)
+            ' not in the depends state: ' .. tostring(state))
     end
 
     if command == 'on' then

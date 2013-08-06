@@ -170,7 +170,7 @@ QlessAPI['recur.get'] = function(now, jid)
 end
 
 QlessAPI['recur.update'] = function(now, jid, ...)
-    return Qless.recurring(jid):update(unpack(arg))
+    return Qless.recurring(jid):update(now, unpack(arg))
 end
 
 QlessAPI['recur.tag'] = function(now, jid, ...)

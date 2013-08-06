@@ -31,13 +31,14 @@ end
 --      - klass
 --      - queue
 --      - backlog 
-function QlessRecurringJob:update(...)
+function QlessRecurringJob:update(now, ...)
     local options = {}
     -- Make sure that the job exists
     if redis.call('exists', 'ql:r:' .. self.jid) ~= 0 then
         for i = 1, #arg, 2 do
             local key = arg[i]
             local value = arg[i+1]
+            assert(value, 'No value provided for ' .. tostring(key))
             if key == 'priority' or key == 'interval' or key == 'retries' then
                 value = assert(tonumber(value), 'Recur(): Arg "' .. key .. '" must be a number: ' .. tostring(value))
                 -- If the command is 'interval', then we need to update the
@@ -60,6 +61,10 @@ function QlessRecurringJob:update(...)
                 queue_obj.recurring.remove(self.jid)
                 Qless.queue(value).recurring.add(score, self.jid)
                 redis.call('hset', 'ql:r:' .. self.jid, 'queue', value)
+                -- If we don't already know about the queue, learn about it
+                if redis.call('zscore', 'ql:queues', value) == false then
+                    redis.call('zadd', 'ql:queues', now, value)
+                end
             elseif key == 'backlog' then
                 value = assert(tonumber(value),
                     'Recur(): Arg "backlog" not a number: ' .. tostring(value))

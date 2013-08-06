@@ -15,3 +15,8 @@ qless.lua: qless-lib.lua api.lua
 
 clean:
 	rm -f qless.lua qless-lib.lua
+
+nose: qless.lua
+	nosetests --exe -v
+
+test: nose qless.lua
