@@ -180,6 +180,12 @@ configuration options that `qless` is meant to support:
 	The heartbeat interval (in seconds) for a particular queue
 1. `max-worker-age` --
     How long before workers are considered disappeared
+1. `<queue>-max-concurrency` --
+	The maximum number of jobs that can be running in a queue. If this number
+	is reduced, it does not impact any currently-running jobs
+1. `max-job-history` --
+	The maximum number of items in a job's history. This can be used to help
+	control the size of long-running jobs' history
 
 
 Internal Redis Structure
