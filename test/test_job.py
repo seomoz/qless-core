@@ -34,7 +34,7 @@ class TestJob(TestQless):
         for index in range(100):
             self.lua('put', index, 'queue', 'jid', 'klass', {}, 0)
         self.assertEqual(self.lua('get', 0, 'jid')['history'], [
-            {'q': 'queue', 'what': 'put', 'when': 95},
+            {'q': 'queue', 'what': 'put', 'when': 0},
             {'q': 'queue', 'what': 'put', 'when': 96},
             {'q': 'queue', 'what': 'put', 'when': 97},
             {'q': 'queue', 'what': 'put', 'when': 98},
