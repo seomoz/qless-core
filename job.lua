@@ -758,7 +758,12 @@ function QlessJob:history(now, what, item)
     end
     return response
   else
-    -- Append to the history
+    -- Append to the history. If the length of the history should be limited,
+    -- then we'll truncate it
+    local count = tonumber(Qless.config.get('max-job-history', 0))
+    if count > 0 then
+      redis.call('ltrim', QlessJob.ns .. self.jid .. '-history', -count + 1, -1)
+    end
     return redis.call('rpush', QlessJob.ns .. self.jid .. '-history',
       cjson.encode({math.floor(now), what, item}))
   end

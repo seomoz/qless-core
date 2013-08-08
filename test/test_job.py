@@ -28,6 +28,18 @@ class TestJob(TestQless):
         self.assertRaisesRegexp(redis.ResponseError, r'does not exist',
             self.lua, 'log', 0, 'jid', 'foo', {'foo': 'bar'})
 
+    def test_history(self):
+        '''We only keep the most recent max-job-history items in history'''
+        self.lua('config.set', 0, 'max-job-history', 5)
+        for index in range(100):
+            self.lua('put', index, 'queue', 'jid', 'klass', {}, 0)
+        self.assertEqual(self.lua('get', 0, 'jid')['history'], [
+            {'q': 'queue', 'what': 'put', 'when': 95},
+            {'q': 'queue', 'what': 'put', 'when': 96},
+            {'q': 'queue', 'what': 'put', 'when': 97},
+            {'q': 'queue', 'what': 'put', 'when': 98},
+            {'q': 'queue', 'what': 'put', 'when': 99}])
+
 
 class TestComplete(TestQless):
     '''Test how we complete jobs'''
