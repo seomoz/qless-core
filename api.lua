@@ -198,7 +198,7 @@ end
 -------------------------------------------------------------------------------
 
 -- None of the qless function calls accept keys
-if #KEYS > 0 then erorr('No Keys should be provided') end
+if #KEYS > 0 then error('No Keys should be provided') end
 
 -- The first argument must be the function that we intend to call, and it must
 -- exist
