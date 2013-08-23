@@ -480,6 +480,10 @@ function QlessJob:retry(now, queue, worker, delay, group, message)
     redis.call('sadd', 'ql:failures', group)
     -- And add this particular instance to the failed types
     redis.call('lpush', 'ql:f:' .. group, self.jid)
+    -- Increment the count of the failed jobs
+    local bin = now - (now % 86400)
+    redis.call('hincrby', 'ql:s:stats:' .. bin .. ':' .. queue, 'failures', 1)
+    redis.call('hincrby', 'ql:s:stats:' .. bin .. ':' .. queue, 'failed'  , 1)
   else
     -- Put it in the queue again with a delay. Like put()
     local queue_obj = Qless.queue(queue)
