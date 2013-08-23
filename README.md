@@ -60,6 +60,13 @@ To run the tests, there is a directive included in the makefile:
 make test
 ```
 
+If you have Redis running somewhere other than `localhost:6379`, you can supply
+the `REDIS_URL` environment variable:
+
+```bash
+REDIS_URL='redis://host:port' make test
+```
+
 Conventions
 ===========
 

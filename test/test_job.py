@@ -201,3 +201,22 @@ class TestCancel(TestQless):
         self.lua('cancel', 3, 'jid')
         self.assertRaisesRegexp(redis.ResponseError, r'Job does not exist',
             self.lua, 'heartbeat', 4, 'jid', 'worker', {})
+
+    def test_cancel_retries(self):
+        '''Can cancel job that has been failed from retries through retry'''
+        self.lua('put', 0, 'queue', 'jid', 'klass', {}, 0, 'retries', 0)
+        self.lua('pop', 1, 'queue', 'worker', 10)
+        self.assertEqual(self.lua('get', 2, 'jid')['state'], 'running')
+        self.lua('retry', 3, 'jid', 'queue', 'worker')
+        self.lua('cancel', 4, 'jid')
+        self.assertEqual(self.lua('get', 5, 'jid'), None)
+
+    def test_cancel_pop_retries(self):
+        '''Can cancel job that has been failed from retries through pop'''
+        self.lua('config.set', 0, 'heartbeat', -10)
+        self.lua('config.set', 0, 'grace-period', 0)
+        self.lua('put', 0, 'queue', 'jid', 'klass', {}, 0, 'retries', 0)
+        self.lua('pop', 1, 'queue', 'worker', 10)
+        self.lua('pop', 2, 'queue', 'worker', 10)
+        self.lua('cancel', 3, 'jid')
+        self.assertEqual(self.lua('get', 4, 'jid'), None)

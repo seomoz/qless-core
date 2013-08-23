@@ -99,3 +99,22 @@ class TestStats(TestQless):
         self.lua('put', 129600, 'queue', 'jid', 'klass', {}, 0)
         self.assertEqual(self.lua('stats', 0, 'queue', 0)['failed'], 0)
         self.assertEqual(self.lua('stats', 0, 'queue', 129600)['failed'], 0)
+
+    def test_failed_retries(self):
+        '''It updates stats for jobs failed from retries'''
+        self.lua('put', 0, 'queue', 'jid', 'klass', {}, 0, 'retries', 0)
+        self.lua('pop', 1, 'queue', 'worker', 10)
+        self.lua('retry', 3, 'jid', 'queue', 'worker')
+        self.assertEqual(self.lua('stats', 0, 'queue', 0)['failed'], 1)
+        self.assertEqual(self.lua('stats', 0, 'queue', 0)['failures'], 1)
+
+    def test_failed_pop_retries(self):
+        '''Increment the count failed jobs when job fail from retries'''
+        '''Can cancel job that has been failed from retries through pop'''
+        self.lua('config.set', 0, 'heartbeat', -10)
+        self.lua('config.set', 0, 'grace-period', 0)
+        self.lua('put', 0, 'queue', 'jid', 'klass', {}, 0, 'retries', 0)
+        self.lua('pop', 1, 'queue', 'worker', 10)
+        self.lua('pop', 2, 'queue', 'worker', 10)
+        self.assertEqual(self.lua('stats', 0, 'queue', 0)['failed'], 1)
+        self.assertEqual(self.lua('stats', 0, 'queue', 0)['failures'], 1)

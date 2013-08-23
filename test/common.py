@@ -1,5 +1,6 @@
 '''Base class for all of our tests'''
 
+import os
 import re
 import redis
 import qless
@@ -10,7 +11,8 @@ class TestQless(unittest.TestCase):
     '''Base class for all of our tests'''
     @classmethod
     def setUpClass(cls):
-        cls.lua = qless.QlessRecorder(redis.Redis())
+        url = os.environ.get('REDIS_URL', 'redis://localhost:6379/')
+        cls.lua = qless.QlessRecorder(redis.Redis.from_url(url))
 
     def tearDown(self):
         self.lua.flush()

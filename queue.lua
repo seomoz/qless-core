@@ -914,6 +914,13 @@ function QlessQueue:invalidate_locks(now, count)
           message =
             'Job exhausted retries in queue "' .. self.name .. '"'
         }))
+
+        -- Increment the count of the failed jobs
+        local bin = now - (now % 86400)
+        redis.call('hincrby',
+          'ql:s:stats:' .. bin .. ':' .. self.name, 'failures', 1)
+        redis.call('hincrby',
+          'ql:s:stats:' .. bin .. ':' .. self.name, 'failed'  , 1)
       else
         table.insert(jids, jid)
       end
