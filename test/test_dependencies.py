@@ -119,6 +119,24 @@ class TestDependencies(TestQless):
         # With all of these dependencies cancelled, this job should be ready
         self.assertEqual(self.lua('get', 100, 'jid')['state'], 'waiting')
 
+    def test_reput_dependency(self):
+        '''When we put a job with new deps, new replaces old'''
+        self.lua('put', 0, 'queue', 'a', 'klass', {}, 0)
+        self.lua('put', 1, 'queue', 'b', 'klass', {}, 0)
+        self.lua('put', 2, 'queue', 'c', 'klass', {}, 0, 'depends', ['a'])
+        self.lua('put', 3, 'queue', 'c', 'klass', {}, 0, 'depends', ['b'])
+        self.assertEqual(self.lua('get', 4, 'c')['dependencies'], ['b'])
+        self.assertEqual(self.lua('get', 5, 'a')['dependents'], {})
+        self.assertEqual(self.lua('get', 6, 'b')['dependents'], ['c'])
+        # Also, let's make sure that its effective dependencies are changed
+        self.lua('pop', 7, 'queue', 'worker', 10)
+        self.lua('complete', 8, 'a', 'worker', 'queue', {})
+        # We should not see the job unlocked
+        self.assertEqual(self.lua('pop', 9, 'queue', 'worker', 10), {})
+        self.lua('complete', 10, 'b', 'worker', 'queue', {})
+        self.assertEqual(
+            self.lua('pop', 9, 'queue', 'worker', 10)[0]['jid'], 'c')
+
     def test_depends_waiting(self):
         '''Cannot add or remove dependencies if the job is waiting'''
         self.lua('put', 0, 'queue', 'jid', 'klass', {}, 0)
