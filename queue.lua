@@ -61,7 +61,7 @@ function Qless.queue(name)
     end
   }
 
-  -- Access to our dependendant jobs
+  -- Access to our dependendent jobs
   queue.depends = {
     peek = function(now, offset, count)
       return redis.call('zrange',
