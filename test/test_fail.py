@@ -93,6 +93,15 @@ class TestFail(TestQless):
         self.assertRaisesRegexp(redis.ResponseError, r'complete',
             self.lua, 'fail', 1, 'jid', 'worker', 'group', 'message', {})
 
+    def test_fail_owner(self):
+        '''Cannot fail a job that's running with another worker'''
+        self.lua('put', 0, 'queue', 'jid', 'klass', {}, 0)
+        self.lua('pop', 1, 'queue', 'worker', 10)
+        self.lua('put', 2, 'queue', 'jid', 'klass', {}, 0)
+        self.lua('pop', 3, 'queue', 'another-worker', 10)
+        self.assertRaisesRegexp(redis.ResponseError, r'another worker',
+            self.lua, 'fail', 4, 'jid', 'worker', 'group', 'message', {})
+
 
 class TestFailed(TestQless):
     '''Test access to our failed jobs'''
