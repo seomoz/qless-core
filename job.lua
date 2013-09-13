@@ -326,14 +326,16 @@ function QlessJob:fail(now, worker, group, message, data)
   end
 
   -- First things first, we should get the history
-  local queue, state = unpack(redis.call('hmget', QlessJob.ns .. self.jid,
-    'queue', 'state'))
+  local queue, state, oldworker = unpack(redis.call(
+    'hmget', QlessJob.ns .. self.jid, 'queue', 'state', 'worker'))
 
   -- If the job has been completed, we cannot fail it
   if not state then
     error('Fail(): Job does not exist')
   elseif state ~= 'running' then
     error('Fail(): Job not currently running: ' .. state)
+  elseif worker ~= oldworker then
+    error('Fail(): Job running with another worker: ' .. oldworker)
   end
 
   -- Send out a log message
