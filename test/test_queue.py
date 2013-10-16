@@ -32,7 +32,7 @@ class TestJobs(TestQless):
         '''Verify we can list complete jobs'''
         jids = map(str, range(10))
         for jid in jids:
-            self.lua('put', jid, 'queue', jid, 'klass', {}, 0)
+            self.lua('put', jid, 'worker', 'queue', jid, 'klass', {}, 0)
             self.lua('pop', jid, 'queue', 'worker', 10)
             self.lua('complete', jid, jid, 'worker', 'queue', {})
             complete = self.lua('jobs', jid, 'complete')
@@ -43,7 +43,7 @@ class TestJobs(TestQless):
         '''Verify that we can get a list of running jobs in a queue'''
         jids = map(str, range(10))
         for jid in jids:
-            self.lua('put', jid, 'queue', jid, 'klass', {}, 0)
+            self.lua('put', jid, 'worker', 'queue', jid, 'klass', {}, 0)
             self.lua('pop', jid, 'queue', 'worker', 10)
             running = self.lua('jobs', jid, 'running', 'queue')
             self.assertEqual(len(running), int(jid) + 1)
@@ -54,7 +54,7 @@ class TestJobs(TestQless):
         self.lua('config.set', 0, 'heartbeat', 10)
         jids = map(str, range(10))
         for jid in jids:
-            self.lua('put', jid, 'queue', jid, 'klass', {}, 0)
+            self.lua('put', jid, 'worker', 'queue', jid, 'klass', {}, 0)
             self.lua('pop', jid, 'queue', 'worker', 10)
             stalled = self.lua('jobs', int(jid) + 20, 'stalled', 'queue')
             self.assertEqual(len(stalled), int(jid) + 1)
@@ -64,18 +64,18 @@ class TestJobs(TestQless):
         '''Verify that we can get a list of scheduled jobs in a queue'''
         jids = map(str, range(1, 11))
         for jid in jids:
-            self.lua('put', jid, 'queue', jid, 'klass', {}, jid)
+            self.lua('put', jid, 'worker', 'queue', jid, 'klass', {}, jid)
             scheduled = self.lua('jobs', 0, 'scheduled', 'queue')
             self.assertEqual(len(scheduled), int(jid))
             self.assertEqual(scheduled[-1], jid)
 
     def test_depends(self):
         '''Verify that we can get a list of dependent jobs in a queue'''
-        self.lua('put', 0, 'queue', 'a', 'klass', {}, 0)
+        self.lua('put', 0, 'worker', 'queue', 'a', 'klass', {}, 0)
         jids = map(str, range(0, 10))
         for jid in jids:
             self.lua(
-                'put', jid, 'queue', jid, 'klass', {}, 0, 'depends', ['a'])
+                'put', jid, 'worker', 'queue', jid, 'klass', {}, 0, 'depends', ['a'])
             depends = self.lua('jobs', 0, 'depends', 'queue')
             self.assertEqual(len(depends), int(jid) + 1)
             self.assertEqual(depends[-1], jid)
@@ -102,14 +102,14 @@ class TestJobs(TestQless):
 
     def test_scheduled_waiting(self):
         '''Jobs that were scheduled but are ready shouldn't be in scheduled'''
-        self.lua('put', 0, 'queue', 'jid', 'klass', {}, 10)
+        self.lua('put', 0, 'worker', 'queue', 'jid', 'klass', {}, 10)
         self.assertEqual(len(self.lua('jobs', 20, 'scheduled', 'queue')), 0)
 
     def test_pagination_complete(self):
         '''Jobs should be able to provide paginated results for complete'''
         jids = map(str, range(100))
         for jid in jids:
-            self.lua('put', jid, 'queue', jid, 'klass', {}, 0)
+            self.lua('put', jid, 'worker', 'queue', jid, 'klass', {}, 0)
             self.lua('pop', jid, 'queue', 'worker', 10)
             self.lua('complete', jid, jid, 'worker', 'queue', {})
         # Get two pages and ensure they're what we expect
@@ -124,7 +124,7 @@ class TestJobs(TestQless):
         jids = map(str, range(100))
         self.lua('config.set', 0, 'heartbeat', 1000)
         for jid in jids:
-            self.lua('put', jid, 'queue', jid, 'klass', {}, 0)
+            self.lua('put', jid, 'worker', 'queue', jid, 'klass', {}, 0)
             self.lua('pop', jid, 'queue', 'worker', 10)
         # Get two pages and ensure they're what we expect
         self.assertEqual(
@@ -155,7 +155,7 @@ class TestQueue(TestQless):
         '''Discern stalled job counts correctly'''
         expected = dict(self.expected)
         expected['stalled'] = 1
-        self.lua('put', 0, 'queue', 'jid', 'klass', {}, 0)
+        self.lua('put', 0, 'worker', 'queue', 'jid', 'klass', {}, 0)
         job = self.lua('pop', 1, 'queue', 'worker', 10)[0]
         expires = job['expires'] + 10
         self.assertEqual(self.lua('queues', expires, 'queue'), expected)
@@ -165,7 +165,7 @@ class TestQueue(TestQless):
         '''Discern waiting job counts correctly'''
         expected = dict(self.expected)
         expected['waiting'] = 1
-        self.lua('put', 0, 'queue', 'jid', 'klass', {}, 0)
+        self.lua('put', 0, 'worker', 'queue', 'jid', 'klass', {}, 0)
         self.assertEqual(self.lua('queues', 0, 'queue'), expected)
         self.assertEqual(self.lua('queues', 0), [expected])
 
@@ -173,7 +173,7 @@ class TestQueue(TestQless):
         '''Discern running job counts correctly'''
         expected = dict(self.expected)
         expected['running'] = 1
-        self.lua('put', 0, 'queue', 'jid', 'klass', {}, 0)
+        self.lua('put', 0, 'worker', 'queue', 'jid', 'klass', {}, 0)
         self.lua('pop', 1, 'queue', 'worker', 10)
         self.assertEqual(self.lua('queues', 0, 'queue'), expected)
         self.assertEqual(self.lua('queues', 0), [expected])
@@ -183,8 +183,8 @@ class TestQueue(TestQless):
         expected = dict(self.expected)
         expected['depends'] = 1
         expected['waiting'] = 1
-        self.lua('put', 0, 'queue', 'a', 'klass', {}, 0)
-        self.lua('put', 0, 'queue', 'b', 'klass', {}, 0, 'depends', ['a'])
+        self.lua('put', 0, 'worker', 'queue', 'a', 'klass', {}, 0)
+        self.lua('put', 0, 'worker', 'queue', 'b', 'klass', {}, 0, 'depends', ['a'])
         self.assertEqual(self.lua('queues', 0, 'queue'), expected)
         self.assertEqual(self.lua('queues', 0), [expected])
 
@@ -192,7 +192,7 @@ class TestQueue(TestQless):
         '''Discern scheduled job counts correctly'''
         expected = dict(self.expected)
         expected['scheduled'] = 1
-        self.lua('put', 0, 'queue', 'jid', 'klass', {}, 10)
+        self.lua('put', 0, 'worker', 'queue', 'jid', 'klass', {}, 10)
         self.assertEqual(self.lua('queues', 0, 'queue'), expected)
         self.assertEqual(self.lua('queues', 0), [expected])
 
@@ -216,7 +216,7 @@ class TestQueue(TestQless):
         '''Can pause and unpause a queue'''
         jids = map(str, range(10))
         for jid in jids:
-            self.lua('put', 0, 'queue', jid, 'klass', {}, 0)
+            self.lua('put', 0, 'worker', 'queue', jid, 'klass', {}, 0)
         # After pausing, we can't get the jobs, and the state reflects it
         self.lua('pause', 0, 'queue')
         self.assertEqual(len(self.lua('pop', 0, 'queue', 'worker', 100)), 0)
@@ -232,7 +232,7 @@ class TestQueue(TestQless):
 
     def test_advance(self):
         '''When advancing a job to a new queue, queues should know about it'''
-        self.lua('put', 0, 'queue', 'jid', 'klass', {}, 0)
+        self.lua('put', 0, 'worker', 'queue', 'jid', 'klass', {}, 0)
         self.lua('pop', 0, 'queue', 'worker', 10)
         self.lua('complete', 0, 'jid', 'worker', 'queue', {}, 'next', 'another')
         expected = dict(self.expected)
@@ -253,7 +253,7 @@ class TestQueue(TestQless):
         '''When checking counts, jobs that /were/ scheduled can be waiting'''
         expected = dict(self.expected)
         expected['waiting'] = 1
-        self.lua('put', 0, 'queue', 'jid', 'klass', {}, 10)
+        self.lua('put', 0, 'worker', 'queue', 'jid', 'klass', {}, 10)
         self.assertEqual(self.lua('queues', 20), [expected])
         self.assertEqual(self.lua('queues', 20, 'queue'), expected)
 
@@ -304,7 +304,7 @@ class TestPut(TestQless):
 
     def test_basic(self):
         '''We should be able to put and get jobs'''
-        jid = self.lua('put', 12345, 'queue', 'jid', 'klass', {}, 0)
+        jid = self.lua('put', 12345, 'worker', 'queue', 'jid', 'klass', {}, 0)
         self.assertEqual(jid, 'jid')
         # Now we should be able to verify the data we get back
         self.assertEqual(self.lua('get', 12345, 'jid'), {
@@ -330,12 +330,12 @@ class TestPut(TestQless):
         '''We should be able to provide an array as data'''
         # In particular, an empty array should be acceptable, and /not/
         # transformed into a dictionary when it returns
-        self.lua('put', 12345, 'queue', 'jid', 'klass', [], 0)
+        self.lua('put', 12345, 'worker', 'queue', 'jid', 'klass', [], 0)
         self.assertEqual(self.lua('get', 12345, 'jid')['data'], '[]')
 
     def test_put_delay(self):
         '''When we put a job with a delay, it's reflected in its data'''
-        self.lua('put', 0, 'queue', 'jid', 'klass', {}, 1)
+        self.lua('put', 0, 'worker', 'queue', 'jid', 'klass', {}, 1)
         self.assertEqual(self.lua('get', 0, 'jid')['state'], 'scheduled')
         # After the delay, we should be able to pop
         self.assertEqual(self.lua('pop', 0, 'queue', 'worker', 10), {})
@@ -343,32 +343,32 @@ class TestPut(TestQless):
 
     def test_put_retries(self):
         '''Reflects changes to 'retries' '''
-        self.lua('put', 12345, 'queue', 'jid', 'klass', {}, 0, 'retries', 2)
+        self.lua('put', 12345, 'worker', 'queue', 'jid', 'klass', {}, 0, 'retries', 2)
         self.assertEqual(self.lua('get', 12345, 'jid')['retries'], 2)
         self.assertEqual(self.lua('get', 12345, 'jid')['remaining'], 2)
 
     def test_put_tags(self):
         '''When we put a job with tags, it's reflected in its data'''
-        self.lua('put', 12345, 'queue', 'jid', 'klass', {}, 0, 'tags', ['foo'])
+        self.lua('put', 12345, 'worker', 'queue', 'jid', 'klass', {}, 0, 'tags', ['foo'])
         self.assertEqual(self.lua('get', 12345, 'jid')['tags'], ['foo'])
 
     def test_put_priority(self):
         '''When we put a job with priority, it's reflected in its data'''
-        self.lua('put', 12345, 'queue', 'jid', 'klass', {}, 0, 'priority', 1)
+        self.lua('put', 12345, 'worker', 'queue', 'jid', 'klass', {}, 0, 'priority', 1)
         self.assertEqual(self.lua('get', 12345, 'jid')['priority'], 1)
 
     def test_put_depends(self):
         '''Dependencies are reflected in job data'''
-        self.lua('put', 12345, 'queue', 'a', 'klass', {}, 0)
-        self.lua('put', 12345, 'queue', 'b', 'klass', {}, 0, 'depends', ['a'])
+        self.lua('put', 12345, 'worker', 'queue', 'a', 'klass', {}, 0)
+        self.lua('put', 12345, 'worker', 'queue', 'b', 'klass', {}, 0, 'depends', ['a'])
         self.assertEqual(self.lua('get', 12345, 'a')['dependents'], ['b'])
         self.assertEqual(self.lua('get', 12345, 'b')['dependencies'], ['a'])
         self.assertEqual(self.lua('get', 12345, 'b')['state'], 'depends')
 
     def test_move(self):
         '''Move is described in terms of puts.'''
-        self.lua('put', 0, 'queue', 'jid', 'klass', {'foo': 'bar'}, 0)
-        self.lua('put', 0, 'other', 'jid', 'klass', {'foo': 'bar'}, 0)
+        self.lua('put', 0, 'worker', 'queue', 'jid', 'klass', {'foo': 'bar'}, 0)
+        self.lua('put', 0, 'worker', 'other', 'jid', 'klass', {'foo': 'bar'}, 0)
         self.assertEqual(self.lua('get', 1, 'jid'), {
             'data': '{"foo": "bar"}',
             'dependencies': {},
@@ -397,24 +397,24 @@ class TestPut(TestQless):
             ('retries', 2, 3)]:
             # First, when not overriding the value, it should stay the sam3
             # even after moving
-            self.lua('put', 0, 'queue', key, 'klass', {}, 0, key, value)
-            self.lua('put', 0, 'other', key, 'klass', {}, 0)
+            self.lua('put', 0, 'worker', 'queue', key, 'klass', {}, 0, key, value)
+            self.lua('put', 0, 'worker', 'other', key, 'klass', {}, 0)
             self.assertEqual(self.lua('get', 0, key)[key], value)
             # But if we override it, it should be updated
-            self.lua('put', 0, 'queue', key, 'klass', {}, 0, key, update)
+            self.lua('put', 0, 'worker', 'queue', key, 'klass', {}, 0, key, update)
             self.assertEqual(self.lua('get', 0, key)[key], update)
 
         # Updating dependecies has to be special-cased a little bit. Without
         # overriding dependencies, they should be carried through the move
-        self.lua('put', 0, 'queue', 'a', 'klass', {}, 0)
-        self.lua('put', 0, 'queue', 'b', 'klass', {}, 0)
-        self.lua('put', 0, 'queue', 'c', 'klass', {}, 0, 'depends', ['a'])
-        self.lua('put', 0, 'other', 'c', 'klass', {}, 0)
+        self.lua('put', 0, 'worker', 'queue', 'a', 'klass', {}, 0)
+        self.lua('put', 0, 'worker', 'queue', 'b', 'klass', {}, 0)
+        self.lua('put', 0, 'worker', 'queue', 'c', 'klass', {}, 0, 'depends', ['a'])
+        self.lua('put', 0, 'worker', 'other', 'c', 'klass', {}, 0)
         self.assertEqual(self.lua('get', 0, 'a')['dependents'], ['c'])
         self.assertEqual(self.lua('get', 0, 'b')['dependents'], {})
         self.assertEqual(self.lua('get', 0, 'c')['dependencies'], ['a'])
         # But if we move and update depends, then it should correctly reflect
-        self.lua('put', 0, 'queue', 'c', 'klass', {}, 0, 'depends', ['b'])
+        self.lua('put', 0, 'worker', 'queue', 'c', 'klass', {}, 0, 'depends', ['b'])
         self.assertEqual(self.lua('get', 0, 'a')['dependents'], {})
         self.assertEqual(self.lua('get', 0, 'b')['dependents'], ['c'])
         self.assertEqual(self.lua('get', 0, 'c')['dependencies'], ['b'])
@@ -437,7 +437,7 @@ class TestPeek(TestQless):
         '''Can peek at a single waiting job'''
         # No jobs for an empty queue
         self.assertEqual(self.lua('peek', 0, 'foo', 10), {})
-        self.lua('put', 0, 'foo', 'jid', 'klass', {}, 0)
+        self.lua('put', 0, 'worker', 'foo', 'jid', 'klass', {}, 0)
         # And now we should see a single job
         self.assertEqual(self.lua('peek', 1, 'foo', 10), [{
             'data': '{}',
@@ -458,7 +458,7 @@ class TestPeek(TestQless):
             'worker': u''
         }])
         # With several jobs in the queue, we should be able to see more
-        self.lua('put', 2, 'foo', 'jid2', 'klass', {}, 0)
+        self.lua('put', 2, 'worker', 'foo', 'jid2', 'klass', {}, 0)
         self.assertEqual([o['jid'] for o in self.lua('peek', 3, 'foo', 10)], [
             'jid', 'jid2'])
 
@@ -467,7 +467,7 @@ class TestPeek(TestQless):
         # We'll inserts some jobs with different priorities
         for jid in xrange(-10, 10):
             self.lua(
-                'put', 0, 'queue', jid, 'klass', {}, 0, 'priority', jid)
+                'put', 0, 'worker', 'queue', jid, 'klass', {}, 0, 'priority', jid)
 
         # Peek at the jobs, and they should be in the right order
         jids = [job['jid'] for job in self.lua('peek', 1, 'queue', 100)]
@@ -477,14 +477,14 @@ class TestPeek(TestQless):
         '''Honor the time that jobs were put, priority constant'''
         # Put 100 jobs on with different times
         for time in xrange(100):
-            self.lua('put', time, 'queue', time, 'klass', {}, 0)
+            self.lua('put', time, 'worker', 'queue', time, 'klass', {}, 0)
         jids = [job['jid'] for job in self.lua('peek', 200, 'queue', 100)]
         self.assertEqual(jids, map(str, range(100)))
 
     def test_move(self):
         '''When we move a job, it should be visible in the new, not old'''
-        self.lua('put', 0, 'queue', 'jid', 'klass', {}, 0)
-        self.lua('put', 0, 'other', 'jid', 'klass', {}, 0)
+        self.lua('put', 0, 'worker', 'queue', 'jid', 'klass', {}, 0)
+        self.lua('put', 0, 'worker', 'other', 'jid', 'klass', {}, 0)
         self.assertEqual(self.lua('peek', 1, 'queue', 10), {})
         self.assertEqual(self.lua('peek', 1, 'other', 10)[0]['jid'], 'jid')
 
@@ -495,8 +495,8 @@ class TestPeek(TestQless):
 
     def test_priority_update(self):
         '''We can change a job's priority'''
-        self.lua('put', 0, 'queue', 'a', 'klass', {}, 0, 'priority', 0)
-        self.lua('put', 0, 'queue', 'b', 'klass', {}, 0, 'priority', 1)
+        self.lua('put', 0, 'worker', 'queue', 'a', 'klass', {}, 0, 'priority', 0)
+        self.lua('put', 0, 'worker', 'queue', 'b', 'klass', {}, 0, 'priority', 1)
         self.assertEqual(['b', 'a'],
             [j['jid'] for j in self.lua('peek', 0, 'queue', 100)])
         self.lua('priority', 0, 'a', 2)
@@ -523,7 +523,7 @@ class TestPop(TestQless):
         # If the queue is empty, you get no jobs
         self.assertEqual(self.lua('pop', 0, 'queue', 'worker', 10), {})
         # With job put, we can get one back
-        self.lua('put', 0, 'queue', 'jid', 'klass', {}, 0)
+        self.lua('put', 0, 'worker', 'queue', 'jid', 'klass', {}, 0)
         self.assertEqual(self.lua('pop', 1, 'queue', 'worker', 1), [{
             'data': '{}',
             'dependencies': {},
@@ -546,7 +546,7 @@ class TestPop(TestQless):
     def test_pop_many(self):
         '''We should be able to pop off many jobs'''
         for jid in range(10):
-            self.lua('put', jid, 'queue', jid, 'klass', {}, 0)
+            self.lua('put', jid, 'worker', 'queue', jid, 'klass', {}, 0)
         # This should only pop the first 7
         self.assertEqual(
             [job['jid'] for job in self.lua('pop', 100, 'queue', 'worker', 7)],
@@ -561,7 +561,7 @@ class TestPop(TestQless):
         # We'll inserts some jobs with different priorities
         for jid in xrange(-10, 10):
             self.lua(
-                'put', 0, 'queue', jid, 'klass', {}, 0, 'priority', jid)
+                'put', 0, 'worker', 'queue', jid, 'klass', {}, 0, 'priority', jid)
 
         # Peek at the jobs, and they should be in the right order
         jids = [job['jid'] for job in self.lua('pop', 1, 'queue', 'worker', 100)]
@@ -571,14 +571,14 @@ class TestPop(TestQless):
         '''Honor the time jobs were inserted, priority held constant'''
         # Put 100 jobs on with different times
         for time in xrange(100):
-            self.lua('put', time, 'queue', time, 'klass', {}, 0)
+            self.lua('put', time, 'worker', 'queue', time, 'klass', {}, 0)
         jids = [job['jid'] for job in self.lua('pop', 200, 'queue', 'worker', 100)]
         self.assertEqual(jids, map(str, range(100)))
 
     def test_move(self):
         '''When we move a job, it should be visible in the new, not old'''
-        self.lua('put', 0, 'queue', 'jid', 'klass', {}, 0)
-        self.lua('put', 0, 'other', 'jid', 'klass', {}, 0)
+        self.lua('put', 0, 'worker', 'queue', 'jid', 'klass', {}, 0)
+        self.lua('put', 0, 'worker', 'other', 'jid', 'klass', {}, 0)
         self.assertEqual(self.lua('pop', 1, 'queue', 'worker', 10), {})
         self.assertEqual(self.lua('pop', 1, 'other', 'worker', 10)[0]['jid'], 'jid')
 
@@ -586,7 +586,7 @@ class TestPop(TestQless):
         '''We can control the maxinum number of jobs available in a queue'''
         self.lua('config.set', 0, 'queue-max-concurrency', 5)
         for jid in xrange(10):
-            self.lua('put', jid, 'queue', jid, 'klass', {}, 0)
+            self.lua('put', jid, 'worker', 'queue', jid, 'klass', {}, 0)
         self.assertEqual(len(self.lua('pop', 10, 'queue', 'worker', 10)), 5)
         # But as we complete the jobs, we can pop more
         for jid in xrange(5):
@@ -599,7 +599,7 @@ class TestPop(TestQless):
         # We'll put and pop a bunch of jobs, then restruct concurrency and
         # validate that jobs can't be popped until we dip below that level
         for jid in xrange(100):
-            self.lua('put', jid, 'queue', jid, 'klass', {}, 0)
+            self.lua('put', jid, 'worker', 'queue', jid, 'klass', {}, 0)
         self.lua('pop', 100, 'queue', 'worker', 10)
         self.lua('config.set', 100, 'queue-max-concurrency', 5)
         for jid in xrange(6):
@@ -614,7 +614,7 @@ class TestPop(TestQless):
         '''Stalled jobs can still be popped with max concurrency'''
         self.lua('config.set', 0, 'queue-max-concurrency', 1)
         self.lua('config.set', 0, 'grace-period', 0)
-        self.lua('put', 0, 'queue', 'jid', 'klass', {}, 0, 'retries', 5)
+        self.lua('put', 0, 'worker', 'queue', 'jid', 'klass', {}, 0, 'retries', 5)
         job = self.lua('pop', 0, 'queue', 'worker', 10)[0]
         job = self.lua('pop', job['expires'] + 10, 'queue', 'worker', 10)[0]
         self.assertEqual(job['jid'], 'jid')
@@ -623,8 +623,8 @@ class TestPop(TestQless):
     def test_fail_max_concurrency(self):
         '''Failing a job makes space for a job in a queue with concurrency'''
         self.lua('config.set', 0, 'queue-max-concurrency', 1)
-        self.lua('put', 0, 'queue', 'a', 'klass', {}, 0)
-        self.lua('put', 1, 'queue', 'b', 'klass', {}, 0)
+        self.lua('put', 0, 'worker', 'queue', 'a', 'klass', {}, 0)
+        self.lua('put', 1, 'worker', 'queue', 'b', 'klass', {}, 0)
         self.lua('pop', 2, 'queue', 'worker', 10)
         self.lua('fail', 3, 'a', 'worker', 'group', 'message', {})
         job = self.lua('pop', 4, 'queue', 'worker', 10)[0]

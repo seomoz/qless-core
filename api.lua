@@ -144,8 +144,8 @@ QlessAPI.timeout = function(now, ...)
   end
 end
 
-QlessAPI.put = function(now, queue, jid, klass, data, delay, ...)
-  return Qless.queue(queue):put(now, jid, klass, data, delay, unpack(arg))
+QlessAPI.put = function(now, me, queue, jid, klass, data, delay, ...)
+  return Qless.queue(queue):put(now, me, jid, klass, data, delay, unpack(arg))
 end
 
 QlessAPI.unfail = function(now, queue, group, count)

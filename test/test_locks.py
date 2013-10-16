@@ -21,11 +21,11 @@ class TestLocks(TestQless):
 
     def test_move(self):
         '''Moving ajob should expire any existing locks'''
-        self.lua('put', 0, 'queue', 'jid', 'klass', {}, 0)
+        self.lua('put', 0, 'worker', 'queue', 'jid', 'klass', {}, 0)
         self.lua('pop', 1, 'queue', 'worker', 10)
         self.lua('heartbeat', 2, 'jid', 'worker', {})
         # Move the job after it's been popped
-        self.lua('put', 3, 'other', 'jid', 'klass', {}, 0)
+        self.lua('put', 3, 'worker', 'other', 'jid', 'klass', {}, 0)
         # Now this job cannot be heartbeated
         self.assertRaisesRegexp(redis.ResponseError, r'waiting',
             self.lua, 'heartbeat',  4, 'jid', 'worker', {})
@@ -33,7 +33,7 @@ class TestLocks(TestQless):
     def test_lose_lock(self):
         '''When enough time passes, we lose our lock on a job'''
         # Put and pop a job
-        self.lua('put', 0, 'queue', 'jid', 'klass', {}, 0)
+        self.lua('put', 0, 'worker', 'queue', 'jid', 'klass', {}, 0)
         job = self.lua('pop', 1, 'queue', 'worker', 10)[0]
         # No jobs should be available since the lock is still valid
         self.assertEqual(self.lua('pop', 2, 'queue', 'worker', 10), {})
@@ -66,7 +66,7 @@ class TestLocks(TestQless):
     def test_heartbeat(self):
         '''Heartbeating extends the lock'''
         # Put and pop a job
-        self.lua('put', 0, 'queue', 'jid', 'klass', {}, 0)
+        self.lua('put', 0, 'worker', 'queue', 'jid', 'klass', {}, 0)
         job = self.lua('pop', 1, 'queue', 'worker', 10)[0]
         # No jobs should be available since the lock is still valid
         self.assertEqual(self.lua('pop', 2, 'queue', 'worker', 10), {})
@@ -76,7 +76,7 @@ class TestLocks(TestQless):
 
     def test_heartbeat_waiting(self):
         '''Only popped jobs can be heartbeated'''
-        self.lua('put', 0, 'queue', 'jid', 'klass', {}, 0)
+        self.lua('put', 0, 'worker', 'queue', 'jid', 'klass', {}, 0)
         self.assertRaisesRegexp(redis.ResponseError, r'waiting',
             self.lua, 'heartbeat',  1, 'jid', 'worker', {})
         # Pop is and it should work
@@ -85,7 +85,7 @@ class TestLocks(TestQless):
 
     def test_heartbeat_failed(self):
         '''Cannot heartbeat a failed job'''
-        self.lua('put', 0, 'queue', 'jid', 'klass', {}, 0)
+        self.lua('put', 0, 'worker', 'queue', 'jid', 'klass', {}, 0)
         self.lua('pop', 0, 'queue', 'worker', 10)
         self.lua('fail', 0, 'jid', 'worker', 'foo', 'bar', {})
         self.assertRaisesRegexp(redis.ResponseError, r'failed',
@@ -93,14 +93,14 @@ class TestLocks(TestQless):
 
     def test_heartbeat_depends(self):
         '''Cannot heartbeat a dependent job'''
-        self.lua('put', 0, 'queue', 'a', 'klass', {}, 0)
-        self.lua('put', 0, 'queue', 'b', 'klass', {}, 0, 'depends', ['a'])
+        self.lua('put', 0, 'worker', 'queue', 'a', 'klass', {}, 0)
+        self.lua('put', 0, 'worker', 'queue', 'b', 'klass', {}, 0, 'depends', ['a'])
         self.assertRaisesRegexp(redis.ResponseError, r'depends',
             self.lua, 'heartbeat',  0, 'b', 'worker', {})
 
     def test_heartbeat_scheduled(self):
         '''Cannot heartbeat a scheduled job'''
-        self.lua('put', 0, 'queue', 'jid', 'klass', {}, 1)
+        self.lua('put', 0, 'worker', 'queue', 'jid', 'klass', {}, 1)
         self.assertRaisesRegexp(redis.ResponseError, r'scheduled',
             self.lua, 'heartbeat',  0, 'jid', 'worker', {})
 
@@ -108,13 +108,13 @@ class TestLocks(TestQless):
         '''Cannot heartbeat a job that doesn't exist'''
         self.assertRaisesRegexp(redis.ResponseError, r'does not exist',
             self.lua, 'heartbeat',  0, 'jid', 'worker', {})
-        self.lua('put', 0, 'queue', 'jid', 'klass', {}, 0)
+        self.lua('put', 0, 'worker', 'queue', 'jid', 'klass', {}, 0)
         self.lua('pop', 0, 'queue', 'worker', 10)
         self.lua('heartbeat', 0, 'jid', 'worker', {})
 
     def test_heartbeat_completed(self):
         '''Cannot heartbeat a job that has been completed'''
-        self.lua('put', 0, 'queue', 'jid', 'klass', {}, 0)
+        self.lua('put', 0, 'worker', 'queue', 'jid', 'klass', {}, 0)
         self.lua('pop', 0, 'queue', 'worker', 10)
         self.lua('complete', 0, 'jid', 'worker', 'queue', {})
         self.assertRaisesRegexp(redis.ResponseError, r'complete',
@@ -122,7 +122,7 @@ class TestLocks(TestQless):
 
     def test_heartbeat_wrong_worker(self):
         '''Only the worker with a job's lock can heartbeat it'''
-        self.lua('put', 0, 'queue', 'jid', 'klass', {}, 0)
+        self.lua('put', 0, 'worker', 'queue', 'jid', 'klass', {}, 0)
         self.lua('pop', 1, 'queue', 'worker', 10)
         # Another worker can't heartbeat, but we can
         self.assertRaisesRegexp(redis.ResponseError, r'another worker',
@@ -140,7 +140,7 @@ class TestRetries(TestQless):
 
     def test_basic(self):
         '''The retries and remaining counters are decremented appropriately'''
-        self.lua('put', 0, 'queue', 'jid', 'klass', {}, 0, 'retries', 5)
+        self.lua('put', 0, 'worker', 'queue', 'jid', 'klass', {}, 0, 'retries', 5)
         self.lua('pop', 0, 'queue', 'worker', 10)
         job = self.lua('pop', 0, 'queue', 'another', 10)[0]
         self.assertEqual(job['retries'], 5)
@@ -148,16 +148,16 @@ class TestRetries(TestQless):
 
     def test_move_failed_retries(self):
         '''Can move a job even if it's failed retries'''
-        self.lua('put', 0, 'queue', 'jid', 'klass', {}, 0, 'retries', 0)
+        self.lua('put', 0, 'worker', 'queue', 'jid', 'klass', {}, 0, 'retries', 0)
         self.lua('pop', 0, 'queue', 'worker', 10)
         self.assertEqual(self.lua('pop', 0, 'queue', 'worker', 10), {})
         self.assertEqual(self.lua('get', 0, 'jid')['state'], 'failed')
-        self.lua('put', 0, 'queue', 'jid', 'klass', {}, 0)
+        self.lua('put', 0, 'worker', 'queue', 'jid', 'klass', {}, 0)
         self.assertEqual(self.lua('get', 0, 'jid')['state'], 'waiting')
 
     def test_reset_complete(self):
         '''Completing a job resets its retries counter'''
-        self.lua('put', 0, 'queue', 'jid', 'klass', {}, 0, 'retries', 5)
+        self.lua('put', 0, 'worker', 'queue', 'jid', 'klass', {}, 0, 'retries', 5)
         self.lua('pop', 0, 'queue', 'worker', 10)
         self.lua('pop', 0, 'queue', 'worker', 10)
         self.lua(
@@ -167,11 +167,11 @@ class TestRetries(TestQless):
 
     def test_reset_move(self):
         '''Moving a job resets its retries counter'''
-        self.lua('put', 0, 'queue', 'jid', 'klass', {}, 0, 'retries', 5)
+        self.lua('put', 0, 'worker', 'queue', 'jid', 'klass', {}, 0, 'retries', 5)
         self.lua('pop', 0, 'queue', 'worker', 10)
         self.lua('pop', 0, 'queue', 'worker', 10)
         # Re-put the job without specifying retries
-        self.lua('put', 0, 'queue', 'jid', 'klass', {}, 0)
+        self.lua('put', 0, 'worker', 'queue', 'jid', 'klass', {}, 0)
         self.assertEqual(self.lua(
             'pop', 0, 'queue', 'worker', 10)[0]['remaining'], 5)
 
@@ -192,13 +192,13 @@ class TestRetry(TestQless):
 
     def test_retry_waiting(self):
         '''Cannot retry a job that's waiting'''
-        self.lua('put', 0, 'queue', 'jid', 'klass', {}, 0)
+        self.lua('put', 0, 'worker', 'queue', 'jid', 'klass', {}, 0)
         self.assertRaisesRegexp(redis.ResponseError, r'not currently running',
             self.lua, 'retry', 0, 'jid', 'queue', 'worker', 0)
 
     def test_retry_completed(self):
         '''Cannot retry a completed job'''
-        self.lua('put', 0, 'queue', 'jid', 'klass', {}, 0)
+        self.lua('put', 0, 'worker', 'queue', 'jid', 'klass', {}, 0)
         self.lua('pop', 0, 'queue', 'worker', 10)
         self.lua('complete', 0, 'jid', 'worker', 'queue', {})
         self.assertRaisesRegexp(redis.ResponseError, r'not currently running',
@@ -206,7 +206,7 @@ class TestRetry(TestQless):
 
     def test_retry_failed(self):
         '''Cannot retry a failed job'''
-        self.lua('put', 0, 'queue', 'jid', 'klass', {}, 0)
+        self.lua('put', 0, 'worker', 'queue', 'jid', 'klass', {}, 0)
         self.lua('pop', 0, 'queue', 'worker', 10)
         self.lua('fail', 0, 'jid', 'worker', 'group', 'message', {})
         self.assertRaisesRegexp(redis.ResponseError, r'not currently running',
@@ -214,14 +214,14 @@ class TestRetry(TestQless):
 
     def test_retry_otherowner(self):
         '''Cannot retry a job owned by another worker'''
-        self.lua('put', 0, 'queue', 'jid', 'klass', {}, 0)
+        self.lua('put', 0, 'worker', 'queue', 'jid', 'klass', {}, 0)
         self.lua('pop', 0, 'queue', 'worker', 10)
         self.assertRaisesRegexp(redis.ResponseError, r'another worker',
             self.lua, 'retry', 0, 'jid', 'queue', 'another', 0)
 
     def test_retry_complete(self):
         '''Cannot complete a job immediately after retry'''
-        self.lua('put', 0, 'queue', 'jid', 'klass', {}, 0)
+        self.lua('put', 0, 'worker', 'queue', 'jid', 'klass', {}, 0)
         self.lua('pop', 0, 'queue', 'worker', 10)
         self.lua('retry', 0, 'jid', 'queue', 'worker', 0)
         self.assertRaisesRegexp(redis.ResponseError, r'not currently running',
@@ -229,7 +229,7 @@ class TestRetry(TestQless):
 
     def test_retry_fail(self):
         '''Cannot fail a job immediately after retry'''
-        self.lua('put', 0, 'queue', 'jid', 'klass', {}, 0)
+        self.lua('put', 0, 'worker', 'queue', 'jid', 'klass', {}, 0)
         self.lua('pop', 0, 'queue', 'worker', 10)
         self.lua('retry', 0, 'jid', 'queue', 'worker', 0)
         self.assertRaisesRegexp(redis.ResponseError, r'not currently running',
@@ -237,7 +237,7 @@ class TestRetry(TestQless):
 
     def test_retry_heartbeat(self):
         '''Cannot heartbeat a job immediately after retry'''
-        self.lua('put', 0, 'queue', 'jid', 'klass', {}, 0)
+        self.lua('put', 0, 'worker', 'queue', 'jid', 'klass', {}, 0)
         self.lua('pop', 0, 'queue', 'worker', 10)
         self.lua('retry', 0, 'jid', 'queue', 'worker', 0)
         self.assertRaisesRegexp(redis.ResponseError, r'not currently running',
@@ -250,7 +250,7 @@ class TestRetry(TestQless):
 
     def test_retry_group_message(self):
         '''Can provide a group/message to be used for retries'''
-        self.lua('put', 0, 'queue', 'jid', 'klass', {}, 0, 'retries', 0)
+        self.lua('put', 0, 'worker', 'queue', 'jid', 'klass', {}, 0, 'retries', 0)
         self.lua('pop', 0, 'queue', 'worker', 10)
         self.lua(
             'retry', 0, 'jid', 'queue', 'worker', 0, 'group', 'message')
@@ -278,7 +278,7 @@ class TestRetry(TestQless):
 
     def test_retry_delay(self):
         '''Can retry a job with a delay and then it's considered scheduled'''
-        self.lua('put', 0, 'queue', 'jid', 'klass', {}, 0)
+        self.lua('put', 0, 'worker', 'queue', 'jid', 'klass', {}, 0)
         self.lua('pop', 0, 'queue', 'worker', 10)
         self.lua(
             'retry', 0, 'jid', 'queue', 'worker', 10)
@@ -288,7 +288,7 @@ class TestRetry(TestQless):
 
     def test_retry_wrong_queue(self):
         '''Cannot retry a job in the wrong queue'''
-        self.lua('put', 0, 'queue', 'jid', 'klass', {}, 0)
+        self.lua('put', 0, 'worker', 'queue', 'jid', 'klass', {}, 0)
         self.lua('pop', 0, 'queue', 'worker', 10)
         self.lua('retry', 0, 'jid', 'queue', 'worker', 0)
         self.assertRaisesRegexp(redis.ResponseError, r'not currently running',
@@ -296,7 +296,7 @@ class TestRetry(TestQless):
 
     def test_retry_failed_retries(self):
         '''Retry can be invoked enough to cause it to fail retries'''
-        self.lua('put', 0, 'queue', 'jid', 'klass', {}, 0, 'retries', 0)
+        self.lua('put', 0, 'worker', 'queue', 'jid', 'klass', {}, 0, 'retries', 0)
         self.lua('pop', 0, 'queue', 'worker', 10)
         self.lua(
             'retry', 0, 'jid', 'queue', 'worker', 0)
@@ -339,7 +339,7 @@ class TestGracePeriod(TestQless):
 
     def test_basic(self):
         '''The lock must expire, and then the grace period must pass'''
-        self.lua('put', 0, 'queue', 'jid', 'klass', {}, 0)
+        self.lua('put', 0, 'worker', 'queue', 'jid', 'klass', {}, 0)
         job = self.lua('pop', 1, 'queue', 'worker', 10)[0]
         # Now, we'll lose the lock, but we should only get a warning, and not
         # actually have the job handed off to another yet
@@ -351,7 +351,7 @@ class TestGracePeriod(TestQless):
 
     def test_repeated(self):
         '''Grace periods should be given for each lock lost, not just first'''
-        self.lua('put', 0, 'queue', 'jid', 'klass', {}, 0, 'retries', 20)
+        self.lua('put', 0, 'worker', 'queue', 'jid', 'klass', {}, 0, 'retries', 20)
         job = self.lua('pop', 0, 'queue', 'worker', 10)[0]
         for _ in xrange(10):
             # Now, we'll lose the lock, but we should only get a warning, and
@@ -365,7 +365,7 @@ class TestGracePeriod(TestQless):
 
     def test_fail(self):
         '''Can still fail a job during the grace period'''
-        self.lua('put', 0, 'queue', 'jid', 'klass', {}, 0)
+        self.lua('put', 0, 'worker', 'queue', 'jid', 'klass', {}, 0)
         job = self.lua('pop', 0, 'queue', 'worker', 10)[0]
         # Lose the lock and fail the job
         expires = job['expires'] + 10

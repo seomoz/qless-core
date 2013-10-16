@@ -16,7 +16,7 @@ class TestTrack(TestQless):
 
     def test_track(self):
         '''Can track a job and it appears in "track"'''
-        self.lua('put', 0, 'queue', 'jid', 'klass', {}, 0)
+        self.lua('put', 0, 'worker', 'queue', 'jid', 'klass', {}, 0)
         self.lua('track', 0, 'track', 'jid')
         self.assertEqual(self.lua('track', 0), {
             'jobs': [{
@@ -42,7 +42,7 @@ class TestTrack(TestQless):
 
     def test_untrack(self):
         '''We can stop tracking a job'''
-        self.lua('put', 0, 'queue', 'jid', 'klass', {}, 0)
+        self.lua('put', 0, 'worker', 'queue', 'jid', 'klass', {}, 0)
         self.lua('track', 0, 'track', 'jid')
         self.lua('track', 0, 'untrack', 'jid')
         self.assertEqual(self.lua('track', 0), {'jobs': {}, 'expired': {}})
@@ -54,11 +54,11 @@ class TestTrack(TestQless):
 
     def test_jobs_tracked(self):
         '''Jobs know when they're tracked'''
-        self.lua('put', 0, 'queue', 'jid', 'klass', {}, 0)
+        self.lua('put', 0, 'worker', 'queue', 'jid', 'klass', {}, 0)
         self.lua('track', 0, 'track', 'jid')
         self.assertEqual(self.lua('get', 0, 'jid')['tracked'], True)
 
     def test_jobs_untracked(self):
         '''Jobs know when they're not tracked'''
-        self.lua('put', 0, 'queue', 'jid', 'klass', {}, 0)
+        self.lua('put', 0, 'worker', 'queue', 'jid', 'klass', {}, 0)
         self.assertEqual(self.lua('get', 0, 'jid')['tracked'], False)
