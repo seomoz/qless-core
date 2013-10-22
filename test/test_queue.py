@@ -372,7 +372,6 @@ class TestPut(TestQless):
         self.assertEqual(self.lua('get', 12345, 'a')['dependents'], ['b'])
         self.assertEqual(self.lua('get', 12345, 'b')['dependencies'], ['a'])
         self.assertEqual(self.lua('get', 12345, 'b')['state'], 'depends')
-        self.assertEqual(self.lua('get', 12345, 'b')['delay'], 1)
 
     def test_move(self):
         '''Move is described in terms of puts.'''
