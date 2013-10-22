@@ -17,6 +17,41 @@ class TestDependencies(TestQless):
         self.assertEqual(
             self.lua('pop', 3, 'queue', 'worker', 10)[0]['jid'], 'b')
 
+    def test_unlock_with_delay(self):
+        '''Dependencies schedule their dependents upon completion'''
+        self.lua('put', 0, 'worker', 'queue', 'a', 'klass', {}, 0)
+        self.lua('put', 0, 'worker', 'queue', 'b', 'klass', {}, 1000, 'depends', ['a'])
+        # Only 'a' should show up
+        self.assertEqual(len(self.lua('pop', 1, 'queue', 'worker', 10)), 1)
+        self.lua('complete', 2, 'a', 'worker', 'queue', {})
+        # And now 'b' should be scheduled
+        self.assertEqual(self.lua('get', 3, 'b')['state'], 'scheduled')
+        # After we wait for the delay, it should be available
+        self.assertEqual(len(self.lua('peek', 1000, 'queue', 10)), 1)
+        self.assertEqual(self.lua('get', 1001, 'b')['state'], 'waiting')
+
+    def test_unlock_with_delay_satisfied(self):
+        '''If deps are satisfied, should be scheduled'''
+        self.lua('put', 0, 'worker', 'queue', 'a', 'klass', {}, 10, 'depends', ['b'])
+        self.assertEqual(self.lua('get', 1, 'a')['state'], 'scheduled')
+
+    def test_complete_depends_with_delay(self):
+        '''We should be able to complete a job and specify delay and depends'''
+        self.lua('put', 0, 'worker', 'queue', 'a', 'klass', {}, 0)
+        self.lua('put', 1, 'worker', 'queue', 'b', 'klass', {}, 0)
+        self.assertEqual(len(self.lua('pop', 2, 'queue', 'worker', 1)), 1)
+        self.lua('complete', 3, 'a', 'worker', 'queue', {}, 'next', 'foo',
+            'depends', ['b'], 'delay', 10)
+        # Now its state should be 'depends'
+        self.assertEqual(self.lua('get', 4, 'a')['state'], 'depends')
+        # Now pop and complete the job it depends on
+        self.lua('pop', 5, 'queue', 'worker', 1)
+        self.lua('complete', 6, 'b', 'worker', 'queue', {})
+        # Now it should be scheduled
+        self.assertEqual(self.lua('get', 7, 'a')['state'], 'scheduled')
+        self.assertEqual(len(self.lua('peek', 13, 'foo', 10)), 1)
+        self.assertEqual(self.lua('get', 14, 'a')['state'], 'waiting')
+
     def test_complete_depends(self):
         '''Can also add dependencies upon completion'''
         self.lua('put', 0, 'worker', 'queue', 'b', 'klass', {}, 0)

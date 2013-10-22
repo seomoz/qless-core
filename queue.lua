@@ -446,11 +446,6 @@ function QlessQueue:put(now, worker, jid, klass, raw_data, delay, ...)
   local depends = assert(cjson.decode(options['depends'] or '[]') ,
     'Put(): Arg "depends" not JSON: '     .. tostring(options['depends']))
 
-  -- Delay and depends are not allowed together
-  if delay > 0 and #depends > 0 then
-    error('Put(): "delay" and "depends" are not allowed to be used together')
-  end
-
   -- If the job has old dependencies, determine which dependencies are
   -- in the new dependencies but not in the old ones, and which are in the
   -- old ones but not in the new
@@ -565,7 +560,16 @@ function QlessQueue:put(now, worker, jid, klass, raw_data, delay, ...)
   -- then we'll have to schedule it. Otherwise, we're just
   -- going to add it to the work queue.
   if delay > 0 then
-    self.scheduled.add(now + delay, jid)
+    if redis.call('scard', QlessJob.ns .. jid .. '-dependencies') > 0 then
+      -- We've already put it in 'depends'. Now, we must just save the data
+      -- for when it's scheduled
+      self.depends.add(now, jid)
+      redis.call('hmset', QlessJob.ns .. jid,
+        'state', 'depends',
+        'scheduled', now + delay)
+    else
+      self.scheduled.add(now + delay, jid)
+    end
   else
     if redis.call('scard', QlessJob.ns .. jid .. '-dependencies') > 0 then
       self.depends.add(now, jid)

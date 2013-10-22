@@ -81,11 +81,6 @@ function QlessJob:complete(now, worker, queue, data, ...)
   local depends = assert(cjson.decode(options['depends'] or '[]'),
     'Complete(): Arg "depends" not JSON: ' .. tostring(options['depends']))
 
-  -- Delay and depends are not allowed together
-  if delay > 0 and #depends > 0 then
-    error('Complete(): "delay" and "depends" are not allowed together')
-  end
-
   -- Depends doesn't make sense without nextq
   if options['delay'] and nextq == nil then
     error('Complete(): "delay" cannot be used without a "next".')
@@ -178,7 +173,7 @@ function QlessJob:complete(now, worker, queue, data, ...)
       'expires', 0,
       'remaining', tonumber(retries))
     
-    if delay > 0 then
+    if (delay > 0) and (#depends == 0) then
       queue_obj.scheduled.add(now + delay, self.jid)
       return 'scheduled'
     else
@@ -198,6 +193,12 @@ function QlessJob:complete(now, worker, queue, data, ...)
       if count > 0 then
         queue_obj.depends.add(now, self.jid)
         redis.call('hset', QlessJob.ns .. self.jid, 'state', 'depends')
+        if delay > 0 then
+          -- We've already put it in 'depends'. Now, we must just save the data
+          -- for when it's scheduled
+          queue_obj.depends.add(now, self.jid)
+          redis.call('hset', QlessJob.ns .. self.jid, 'scheduled', now + delay)
+        end
         return 'depends'
       else
         queue_obj.work.add(now, priority, self.jid)
@@ -268,13 +269,19 @@ function QlessJob:complete(now, worker, queue, data, ...)
       redis.call('srem', QlessJob.ns .. j .. '-dependencies', self.jid)
       if redis.call(
         'scard', QlessJob.ns .. j .. '-dependencies') == 0 then
-        local q, p = unpack(
-          redis.call('hmget', QlessJob.ns .. j, 'queue', 'priority'))
+        local q, p, scheduled = unpack(
+          redis.call('hmget', QlessJob.ns .. j, 'queue', 'priority', 'scheduled'))
         if q then
           local queue = Qless.queue(q)
           queue.depends.remove(j)
-          queue.work.add(now, p, j)
-          redis.call('hset', QlessJob.ns .. j, 'state', 'waiting')
+          if scheduled then
+            queue.scheduled.add(scheduled, j)
+            redis.call('hset', QlessJob.ns .. j, 'state', 'scheduled')
+            redis.call('hdel', QlessJob.ns .. j, 'scheduled')
+          else
+            queue.work.add(now, p, j)
+            redis.call('hset', QlessJob.ns .. j, 'state', 'waiting')
+          end
         end
       end
     end
