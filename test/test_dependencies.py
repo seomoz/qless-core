@@ -28,7 +28,7 @@ class TestDependencies(TestQless):
         self.assertEqual(self.lua('get', 3, 'b')['state'], 'scheduled')
         # After we wait for the delay, it should be available
         self.assertEqual(len(self.lua('peek', 1000, 'queue', 10)), 1)
-        self.assertEqual(self.lua('get', 3, 'b')['state'], 'waiting')
+        self.assertEqual(self.lua('get', 1001, 'b')['state'], 'waiting')
 
     def test_unlock_with_delay_satisfied(self):
         '''If deps are satisfied, should be scheduled'''
