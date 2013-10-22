@@ -365,6 +365,15 @@ class TestPut(TestQless):
         self.assertEqual(self.lua('get', 12345, 'b')['dependencies'], ['a'])
         self.assertEqual(self.lua('get', 12345, 'b')['state'], 'depends')
 
+    def test_put_depends_with_delay(self):
+        '''When we put a job with a depends and a delay it is reflected in the job data'''
+        self.lua('put', 12345, 'worker', 'queue', 'a', 'klass', {}, 0)
+        self.lua('put', 12345, 'worker', 'queue', 'b', 'klass', {}, 1, 'depends', ['a'])
+        self.assertEqual(self.lua('get', 12345, 'a')['dependents'], ['b'])
+        self.assertEqual(self.lua('get', 12345, 'b')['dependencies'], ['a'])
+        self.assertEqual(self.lua('get', 12345, 'b')['state'], 'depends')
+        self.assertEqual(self.lua('get', 12345, 'b')['delay'], 1)
+
     def test_move(self):
         '''Move is described in terms of puts.'''
         self.lua('put', 0, 'worker', 'queue', 'jid', 'klass', {'foo': 'bar'}, 0)

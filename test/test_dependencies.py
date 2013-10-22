@@ -17,6 +17,27 @@ class TestDependencies(TestQless):
         self.assertEqual(
             self.lua('pop', 3, 'queue', 'worker', 10)[0]['jid'], 'b')
 
+    def test_unlock_with_short_delay(self):
+        '''Dependencies unlock their dependents upon completion when they have a short delay'''
+        self.lua('put', 0, 'worker', 'queue', 'a', 'klass', {}, 0)
+        self.lua('put', 0, 'worker', 'queue', 'b', 'klass', {}, 1, 'depends', ['a'])
+        # Only 'a' should show up
+        self.assertEqual(len(self.lua('pop', 1, 'queue', 'worker', 10)), 1)
+        self.lua('complete', 2, 'a', 'worker', 'queue', {})
+        # And now 'b' should be available
+        self.assertEqual(
+            self.lua('pop', 3, 'queue', 'worker', 10)[0]['jid'], 'b')
+
+    def test_unlock_with_long_delay(self):
+        '''Dependencies schedule their dependents upon completion when they have a long delay'''
+        self.lua('put', 0, 'worker', 'queue', 'a', 'klass', {}, 0)
+        self.lua('put', 0, 'worker', 'queue', 'b', 'klass', {}, 1000, 'depends', ['a'])
+        # Only 'a' should show up
+        self.assertEqual(len(self.lua('pop', 1, 'queue', 'worker', 10)), 1)
+        self.lua('complete', 2, 'a', 'worker', 'queue', {})
+        # And now 'b' should be scheduled
+        self.assertEqual(self.lua('get', 3, 'b')['state'], 'scheduled')
+
     def test_complete_depends(self):
         '''Can also add dependencies upon completion'''
         self.lua('put', 0, 'worker', 'queue', 'b', 'klass', {}, 0)
