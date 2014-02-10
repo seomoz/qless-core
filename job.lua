@@ -96,9 +96,9 @@ function QlessJob:complete(now, worker, queue, data, ...)
   local bin = now - (now % 86400)
 
   -- First things first, we should see if the worker still owns this job
-  local lastworker, state, priority, retries = unpack(
+  local lastworker, state, priority, retries, current_queue = unpack(
     redis.call('hmget', QlessJob.ns .. self.jid, 'worker', 'state',
-      'priority', 'retries', 'dependents'))
+      'priority', 'retries', 'queue'))
 
   if lastworker == false then
     error('Complete(): Job does not exist')
@@ -107,6 +107,9 @@ function QlessJob:complete(now, worker, queue, data, ...)
   elseif lastworker ~= worker then
     error('Complete(): Job has been handed out to another worker: ' ..
       tostring(lastworker))
+  elseif queue ~= current_queue then
+    error('Complete(): Job running in another queue: ' ..
+      tostring(current_queue))
   end
 
   -- Now we can assume that the worker does own the job. We need to
