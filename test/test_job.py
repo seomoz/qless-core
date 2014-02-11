@@ -151,6 +151,13 @@ class TestComplete(TestQless):
         self.assertRaisesRegexp(redis.ResponseError, r'another worker',
             self.lua, 'complete', 2, 'jid', 'another', 'queue', {})
 
+    def test_wrong_queue(self):
+        '''A job can only be completed in the queue it's in'''
+        self.lua('put', 0, 'worker', 'queue', 'jid', 'klass', {}, 0)
+        self.lua('pop', 1, 'queue', 'worker', 10)
+        self.assertRaisesRegexp(redis.ResponseError, r'another queue',
+            self.lua, 'complete', 2, 'jid', 'worker', 'another-queue', {})
+
     def test_expire_complete_count(self):
         '''Jobs expire after a k complete jobs'''
         self.lua('config.set', 0, 'jobs-history-count', 5)
