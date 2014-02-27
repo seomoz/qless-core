@@ -10,6 +10,12 @@ class TestWorker(TestQless):
         # No grace period
         self.lua('config.set', 0, 'grace-period', 0)
 
+    def test_malformed(self):
+        '''Enumerate all the ways in which the input can be malformed'''
+        self.assertMalformed(self.lua, [
+            ('workers', 1, 0, 'arg2') # Count arg malformed
+        ])
+
     def test_basic(self):
         '''Basic worker-level information'''
         self.lua('put', 0, 'worker', 'queue', 'jid', 'klass', {}, 0)
@@ -23,6 +29,31 @@ class TestWorker(TestQless):
             'jobs': 1,
             'stalled': 0
         }])
+
+    def test_paginated(self):
+        '''Paginated worker-level information'''
+
+        self.lua('put', 0, 'worker-1', 'queue', 'jid-1', 'klass', {}, 0)
+        self.lua('pop', 1, 'queue', 'worker-1', 10)
+        self.lua('put', 2, 'worker-2', 'queue', 'jid-2', 'klass', {}, 0)
+        self.lua('pop', 3, 'queue', 'worker-2', 10)
+        self.lua('put', 2, 'worker-3', 'queue', 'jid-3', 'klass', {}, 0)
+        self.lua('pop', 3, 'queue', 'worker-3', 10)
+
+        worker_names = [w['name'] for w in self.lua('workers', 20)]
+        self.assertEqual(worker_names, ['worker-3', 'worker-2', 'worker-1'])
+
+        worker_names = [w['name'] for w in self.lua('workers', 20, 0, 1)]
+        self.assertEqual(worker_names, ['worker-3'])
+
+        worker_names = [w['name'] for w in self.lua('workers', 20, 1, 1)]
+        self.assertEqual(worker_names, ['worker-2'])
+
+        worker_names = [w['name'] for w in self.lua('workers', 20, 2, 1)]
+        self.assertEqual(worker_names, ['worker-1'])
+
+        worker_names = [w['name'] for w in self.lua('workers', 20, 1, 2)]
+        self.assertEqual(worker_names, ['worker-2', 'worker-1'])
 
     def test_stalled(self):
         '''We should be able to detect stalled jobs'''

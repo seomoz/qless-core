@@ -3,6 +3,8 @@ function QlessWorker.deregister(...)
   redis.call('zrem', 'ql:workers', unpack(arg))
 end
 
+-- Counts(now, [offset, [count]])
+-- Counts(now, worker)
 -- Provide data about all the workers, or if a specific worker is provided,
 -- then which jobs that worker is responsible for. If no worker is provided,
 -- expect a response of the form:
@@ -31,7 +33,7 @@ end
 --      ]
 --  }
 --
-function QlessWorker.counts(now, worker)
+function QlessWorker.counts(now, ...)
   -- Clean up all the workers' job lists if they're too old. This is
   -- determined by the `max-worker-age` configuration, defaulting to the
   -- last day. Seems like a 'reasonable' default
@@ -45,14 +47,26 @@ function QlessWorker.counts(now, worker)
   -- And now remove them from the list of known workers
   redis.call('zremrangebyscore', 'ql:workers', 0, now - interval)
 
+  --- Preserve backwards compatibility for counts() which only
+  --- takes a worker and not offset/count
+  local worker
+  if not tonumber(arg[1]) then
+    worker = arg[1]
+  end
+
   if worker then
     return {
       jobs    = redis.call('zrevrangebyscore', 'ql:w:' .. worker .. ':jobs', now + 8640000, now),
       stalled = redis.call('zrevrangebyscore', 'ql:w:' .. worker .. ':jobs', now, 0)
     }
   else
+    local offset = assert(tonumber(arg[1] or 0),
+      'Failed(): Arg "offset" is not a number: ' .. tostring(arg[1]))
+    local count = assert(tonumber(arg[2] or 0),
+      'Failed(): Arg "count" is not a number: ' .. tostring(arg[2]))
+
     local response = {}
-    local workers = redis.call('zrevrange', 'ql:workers', 0, -1)
+    local workers = redis.call('zrevrange', 'ql:workers', offset, offset + count - 1)
     for index, worker in ipairs(workers) do
       table.insert(response, {
         name    = worker,

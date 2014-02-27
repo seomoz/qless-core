@@ -74,8 +74,8 @@ QlessAPI.heartbeat = function(now, jid, worker, data)
   return Qless.job(jid):heartbeat(now, worker, data)
 end
 
-QlessAPI.workers = function(now, worker)
-  return cjson.encode(QlessWorker.counts(now, worker))
+QlessAPI.workers = function(now, ...)
+  return cjson.encode(QlessWorker.counts(now, unpack(arg)))
 end
 
 QlessAPI.track = function(now, command, jid)
