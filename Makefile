@@ -18,4 +18,4 @@ clean:
 
 .PHONY: test
 test: qless.lua *.lua
-	nosetests --exe -v
+	nosetests --exe -v $(TEST)

@@ -54,11 +54,24 @@ installed:
 pip install redis nose
 ```
 
-To run the tests, there is a directive included in the makefile:
+To run all the tests, there is a directive included in the makefile:
 
 ```bash
 make test
 ```
+
+You can run specific test files by passing the TEST environment variable to make:
+
+```bash
+make test TEST=test/test_worker.py
+```
+
+or for a single test case in that file:
+
+```bash
+make test TEST=test/test_worker.py:TestWorker.test_basic
+```
+
 
 If you have Redis running somewhere other than `localhost:6379`, you can supply
 the `REDIS_URL` environment variable:
