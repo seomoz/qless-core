@@ -23,6 +23,12 @@ local QlessJob = {
 }
 QlessJob.__index = QlessJob
 
+-- throttle forward declaration
+local Qlessthrottle = {
+  ns = Qless.ns .. 'rs:'
+}
+Qlessthrottle.__index = Qlessthrottle;
+
 -- RecurringJob forward declaration
 local QlessRecurringJob = {}
 QlessRecurringJob.__index = QlessRecurringJob
@@ -61,19 +67,64 @@ function Qless.recurring(jid)
   return job
 end
 
+-- Return a throttle object
+-- throttle objects are used for arbitrary throttling of jobs.
+function Qless.throttle(tid)
+  assert(tid, 'Throttle(): no tid provided')
+  local throttle = {}
+  setmetatable(throttle, QlessThrottle)
+  throttle.id = rid
+
+  -- Set maximum for this throttle, if no maximum is defined it defaults to 0 (unlimited)
+  throttle.maximum = Qless.config.get(tonumber(Qless.config.get(throttle.prefix .. '-maximum')) or 0
+
+  -- set of jids which have acquired a lock on this throttle.
+  throttle.locks = {
+    count = function()
+      redis.call('scard', throttle:prefix .. '-locks')
+    end, add = function(...)
+      if #arg > 0 then
+        redis.call('sadd', throttle:prefix .. '-locks', unpack(arg))
+      end
+    end, remove = function(...)
+      if #arg > 0 then
+        return redis.call('srem', throttle:prefix .. '-locks', unpack(arg))
+      end
+    end
+  }
+
+  -- set of jids waiting on this throttle to become available.
+  throttle.pending = {
+    count = function()
+      redis.call('scard', throttle:prefix .. '-pending')
+    end, add = function(...)
+      if #arg > 0 then
+        redis.call('sadd', throttle:prefix .. '-pending', unpack(arg))
+      end
+    end, remove = function(...)
+      if #arg > 0 then
+        redis.call('srem', throttle:prefix .. '-pending', unpack(arg))
+      end
+    end, pop = function()
+      return redis.call('spop', throttle:prefix .. '-pending')
+    end
+  }
+  return throttle
+end
+
 -- Failed([group, [start, [limit]]])
 -- ------------------------------------
 -- If no group is provided, this returns a JSON blob of the counts of the
 -- various groups of failures known. If a group is provided, it will report up
 -- to `limit` from `start` of the jobs affected by that issue.
--- 
+--
 --  # If no group, then...
 --  {
 --      'group1': 1,
 --      'group2': 5,
 --      ...
 --  }
---  
+--
 --  # If a group is provided, then...
 --  {
 --      'total': 20,
@@ -119,9 +170,9 @@ end
 -------------------------------------------------------------------------------
 -- Return all the job ids currently considered to be in the provided state
 -- in a particular queue. The response is a list of job ids:
--- 
+--
 --  [
---      jid1, 
+--      jid1,
 --      jid2,
 --      ...
 --  ]
@@ -167,7 +218,7 @@ end
 -- associated with that id, and 'untrack' stops tracking it. In this context,
 -- tracking is nothing more than saving the job to a list of jobs that are
 -- considered special.
--- 
+--
 --  {
 --      'jobs': [
 --          {
@@ -252,7 +303,7 @@ function Qless.tag(now, command, ...)
       tags = cjson.decode(tags)
       local _tags = {}
       for i,v in ipairs(tags) do _tags[v] = true end
-    
+
       -- Otherwise, add the job to the sorted set with that tags
       for i=2,#arg do
         local tag = arg[i]
@@ -263,7 +314,7 @@ function Qless.tag(now, command, ...)
         redis.call('zadd', 'ql:t:' .. tag, now, jid)
         redis.call('zincrby', 'ql:tags', 1, tag)
       end
-    
+
       tags = cjson.encode(tags)
       redis.call('hset', QlessJob.ns .. jid, 'tags', tags)
       return tags
@@ -279,7 +330,7 @@ function Qless.tag(now, command, ...)
       tags = cjson.decode(tags)
       local _tags = {}
       for i,v in ipairs(tags) do _tags[v] = true end
-    
+
       -- Otherwise, add the job to the sorted set with that tags
       for i=2,#arg do
         local tag = arg[i]
@@ -287,10 +338,10 @@ function Qless.tag(now, command, ...)
         redis.call('zrem', 'ql:t:' .. tag, jid)
         redis.call('zincrby', 'ql:tags', -1, tag)
       end
-    
+
       local results = {}
       for i,tag in ipairs(tags) do if _tags[tag] then table.insert(results, tag) end end
-    
+
       tags = cjson.encode(results)
       redis.call('hset', QlessJob.ns .. jid, 'tags', tags)
       return results
@@ -343,6 +394,7 @@ function Qless.cancel(...)
   -- If we've made it this far, then we are good to go. We can now just
   -- remove any trace of all these jobs, as they form a dependent clique
   for _, jid in ipairs(arg) do
+    local namespaced_jid = QlessJob.ns .. jid
     -- Find any stage it's associated with and remove its from that stage
     local state, queue, failure, worker = unpack(redis.call(
       'hmget', QlessJob.ns .. jid, 'state', 'queue', 'failure', 'worker'))
@@ -372,6 +424,8 @@ function Qless.cancel(...)
         queue.scheduled.remove(jid)
         queue.depends.remove(jid)
       end
+
+      Qless.job(namespaced_jid):release_throttles()
 
       -- We should probably go through all our dependencies and remove
       -- ourselves from the list of dependents
@@ -418,7 +472,7 @@ function Qless.cancel(...)
       redis.call('del', QlessJob.ns .. jid .. '-history')
     end
   end
-  
+
   return arg
 end
 
