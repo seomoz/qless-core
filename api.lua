@@ -203,13 +203,14 @@ end
 
 QlessAPI['throttle.get'] = function(now, tid)
   local data = Qless.throttle(tid):data()
+  redis.call('set', 'printline5', cjson.encode(data))
   if not data then
     return nil
   end
   return cjson.encode(data)
 end
 
-QlessAPI['throttle.unset'] = function(now, tid)
+QlessAPI['throttle.delete'] = function(now, tid)
   return Qless.throttle(tid):unset()
 end
 
