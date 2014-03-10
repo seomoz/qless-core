@@ -1,3 +1,17 @@
+function QlessThrottle:data()
+  local throttle = redis.call('hmget', QlessThrottle.ns .. self.id, 'tid', 'maximum')
+  local data = {
+    tid = throttle[0],
+    maximum = throttle[1]
+  }
+  redis.call('set', 'print_line', cjson.encode(data))
+  return data
+end
+
+function QlessThrottle:set(data)
+  redis.call('hmset', QlessThrottle.ns .. self.id, 'id', self.id, 'maximum', data.maximum)
+end
+
 function QlessThrottle:acquire(jid)
   if self:available() then
     self.locks.add(jid)

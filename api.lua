@@ -193,6 +193,33 @@ QlessAPI['queue.forget'] = function(now, ...)
   QlessQueue.deregister(unpack(arg))
 end
 
+-- Throttle apis
+QlessAPI['throttle.set'] = function(now, tid, max)
+  local data = {
+    maximum = max
+  }
+  Qless.throttle(tid):set(data)
+end
+
+QlessAPI['throttle.get'] = function(now, tid)
+  local data = Qless.throttle(tid):data()
+  if not data then
+    return nil
+  end
+  return cjson.encode(data)
+end
+
+QlessAPI['throttle.unset'] = function(now, tid)
+  return Qless.throttle(tid):unset()
+end
+
+QlessAPI['throttle.locks'] = function(now, tid)
+  return Qless.throttle(tid):locks()
+end
+
+QlessAPI['throttle.pending'] = function(now, tid)
+  return Qless.throttle(tid):pending()
+end
 -------------------------------------------------------------------------------
 -- Function lookup
 -------------------------------------------------------------------------------

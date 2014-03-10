@@ -12,7 +12,8 @@ class TestQless(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         url = os.environ.get('REDIS_URL', 'redis://localhost:6379/')
-        cls.lua = qless.QlessRecorder(redis.Redis.from_url(url))
+        cls.redis = redis.Redis.from_url(url)
+        cls.lua = qless.QlessRecorder(cls.redis)
 
     def tearDown(self):
         self.lua.flush()
