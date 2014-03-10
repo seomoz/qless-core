@@ -215,11 +215,11 @@ QlessAPI['throttle.delete'] = function(now, tid)
 end
 
 QlessAPI['throttle.locks'] = function(now, tid)
-  return Qless.throttle(tid):locks()
+  return Qless.throttle(tid).locks:members()
 end
 
 QlessAPI['throttle.pending'] = function(now, tid)
-  return Qless.throttle(tid):pending()
+  return Qless.throttle(tid).pending:members()
 end
 -------------------------------------------------------------------------------
 -- Function lookup

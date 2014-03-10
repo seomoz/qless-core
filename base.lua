@@ -86,6 +86,8 @@ function Qless.throttle(tid)
       if #arg > 0 then
         redis.call('sadd', QlessThrottle.ns .. tid .. '-locks', unpack(arg))
       end
+    end, members = function()
+      return redis.call('smembers', QlessThrottle.ns .. tid .. '-locks')
     end, remove = function(...)
       if #arg > 0 then
         return redis.call('srem', QlessThrottle.ns .. tid .. '-locks', unpack(arg))
@@ -101,6 +103,8 @@ function Qless.throttle(tid)
       if #arg > 0 then
         redis.call('sadd', QlessThrottle.ns .. tid .. '-pending', unpack(arg))
       end
+    end, members = function()
+      return redis.call('smembers', QlessThrottle.ns .. tid .. '-pending')
     end, remove = function(...)
       if #arg > 0 then
         redis.call('srem', QlessThrottle.ns .. tid .. '-pending', unpack(arg))
