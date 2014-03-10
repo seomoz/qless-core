@@ -34,7 +34,7 @@ function QlessJob:data(...)
     tags         = cjson.decode(job[11]),
     history      = self:history(),
     failure      = cjson.decode(job[12] or '{}'),
-    throttle     = job[13],
+    throttle     = job[13] or nil,
     dependents   = redis.call(
       'smembers', QlessJob.ns .. self.jid .. '-dependents'),
     dependencies = redis.call(
@@ -400,7 +400,7 @@ function QlessJob:fail(now, worker, group, message, data)
       ['worker']  = worker
     }))
 
-  self:release_throttle()
+  self:release_throttle(now)
 
   -- Add this group of failure to the list of failures
   redis.call('sadd', 'ql:failures', group)
@@ -801,10 +801,15 @@ end
 
 function QlessJob:release_throttle(now)
   local tid = redis.call('hget', QlessJob.ns .. self.jid, 'throttle')
-  Qless.throttle(tid):release(now, self.jid)
+  if tid then
+    Qless.throttle(tid):release(now, self.jid)
+  end
 end
 
 function QlessJob:acquire_throttle()
-  local rid = unpack(redis.call('hmget', QlessJob.ns .. self.jid, 'throttle'))
-  return Qless.resource(rid):acquire(self.jid)
+  local tid = unpack(redis.call('hmget', QlessJob.ns .. self.jid, 'throttle'))
+  if tid then
+    return Qless.resource(tid):acquire(self.jid)
+  end
+  return true
 end

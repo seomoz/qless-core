@@ -427,7 +427,7 @@ function Qless.cancel(...)
         queue.depends.remove(jid)
       end
 
-      Qless.job(namespaced_jid):release_throttles()
+      Qless.job(namespaced_jid):release_throttle()
 
       -- We should probably go through all our dependencies and remove
       -- ourselves from the list of dependents
