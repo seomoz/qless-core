@@ -36,3 +36,29 @@ class TestAcquire(TestQless):
     self.lua('put', 0, 'worker', 'queue', 'jid3', 'klass', {}, 0, 'throttle', 'tid')
     self.lua('put', 0, 'worker', 'queue', 'jid4', 'klass', {}, 0, 'throttle', 'tid')
     self.assertEqual(self.lua('throttle.locks', 0, 'tid'), ['jid1'])
+    self.assertEqual(self.lua('throttle.pending', 0, 'tid'), ['jid2', 'jid3', 'jid4'])
+
+Class TestRelease(TestQless):
+  '''Test that when there are no pending jobs lock is properly released'''
+  def test_no_pending_jobs(self):
+    print("pending")
+
+  '''Test that releasing a lock properly another job in the work queue'''
+  def test_next_job_is_moved_into_work_qeueue(self):
+    print("pending")
+
+  '''Test that when a job completes it properly releases the lock'''
+  def test_on_complete_lock_is_released(self):
+    print("pending")
+
+  '''Test that when a job fails it properly releases the lock'''
+  def test_on_failure_lock_is_released(self):
+    print("pending")
+
+  '''Test that when a job retries it properly releases the lock
+     and goes back into pending'''
+  def test_on_retry_lock_is_released(self):
+    print("pending")
+
+
+# What about Recurring Jobs???

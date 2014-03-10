@@ -53,6 +53,7 @@ function QlessThrottle:release(now, jid)
   end
 end
 
+-- Returns true if the throttle has locks available, false otherwise.
 function QlessThrottle:available()
   return self.maximum == 0 or self.locks.count() < self.maximum
 end

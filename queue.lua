@@ -600,6 +600,7 @@ function QlessQueue:put(now, worker, jid, klass, raw_data, delay, ...)
       self.depends.add(now, jid)
       redis.call('hset', QlessJob.ns .. jid, 'state', 'depends')
     elseif job:acquire_throttle() then
+      redis.call('set', 'printline5', 'adding job to work queue')
       self.work.add(now, priority, jid)
     else
       self.throttled.add(jid)
