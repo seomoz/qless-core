@@ -22,10 +22,17 @@ class TestThrottle(TestQless):
     self.lua('throttle.delete', 0, 'tid')
     self.assertEqual(self.lua('throttle.get', 0, 'tid'), None)
 
+class TestAcquire(TestQless):
   '''Test acquiring of a throttle lock'''
   def test_acquire(self):
     self.lua('put', 0, 'worker', 'queue', 'jid', 'klass', {}, 0, 'throttle', 'tid')
     self.assertEqual(self.lua('get', 0, 'jid')['throttle'], 'tid')
 
-  # '''Test that acquiring of a throttle lock properly limits the number of jobs'''
-  # def test_
+  '''Test that acquiring of a throttle lock properly limits the number of jobs'''
+  def test_limit_number_of_locks(self):
+    self.lua('throttle.set', 0, 'tid', 1)
+    self.lua('put', 0, 'worker', 'queue', 'jid1', 'klass', {}, 0, 'throttle', 'tid')
+    self.lua('put', 0, 'worker', 'queue', 'jid2', 'klass', {}, 0, 'throttle', 'tid')
+    self.lua('put', 0, 'worker', 'queue', 'jid3', 'klass', {}, 0, 'throttle', 'tid')
+    self.lua('put', 0, 'worker', 'queue', 'jid4', 'klass', {}, 0, 'throttle', 'tid')
+    self.assertEqual(self.lua('throttle.locks', 0, 'tid'), ['jid1'])

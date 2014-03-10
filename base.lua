@@ -71,11 +71,13 @@ end
 -- throttle objects are used for arbitrary throttling of jobs.
 function Qless.throttle(tid)
   assert(tid, 'Throttle(): no tid provided')
-  local throttle = {
-    id = tid,
-    maximum = tonumber(Qless.config.get(QlessThrottle.ns .. tid .. '-maximum') or 0)
-  }
-
+  local throttle = QlessThrottle.data({id = tid})
+  if not throttle then
+    throttle = {
+      id = tid,
+      maximum = 0
+    }
+  end
   setmetatable(throttle, QlessThrottle)
 
   -- set of jids which have acquired a lock on this throttle.
@@ -103,12 +105,12 @@ function Qless.throttle(tid)
       if #arg > 0 then
         redis.call('sadd', QlessThrottle.ns .. tid .. '-pending', unpack(arg))
       end
-    end, members = function()
-      return redis.call('smembers', QlessThrottle.ns .. tid .. '-pending')
     end, remove = function(...)
       if #arg > 0 then
         redis.call('srem', QlessThrottle.ns .. tid .. '-pending', unpack(arg))
       end
+    end, members = function()
+      return redis.call('smembers', QlessThrottle.ns .. tid .. '-pending')
     end, pop = function()
       return redis.call('spop', QlessThrottle.ns .. tid .. '-pending')
     end

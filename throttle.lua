@@ -8,7 +8,7 @@ function QlessThrottle:data()
 
   local data = {
     id = throttle[1],
-    maximum = throttle[2]
+    maximum = tonumber(throttle[2])
   }
   return data
 end
@@ -32,8 +32,6 @@ function QlessThrottle:acquire(jid)
     self.locks.add(jid)
     return true
   else
-    queue_obj = Qless.queue(Qless.job(jid).queue)
-    queue_obj.throttled.add(jid)
     self.pending.add(jid)
     return false
   end
