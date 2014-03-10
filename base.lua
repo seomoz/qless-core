@@ -78,19 +78,19 @@ function Qless.throttle(tid)
   throttle.name = QlessThrottle.ns .. tid
 
   -- Set maximum for this throttle, if no maximum is defined it defaults to 0 (unlimited)
-  throttle.maximum = Qless.config.get(tonumber(Qless.config.get(throttle.name .. '-maximum')) or 0
+  throttle.maximum = Qless.config.get(tonumber(Qless.config.get(throttle.name .. '-maximum'))) or 0
 
   -- set of jids which have acquired a lock on this throttle.
   throttle.locks = {
     count = function()
-      redis.call('scard', throttle:name .. '-locks')
+      redis.call('scard', throttle.name .. '-locks')
     end, add = function(...)
       if #arg > 0 then
-        redis.call('sadd', throttle:name .. '-locks', unpack(arg))
+        redis.call('sadd', throttle.name .. '-locks', unpack(arg))
       end
     end, remove = function(...)
       if #arg > 0 then
-        return redis.call('srem', throttle:name .. '-locks', unpack(arg))
+        return redis.call('srem', throttle.name .. '-locks', unpack(arg))
       end
     end
   }
@@ -98,17 +98,17 @@ function Qless.throttle(tid)
   -- set of jids waiting on this throttle to become available.
   throttle.pending = {
     count = function()
-      redis.call('scard', throttle:name .. '-pending')
+      redis.call('scard', throttle.name .. '-pending')
     end, add = function(...)
       if #arg > 0 then
-        redis.call('sadd', throttle:name .. '-pending', unpack(arg))
+        redis.call('sadd', throttle.name .. '-pending', unpack(arg))
       end
     end, remove = function(...)
       if #arg > 0 then
-        redis.call('srem', throttle:name .. '-pending', unpack(arg))
+        redis.call('srem', throttle.name .. '-pending', unpack(arg))
       end
     end, pop = function()
-      return redis.call('spop', throttle:name .. '-pending')
+      return redis.call('spop', throttle.name .. '-pending')
     end
   }
   return throttle
