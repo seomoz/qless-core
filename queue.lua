@@ -547,10 +547,11 @@ function QlessQueue:put(now, worker, jid, klass, raw_data, delay, ...)
     redis.call('hincrby', 'ql:s:stats:' .. bin .. ':' .. self.name, 'failed'  , -1)
   end
 
+  redis.call('set', 'print_line_set_throttle', 'hello')
   data = {
-    'jid'      = jid,
-    'klass'    = klass,
-    'data'     = raw_data,
+    'jid'      , jid,
+    'klass'    , klass,
+    'data'     , raw_data,
     'priority' , priority,
     'tags'     , cjson.encode(tags),
     'state'    , ((delay > 0) and 'scheduled') or 'waiting',
@@ -559,11 +560,14 @@ function QlessQueue:put(now, worker, jid, klass, raw_data, delay, ...)
     'queue'    , self.name,
     'retries'  , retries,
     'remaining', retries,
-    'time'     , string.format("%.20f", now),
+    'time'     , string.format("%.20f", now)
   }
 
+  -- Insert the throttle resource into the array if it exists.
   if options['throttle'] then
-    data['throttle'] = options['throttle']
+    redis.call('set', 'print_line_set_throttle', 'true')
+    table.insert(data, 'throttle')
+    table.insert(data, options['throttle'])
   end
 
   -- First, let's save its data

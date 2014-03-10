@@ -7,4 +7,5 @@ class TestAcquire(TestQless):
   '''Test acquiring of a throttle lock'''
   def test_acquire(self):
     self.lua('put', 0, 'worker', 'queue', 'jid', 'klass', {}, 0, 'throttle', 'tid')
+    print(self.lua('get', 0, 'jid'))
     self.assertEqual(self.lua('get', 0, 'jid')['throttle'], 'tid')

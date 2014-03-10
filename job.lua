@@ -34,7 +34,7 @@ function QlessJob:data(...)
     tags         = cjson.decode(job[11]),
     history      = self:history(),
     failure      = cjson.decode(job[12] or '{}'),
-    throttle     = job[13],
+    throttle     = job[13] or nil,
     dependents   = redis.call(
       'smembers', QlessJob.ns .. self.jid .. '-dependents'),
     dependencies = redis.call(
@@ -462,7 +462,7 @@ function QlessJob:retry(now, queue, worker, delay, group, message)
 
   -- Release the throttle for the job
   self:release_throttle(now)
-  self.acquire_throttle()
+  self:acquire_throttle()
 
   -- Remove this job from the worker that was previously working it
   redis.call('zrem', 'ql:w:' .. worker .. ':jobs', self.jid)
