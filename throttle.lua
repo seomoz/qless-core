@@ -1,5 +1,5 @@
 function QlessThrottle:acquire(jid)
-  if self.available() then
+  if self:available() then
     self.locks.add(jid)
     return true
   else
@@ -12,7 +12,7 @@ end
 
 function QlessThrottle:release(now, jid)
   self.locks.remove(jid)
-  if self.available() then
+  if self:available() then
     next_jid = self.pending.pop
     if next_jid then
       queue_obj = Qless.queue(Qless.job(next_jid).queue)
@@ -23,5 +23,5 @@ function QlessThrottle:release(now, jid)
 end
 
 function QlessThrottle:available()
-  return self.maximum == 0 or self.locks.count < self.maximum
+  return self.maximum == 0 or self.locks.count() < self.maximum
 end

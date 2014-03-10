@@ -34,7 +34,7 @@ function QlessJob:data(...)
     tags         = cjson.decode(job[11]),
     history      = self:history(),
     failure      = cjson.decode(job[12] or '{}'),
-    throttle     = job[13] or nil,
+    throttle     = job[13],
     dependents   = redis.call(
       'smembers', QlessJob.ns .. self.jid .. '-dependents'),
     dependencies = redis.call(
@@ -809,7 +809,7 @@ end
 function QlessJob:acquire_throttle()
   local tid = unpack(redis.call('hmget', QlessJob.ns .. self.jid, 'throttle'))
   if tid then
-    return Qless.resource(tid):acquire(self.jid)
+    return Qless.throttle(tid):acquire(self.jid)
   end
   return true
 end

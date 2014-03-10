@@ -452,14 +452,15 @@ function QlessQueue:put(now, worker, jid, klass, raw_data, delay, ...)
   end
 
   -- Sanity check on optional args
-  retries  = assert(tonumber(options['retries']  or retries or 5) ,
+  local retries  = assert(tonumber(options['retries']  or retries or 5) ,
     'Put(): Arg "retries" not a number: ' .. tostring(options['retries']))
-  tags     = assert(cjson.decode(options['tags'] or tags or '[]' ),
+  local tags     = assert(cjson.decode(options['tags'] or tags or '[]' ),
     'Put(): Arg "tags" not JSON'          .. tostring(options['tags']))
-  priority = assert(tonumber(options['priority'] or priority or 0),
+  local priority = assert(tonumber(options['priority'] or priority or 0),
     'Put(): Arg "priority" not a number'  .. tostring(options['priority']))
   local depends = assert(cjson.decode(options['depends'] or '[]') ,
     'Put(): Arg "depends" not JSON: '     .. tostring(options['depends']))
+  -- local throttle = options['throttle']
 
   -- If the job has old dependencies, determine which dependencies are
   -- in the new dependencies but not in the old ones, and which are in the
@@ -546,11 +547,10 @@ function QlessQueue:put(now, worker, jid, klass, raw_data, delay, ...)
     redis.call('hincrby', 'ql:s:stats:' .. bin .. ':' .. self.name, 'failed'  , -1)
   end
 
-  -- First, let's save its data
-  redis.call('hmset', QlessJob.ns .. jid,
-    'jid'      , jid,
-    'klass'    , klass,
-    'data'     , raw_data,
+  data = {
+    'jid'      = jid,
+    'klass'    = klass,
+    'data'     = raw_data,
     'priority' , priority,
     'tags'     , cjson.encode(tags),
     'state'    , ((delay > 0) and 'scheduled') or 'waiting',
@@ -559,7 +559,15 @@ function QlessQueue:put(now, worker, jid, klass, raw_data, delay, ...)
     'queue'    , self.name,
     'retries'  , retries,
     'remaining', retries,
-    'time'     , string.format("%.20f", now))
+    'time'     , string.format("%.20f", now),
+  }
+
+  if options['throttle'] then
+    data['throttle'] = options['throttle']
+  end
+
+  -- First, let's save its data
+  redis.call('hmset', QlessJob.ns .. jid, unpack(data))
 
   -- These are the jids we legitimately have to wait on
   for i, j in ipairs(depends) do
@@ -590,7 +598,9 @@ function QlessQueue:put(now, worker, jid, klass, raw_data, delay, ...)
       self.depends.add(now, jid)
       redis.call('hset', QlessJob.ns .. jid, 'state', 'depends')
     else
-      self.work.add(now, priority, jid)
+      if job:acquire_throttle() then
+        self.work.add(now, priority, jid)
+      end
     end
   end
 
