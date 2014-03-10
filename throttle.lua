@@ -1,5 +1,5 @@
 function QlessThrottle:acquire(jid)
-  if self.available() then
+  if self.available then
     self.locks.add(jid)
     return true
   else
@@ -12,21 +12,16 @@ end
 
 function QlessThrottle:release(now, jid)
   self.locks.remove(jid)
-  if self.available() then
+  if self.available then
     next_jid = self.pending.pop
     if next_jid then
       queue_obj = Qless.queue(Qless.job(next_jid).queue)
       queue_obj.throttled.remove(next_jid)
-      queue_obj.scheduled.add(now, next_jid)
+      queue_obj.work.add(now, next_jid)
     end
   end
 end
 
-function QlessThrottle:available
+function QlessThrottle:available()
   return self.maximum == 0 or self.locks.count < self.maximum
-end
-
--- Return the prefix for this particular resource
-function QlessThrottle:prefix()
-  return QlessThrottle.ns .. self.id
 end

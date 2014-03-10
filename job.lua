@@ -34,8 +34,7 @@ function QlessJob:data(...)
     tags         = cjson.decode(job[11]),
     history      = self:history(),
     failure      = cjson.decode(job[12] or '{}'),
-    -- default to queue throttle if no throttle was specified.
-    throttle     = job[13] or QlessQueue.ns .. job[4],
+    throttle     = job[13],
     dependents   = redis.call(
       'smembers', QlessJob.ns .. self.jid .. '-dependents'),
     dependencies = redis.call(
@@ -132,7 +131,7 @@ function QlessJob:complete(now, worker, queue, data, ...)
   queue_obj.locks.remove(self.jid)
   queue_obj.scheduled.remove(self.jid)
 
-  self:release_throttle()
+  self:release_throttle(now)
 
   ----------------------------------------------------------
   -- This is the massive stats update that we have to do
@@ -462,7 +461,8 @@ function QlessJob:retry(now, queue, worker, delay, group, message)
   Qless.queue(oldqueue).locks.remove(self.jid)
 
   -- Release the throttle for the job
-  self:release_throttle()
+  self:release_throttle(now)
+  self.acquire_throttle()
 
   -- Remove this job from the worker that was previously working it
   redis.call('zrem', 'ql:w:' .. worker .. ':jobs', self.jid)
@@ -804,7 +804,7 @@ function QlessJob:release_throttle(now)
   Qless.throttle(tid):release(now, self.jid)
 end
 
-function QlessJob:acquire_throttle(now)
+function QlessJob:acquire_throttle()
   local rid = unpack(redis.call('hmget', QlessJob.ns .. self.jid, 'throttle'))
-  return Qless.resource(rid):acquire(now, self.jid)
+  return Qless.resource(rid):acquire(self.jid)
 end
