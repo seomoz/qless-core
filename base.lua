@@ -83,16 +83,16 @@ function Qless.throttle(tid)
   -- set of jids which have acquired a lock on this throttle.
   throttle.locks = {
     count = function()
-      return (redis.call('scard', QlessThrottle.ns .. tid .. '-locks') or 0)
+      return (redis.call('zcard', QlessThrottle.ns .. tid .. '-locks') or 0)
     end, add = function(...)
       if #arg > 0 then
-        redis.call('sadd', QlessThrottle.ns .. tid .. '-locks', unpack(arg))
+        redis.call('zadd', QlessThrottle.ns .. tid .. '-locks', unpack(arg))
       end
     end, members = function()
-      return redis.call('smembers', QlessThrottle.ns .. tid .. '-locks')
+      return redis.call('zmembers', QlessThrottle.ns .. tid .. '-locks')
     end, remove = function(...)
       if #arg > 0 then
-        return redis.call('srem', QlessThrottle.ns .. tid .. '-locks', unpack(arg))
+        return redis.call('zrem', QlessThrottle.ns .. tid .. '-locks', unpack(arg))
       end
     end
   }
@@ -100,19 +100,19 @@ function Qless.throttle(tid)
   -- set of jids waiting on this throttle to become available.
   throttle.pending = {
     count = function()
-      redis.call('scard', QlessThrottle.ns .. tid .. '-pending')
+      redis.call('zcard', QlessThrottle.ns .. tid .. '-pending')
     end, add = function(...)
       if #arg > 0 then
-        redis.call('sadd', QlessThrottle.ns .. tid .. '-pending', unpack(arg))
-      end
-    end, remove = function(...)
-      if #arg > 0 then
-        redis.call('srem', QlessThrottle.ns .. tid .. '-pending', unpack(arg))
+        redis.call('zadd', QlessThrottle.ns .. tid .. '-pending', unpack(arg))
       end
     end, members = function()
-      return redis.call('smembers', QlessThrottle.ns .. tid .. '-pending')
+      return redis.call('zmembers', QlessThrottle.ns .. tid .. '-pending')
+    end, remove = function(...)
+      if #arg > 0 then
+        redis.call('zrem', QlessThrottle.ns .. tid .. '-pending', unpack(arg))
+      end
     end, pop = function()
-      return redis.call('spop', QlessThrottle.ns .. tid .. '-pending')
+      return redis.call('zremrangebyrank', QlessThrottle.ns .. tid .. '-pending', 0, 1)
     end
   }
   return throttle

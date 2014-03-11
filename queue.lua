@@ -80,15 +80,15 @@ function Qless.queue(name)
   -- Access to our throttled jobs
   queue.throttled = {
     peek = function(now, offset, count)
-      return redis.call('srange', queue:prefix('throttled'), offset, offset + count - 1)
+      return redis.call('zrange', queue:prefix('throttled'), offset, offset + count - 1)
     end, add = function(now, jid)
-      redis.call('sadd', queue:prefix('throttled'), jid)
+      redis.call('zadd', queue:prefix('throttled'), jid)
     end, remove = function(...)
       if #arg > 0 then
-        return redis.call('srem', queue:prefix('throttled'), unpack(arg))
+        return redis.call('zrem', queue:prefix('throttled'), unpack(arg))
       end
     end, length = function()
-      return redis.call('scard', queue:prefix('throttled'))
+      return redis.call('zcard', queue:prefix('throttled'))
     end
   }
 
@@ -600,7 +600,6 @@ function QlessQueue:put(now, worker, jid, klass, raw_data, delay, ...)
       self.depends.add(now, jid)
       redis.call('hset', QlessJob.ns .. jid, 'state', 'depends')
     elseif job:acquire_throttle() then
-      redis.call('set', 'printline5', 'adding job to work queue')
       self.work.add(now, priority, jid)
     else
       self.throttled.add(jid)

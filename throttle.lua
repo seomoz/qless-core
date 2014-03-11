@@ -29,10 +29,10 @@ end
 -- Returns true of the job acquired the resource.
 function QlessThrottle:acquire(jid)
   if self:available() then
-    self.locks.add(jid)
+    self.locks.add(1, jid)
     return true
   else
-    self.pending.add(jid)
+    self.pending.add(1, jid)
     return false
   end
 end
@@ -45,7 +45,7 @@ end
 -- queue into the work queue
 function QlessThrottle:release(now, jid)
   self.locks.remove(jid)
-  next_jid = self.pending.pop
+  local pri, next_jid = self.pending.pop()
   if next_jid and self:acquire(next_jid) then
     queue_obj = Qless.queue(Qless.job(next_jid).queue)
     queue_obj.throttled.remove(next_jid)
