@@ -89,7 +89,7 @@ function Qless.throttle(tid)
         redis.call('zadd', QlessThrottle.ns .. tid .. '-locks', unpack(arg))
       end
     end, members = function()
-      return redis.call('zmembers', QlessThrottle.ns .. tid .. '-locks')
+      return redis.call('zrange', QlessThrottle.ns .. tid .. '-locks', 0, -1)
     end, remove = function(...)
       if #arg > 0 then
         return redis.call('zrem', QlessThrottle.ns .. tid .. '-locks', unpack(arg))
@@ -106,7 +106,7 @@ function Qless.throttle(tid)
         redis.call('zadd', QlessThrottle.ns .. tid .. '-pending', unpack(arg))
       end
     end, members = function()
-      return redis.call('zmembers', QlessThrottle.ns .. tid .. '-pending')
+      return redis.call('zrange', QlessThrottle.ns .. tid .. '-pending', 0, -1)
     end, remove = function(...)
       if #arg > 0 then
         redis.call('zrem', QlessThrottle.ns .. tid .. '-pending', unpack(arg))
