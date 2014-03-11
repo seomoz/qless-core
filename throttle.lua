@@ -46,10 +46,10 @@ end
 -- the job will be moved from the throttled
 -- queue into the work queue
 function QlessThrottle:release(now, jid)
+  redis.call('set', 'printline', jid .. ' is releasing lock on ' .. self.id)
   self.locks.remove(jid)
-
-  -- 0th index does not exist, thanks redis!
-  local next_jid = unpack(self:pending_pop(1, 1))
+  redis.call('set', 'printline', 'retrieving next job from pending on ' .. self.id)
+  local next_jid = unpack(self:pending_pop(0, 0))
   if next_jid and self:acquire(next_jid) then
     local job = Qless.job(next_jid):data()
     local queue_obj = Qless.queue(job.queue)

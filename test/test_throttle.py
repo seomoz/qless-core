@@ -115,4 +115,4 @@ class TestRelease(TestQless):
     self.assertEqual(self.lua('throttle.locks', 0, 'tid'), ['jid'])
     self.assertEqual(self.lua('throttle.pending', 0, 'tid'), [])
 
-# What about Recurring Jobs???
+# class TestRecurring(TestQless):

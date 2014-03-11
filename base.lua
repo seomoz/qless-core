@@ -95,7 +95,7 @@ function Qless.throttle(tid)
         return redis.call('zrem', QlessThrottle.ns .. tid .. '-locks', unpack(arg))
       end
     end, pop = function(min, max)
-      return redis.call('zremrangebyscore', QlessThrottle.ns .. tid .. '-locks', min, max)
+      return redis.call('zremrangebyrank', QlessThrottle.ns .. tid .. '-locks', min, max)
     end
   }
 
@@ -106,7 +106,7 @@ function Qless.throttle(tid)
     end, members = function()
       return redis.call('zrange', QlessThrottle.ns .. tid .. '-pending', 0, -1)
     end, peek = function(min, max)
-      return redis.call('zrangebyscore', QlessThrottle.ns .. tid .. '-pending', min, max)
+      return redis.call('zrange', QlessThrottle.ns .. tid .. '-pending', min, max)
     end, add = function(...)
       if #arg > 0 then
         redis.call('zadd', QlessThrottle.ns .. tid .. '-pending', unpack(arg))
@@ -116,7 +116,7 @@ function Qless.throttle(tid)
         return redis.call('zrem', QlessThrottle.ns .. tid .. '-pending', unpack(arg))
       end
     end, pop = function(min, max)
-      return redis.call('zremrangebyscore', QlessThrottle.ns .. tid .. '-pending', min, max)
+      return redis.call('zremrangebyrank', QlessThrottle.ns .. tid .. '-pending', min, max)
     end
   }
   return throttle
