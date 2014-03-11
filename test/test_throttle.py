@@ -13,12 +13,12 @@ class TestThrottle(TestQless):
   '''Test retrieving throttle data'''
   def test_get(self):
     self.redis.hmset('ql:t:tid', {'id': 'tid', 'maximum' : 5})
-    self.assertEqual(self.lua('throttle.get', 0, 'tid'), {'id' : 'tid', 'maximum' : '5'})
+    self.assertEqual(self.lua('throttle.get', 0, 'tid'), {'id' : 'tid', 'maximum' : 5})
 
   '''Test deleting the throttle data'''
   def test_delete(self):
     self.lua('throttle.set', 0, 'tid', 5)
-    self.assertEqual(self.lua('throttle.get', 0, 'tid'), {'id' : 'tid', 'maximum' : '5'})
+    self.assertEqual(self.lua('throttle.get', 0, 'tid'), {'id' : 'tid', 'maximum' : 5})
     self.lua('throttle.delete', 0, 'tid')
     self.assertEqual(self.lua('throttle.get', 0, 'tid'), None)
 
@@ -38,7 +38,7 @@ class TestAcquire(TestQless):
     self.assertEqual(self.lua('throttle.locks', 0, 'tid'), ['jid1'])
     self.assertEqual(self.lua('throttle.pending', 0, 'tid'), ['jid2', 'jid3', 'jid4'])
 
-Class TestRelease(TestQless):
+class TestRelease(TestQless):
   '''Test that when there are no pending jobs lock is properly released'''
   def test_no_pending_jobs(self):
     print("pending")
