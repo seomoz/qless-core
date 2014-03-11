@@ -29,7 +29,7 @@ end
 -- Returns true of the job acquired the resource.
 function QlessThrottle:acquire(jid)
   if self:available() then
-    redis.call('set', 'printline', jid .. ' is acquiring the lock for ' .. self.id)
+    redis.call('set', 'printline', jid .. ' acquired the lock for ' .. self.id)
     self.locks.add(1, jid)
     return true
   else
@@ -37,6 +37,12 @@ function QlessThrottle:acquire(jid)
     self.pending.add(1, jid)
     return false
   end
+end
+
+-- Rolls back an attempted lock acquisition.
+function QlessThrottle:rollback_acquire(jid)
+  self.locks.remove(jid)
+  self.pending.add(1, jid)
 end
 
 -- Release a throttled resource.
@@ -48,6 +54,7 @@ end
 function QlessThrottle:release(now, jid)
   --redis.call('set', 'printline', jid .. ' is releasing lock on ' .. self.id)
   self.locks.remove(jid)
+
   --redis.call('set', 'printline', 'retrieving next job from pending on ' .. self.id)
   local next_jid = unpack(self:pending_pop(0, 0))
   if next_jid then

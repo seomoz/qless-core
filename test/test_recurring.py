@@ -260,6 +260,7 @@ class TestRecurring(TestQless):
             'state': 'running',
             'tags': ['foo'],
             'tracked': False,
+            'throttles': [],
             'worker': 'worker'})
         self.lua('recur', 60, 'queue', 'jid', 'class', {'foo': 'bar'},
             'interval', 10, 0, 'priority', 5, 'tags', ['bar'], 'retries', 5)
@@ -280,6 +281,7 @@ class TestRecurring(TestQless):
             'state': 'running',
             'tags': ['bar'],
             'tracked': False,
+            'throttles': [],
             'worker': 'worker'})
 
     def test_rerecur_move(self):

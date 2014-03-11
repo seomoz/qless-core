@@ -323,6 +323,7 @@ class TestPut(TestQless):
             'state': 'waiting',
             'tags': {},
             'tracked': False,
+            'throttles': ['ql:q:queue'],
             'worker': u''
         })
 
@@ -395,6 +396,7 @@ class TestPut(TestQless):
             'state': 'waiting',
             'tags': {},
             'tracked': False,
+            'throttles': ['ql:q:other'],
             'worker': u''})
 
     def test_move_update(self):
@@ -463,6 +465,7 @@ class TestPeek(TestQless):
             'state': 'waiting',
             'tags': {},
             'tracked': False,
+            'throttles': ['ql:q:foo'],
             'worker': u''
         }])
         # With several jobs in the queue, we should be able to see more
@@ -549,6 +552,7 @@ class TestPop(TestQless):
             'state': 'running',
             'tags': {},
             'tracked': False,
+            'throttles': ['ql:q:queue'],
             'worker': 'worker'}])
 
     def test_pop_many(self):

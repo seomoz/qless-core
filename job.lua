@@ -11,7 +11,7 @@ function QlessJob:data(...)
   local job = redis.call(
       'hmget', QlessJob.ns .. self.jid, 'jid', 'klass', 'state', 'queue',
       'worker', 'priority', 'expires', 'retries', 'remaining', 'data',
-      'tags', 'failure', 'throttle')
+      'tags', 'failure', 'throttles')
 
   -- Return nil if we haven't found it
   if not job[1] then
@@ -34,7 +34,7 @@ function QlessJob:data(...)
     tags         = cjson.decode(job[11]),
     history      = self:history(),
     failure      = cjson.decode(job[12] or '{}'),
-    throttle     = job[13] or nil,
+    throttles    = cjson.decode(job[13] or '[]'),
     dependents   = redis.call(
       'smembers', QlessJob.ns .. self.jid .. '-dependents'),
     dependencies = redis.call(
@@ -131,9 +131,7 @@ function QlessJob:complete(now, worker, queue, data, ...)
   queue_obj.locks.remove(self.jid)
   queue_obj.scheduled.remove(self.jid)
 
-  -- Release queue throttle
-  Qless.throttle(QlessQueue.ns .. queue):release(now, self.jid)
-  self:release_throttle(now)
+  self:release_throttles(now)
 
   ----------------------------------------------------------
   -- This is the massive stats update that we have to do
@@ -402,9 +400,7 @@ function QlessJob:fail(now, worker, group, message, data)
       ['worker']  = worker
     }))
 
-  -- Release queue throttle
-  Qless.throttle(QlessQueue.ns .. queue):release(now, self.jid)
-  self:release_throttle(now)
+  self:release_throttles(now)
 
   -- Add this group of failure to the list of failures
   redis.call('sadd', 'ql:failures', group)
@@ -464,11 +460,8 @@ function QlessJob:retry(now, queue, worker, delay, group, message)
   -- Remove it from the locks key of the old queue
   Qless.queue(oldqueue).locks.remove(self.jid)
 
-  -- Release the throttle for the queue
-  Qless.throttle(QlessQueue.ns .. queue):release(now, self.jid)
-
   -- Release the throttle for the job
-  self:release_throttle(now)
+  self:release_throttles(now)
 
   -- Remove this job from the worker that was previously working it
   redis.call('zrem', 'ql:w:' .. worker .. ':jobs', self.jid)
@@ -805,17 +798,33 @@ function QlessJob:history(now, what, item)
   end
 end
 
-function QlessJob:release_throttle(now)
-  local tid = redis.call('hget', QlessJob.ns .. self.jid, 'throttle')
-  if tid then
+function QlessJob:release_throttles(now)
+  local throttles = redis.call('hget', QlessJob.ns .. self.jid, 'throttles')
+  throttles = cjson.decode(throttles or '[]')
+
+  for _, tid in ipairs(throttles) do
+    redis.call('set', 'printline', 'releasing throttle : ' .. tid)
     Qless.throttle(tid):release(now, self.jid)
   end
 end
 
-function QlessJob:acquire_throttle()
-  local tid = unpack(redis.call('hmget', QlessJob.ns .. self.jid, 'throttle'))
-  if tid then
-    return Qless.throttle(tid):acquire(self.jid)
+function QlessJob:acquire_throttles(now)
+  local throttles = redis.call('hget', QlessJob.ns .. self.jid, 'throttles')
+  throttles = cjson.decode(throttles or '[]')
+
+  local acquired_all = true
+  local acquired_throttles = {}
+  for _, tid in ipairs(throttles) do
+    acquired_all = acquired_all and Qless.throttle(tid):acquire(self.jid)
+    table.insert(acquired_throttles, tid)
   end
-  return true
+
+  if not acquired_all then
+    redis.call('set', 'printline', 'rolling back acquired locks')
+    for _, tid in ipairs(acquired_throttles) do
+      Qless.throttle(tid):rollback_acquire(self.jid)
+    end
+  end
+
+  return acquired_all
 end

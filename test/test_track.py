@@ -33,6 +33,7 @@ class TestTrack(TestQless):
                 'dependencies': {},
                 'klass': 'klass',
                 'dependents': {},
+                'throttles': ['ql:q:queue'],
                 'data': '{}',
                 'remaining': 5,
                 'history': [{

@@ -135,7 +135,7 @@ QlessAPI.unpause = function(now, ...)
 end
 
 QlessAPI.cancel = function(now, ...)
-  return Qless.cancel(unpack(arg))
+  return Qless.cancel(now, unpack(arg))
 end
 
 QlessAPI.timeout = function(now, ...)

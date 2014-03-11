@@ -382,7 +382,7 @@ end
 -- Cancel a job from taking place. It will be deleted from the system, and any
 -- attempts to renew a heartbeat will fail, and any attempts to complete it
 -- will fail. If you try to get the data on the object, you will get nothing.
-function Qless.cancel(...)
+function Qless.cancel(now, ...)
   -- Dependents is a mapping of a job to its dependent jids
   local dependents = {}
   for _, jid in ipairs(arg) do
@@ -435,7 +435,7 @@ function Qless.cancel(...)
         queue.depends.remove(jid)
       end
 
-      Qless.job(namespaced_jid):release_throttle()
+      Qless.job(namespaced_jid):release_throttles(now)
 
       -- We should probably go through all our dependencies and remove
       -- ourselves from the list of dependents

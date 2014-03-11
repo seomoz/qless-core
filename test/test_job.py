@@ -135,6 +135,7 @@ class TestComplete(TestQless):
             'state': 'complete',
             'tags': {},
             'tracked': False,
+            'throttles': ['ql:q:queue'],
             'worker': u''})
 
     def test_advance(self):
