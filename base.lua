@@ -250,7 +250,6 @@ function Qless.track(now, command, jid)
     assert(jid, 'Track(): Arg "jid" missing')
     -- Verify that job exists
     assert(Qless.job(jid):exists(), 'Track(): Job does not exist')
-    redis.call('set', 'print_line_track_command', now .. command .. jid)
     if string.lower(command) == 'track' then
       Qless.publish('track', jid)
       return redis.call('zadd', 'ql:tracked', now, jid)

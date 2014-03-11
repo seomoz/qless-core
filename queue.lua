@@ -368,9 +368,11 @@ function QlessQueue:pop(now, worker, count)
       if tracked then
         Qless.publish('popped', jid)
       end
-      popped[jid] = jid
+
+      table.insert(popped, jid)
     else
       job:history(now, 'throttled', {worker = worker})
+      self.throttled.add(now, jid)
     end
   end
 
