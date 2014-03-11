@@ -82,7 +82,7 @@ function Qless.queue(name)
     peek = function(now, offset, count)
       return redis.call('zrange', queue:prefix('throttled'), offset, offset + count - 1)
     end, add = function(now, jid)
-      redis.call('zadd', queue:prefix('throttled'), jid)
+      redis.call('zadd', queue:prefix('throttled'), now, jid)
     end, remove = function(...)
       if #arg > 0 then
         return redis.call('zrem', queue:prefix('throttled'), unpack(arg))
@@ -336,10 +336,12 @@ function QlessQueue:pop(now, worker, count)
   -- queue itself and the priorities therein
   table.extend(jids, self.work.peek(count - #jids))
 
+  redis.call('set', 'printline', 'before loop')
   local state
   local popped = {}
   for index, jid in ipairs(jids) do
     local job = Qless.job(jid)
+    redis.call('set', 'printline', 'pop acquiring throttle')
     if job:acquire_throttle() then
       state = unpack(job:data('state'))
       job:history(now, 'popped', {worker = worker})
@@ -371,11 +373,13 @@ function QlessQueue:pop(now, worker, count)
 
       table.insert(popped, jid)
     else
+      redis.call('set', 'printline', 'acquire failed')
       job:history(now, 'throttled', {worker = worker})
+      redis.call('set', 'printline', 'history set')
       self.throttled.add(now, jid)
     end
   end
-
+  redis.call('set', 'printline', 'before loop')
   -- If we are returning any jobs, then we should remove them from the work
   -- queue
   self.work.remove(unpack(popped))

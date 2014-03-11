@@ -3,7 +3,6 @@
 import redis
 import code
 from common import TestQless
-# code.interact(local=locals())
 
 class TestThrottle(TestQless):
   '''Test setting throttle data'''
