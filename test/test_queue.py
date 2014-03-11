@@ -592,7 +592,7 @@ class TestPop(TestQless):
 
     def test_max_concurrency(self):
         '''We can control the maxinum number of jobs available in a queue'''
-        self.lua('config.set', 0, 'queue-max-concurrency', 5)
+        self.lua('throttle.set', 0, 'ql:q:queue', 5)
         for jid in xrange(10):
             self.lua('put', jid, 'worker', 'queue', jid, 'klass', {}, 0)
         self.assertEqual(len(self.lua('pop', 10, 'queue', 'worker', 10)), 5)
@@ -609,7 +609,7 @@ class TestPop(TestQless):
         for jid in xrange(100):
             self.lua('put', jid, 'worker', 'queue', jid, 'klass', {}, 0)
         self.lua('pop', 100, 'queue', 'worker', 10)
-        self.lua('config.set', 100, 'queue-max-concurrency', 5)
+        self.lua('throttle.set', 100, 'ql:q:queue', 5)
         for jid in xrange(6):
             self.assertEqual(
                 len(self.lua('pop', 100, 'queue', 'worker', 10)), 0)
@@ -620,7 +620,7 @@ class TestPop(TestQless):
 
     def test_stalled_max_concurrency(self):
         '''Stalled jobs can still be popped with max concurrency'''
-        self.lua('config.set', 0, 'queue-max-concurrency', 1)
+        self.lua('throttle.set', 0, 'ql:q:queue', 1)
         self.lua('config.set', 0, 'grace-period', 0)
         self.lua('put', 0, 'worker', 'queue', 'jid', 'klass', {}, 0, 'retries', 5)
         job = self.lua('pop', 0, 'queue', 'worker', 10)[0]
@@ -630,7 +630,7 @@ class TestPop(TestQless):
 
     def test_fail_max_concurrency(self):
         '''Failing a job makes space for a job in a queue with concurrency'''
-        self.lua('config.set', 0, 'queue-max-concurrency', 1)
+        self.lua('throttle.set', 0, 'ql:q:queue', 1)
         self.lua('put', 0, 'worker', 'queue', 'a', 'klass', {}, 0)
         self.lua('put', 1, 'worker', 'queue', 'b', 'klass', {}, 0)
         self.lua('pop', 2, 'queue', 'worker', 10)

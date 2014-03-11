@@ -131,6 +131,8 @@ function QlessJob:complete(now, worker, queue, data, ...)
   queue_obj.locks.remove(self.jid)
   queue_obj.scheduled.remove(self.jid)
 
+  -- Release queue throttle
+  Qless.throttle(QlessQueue.ns .. queue):release(now, self.jid)
   self:release_throttle(now)
 
   ----------------------------------------------------------
@@ -400,6 +402,8 @@ function QlessJob:fail(now, worker, group, message, data)
       ['worker']  = worker
     }))
 
+  -- Release queue throttle
+  Qless.throttle(QlessQueue.ns .. queue):release(now, self.jid)
   self:release_throttle(now)
 
   -- Add this group of failure to the list of failures
@@ -459,6 +463,9 @@ function QlessJob:retry(now, queue, worker, delay, group, message)
 
   -- Remove it from the locks key of the old queue
   Qless.queue(oldqueue).locks.remove(self.jid)
+
+  -- Release the throttle for the queue
+  Qless.throttle(QlessQueue.ns .. queue):release(now, self.jid)
 
   -- Release the throttle for the job
   self:release_throttle(now)

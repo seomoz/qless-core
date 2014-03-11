@@ -292,11 +292,6 @@ function QlessQueue:pop(now, worker, count)
   count = assert(tonumber(count),
     'Pop(): Arg "count" missing or not a number: ' .. tostring(count))
 
-  -- We should find the heartbeat interval for this queue heartbeat
-  local expires = now + tonumber(
-    Qless.config.get(self.name .. '-heartbeat') or
-    Qless.config.get('heartbeat', 60))
-
   -- If this queue is paused, then return no jobs
   if self:paused() then
     return {}
@@ -305,86 +300,87 @@ function QlessQueue:pop(now, worker, count)
   -- Make sure we this worker to the list of seen workers
   redis.call('zadd', 'ql:workers', now, worker)
 
-  -- Check our max concurrency, and limit the count
-  local max_concurrency = tonumber(
-    Qless.config.get(self.name .. '-max-concurrency', 0))
-
-  if max_concurrency > 0 then
-    -- Allow at most max_concurrency - #running
-    local allowed = math.max(0, max_concurrency - self.locks.running(now))
-    count = math.min(allowed, count)
-    if count == 0 then
-      return {}
-    end
-  end
-
-  local jids = self:invalidate_locks(now, count)
+  local dead_jids = self:invalidate_locks(now, count) or {}
   -- Now we've checked __all__ the locks for this queue the could
   -- have expired, and are no more than the number requested.
 
   -- If we still need jobs in order to meet demand, then we should
   -- look for all the recurring jobs that need jobs run
-  self:check_recurring(now, count - #jids)
+  self:check_recurring(now, count - #dead_jids)
 
   -- If we still need values in order to meet the demand, then we
   -- should check if any scheduled items, and if so, we should
   -- insert them to ensure correctness when pulling off the next
   -- unit of work.
-  self:check_scheduled(now, count - #jids)
+  self:check_scheduled(now, count - #dead_jids)
 
   -- With these in place, we can expand this list of jids based on the work
   -- queue itself and the priorities therein
-  table.extend(jids, self.work.peek(count - #jids))
+  local jids = self.work.peek(count - #dead_jids) or {}
 
-  redis.call('set', 'printline', 'before loop')
-  local state
+  local queue_throttle = Qless.throttle(QlessQueue.ns .. self.name)
+
   local popped = {}
   for index, jid in ipairs(jids) do
     local job = Qless.job(jid)
-    redis.call('set', 'printline', 'pop acquiring throttle')
-    if job:acquire_throttle() then
-      state = unpack(job:data('state'))
-      job:history(now, 'popped', {worker = worker})
-
-      -- Update the wait time statistics
-      local time = tonumber(
-        redis.call('hget', QlessJob.ns .. jid, 'time') or now)
-      local waiting = now - time
-      self:stat(now, 'wait', waiting)
-      redis.call('hset', QlessJob.ns .. jid,
-        'time', string.format("%.20f", now))
-
-      -- Add this job to the list of jobs handled by this worker
-      redis.call('zadd', 'ql:w:' .. worker .. ':jobs', expires, jid)
-
-      -- Update the jobs data, and add its locks, and return the job
-      job:update({
-        worker  = worker,
-        expires = expires,
-        state   = 'running'
-      })
-
-      self.locks.add(expires, jid)
-
-      local tracked = redis.call('zscore', 'ql:tracked', jid) ~= false
-      if tracked then
-        Qless.publish('popped', jid)
-      end
-
+    if queue_throttle:acquire(jid) and job:acquire_throttle() then
+      self:pop_job(now, worker, job)
       table.insert(popped, jid)
     else
-      redis.call('set', 'printline', 'acquire failed')
       job:history(now, 'throttled', {worker = worker})
-      redis.call('set', 'printline', 'history set')
-      self.throttled.add(now, jid)
     end
   end
-  redis.call('set', 'printline', 'before loop')
-  -- If we are returning any jobs, then we should remove them from the work
-  -- queue
+
+  -- If we are returning any jobs, then remove popped jobs from
+  -- work queue
   self.work.remove(unpack(popped))
 
+  -- Process dead jids after removing newly popped jids from work queue
+  -- This changes the order of returned jids
+  for index, jid in ipairs(dead_jids) do
+    self:pop_job(now, worker, Qless.job(jid))
+    table.insert(popped, jid)
+  end
+
   return popped
+end
+
+function QlessQueue:pop_job(now, worker, job)
+  local state
+  local jid = job.jid
+  state = unpack(job:data('state'))
+  job:history(now, 'popped', {worker = worker})
+
+  -- We should find the heartbeat interval for this queue heartbeat
+  local expires = now + tonumber(
+    Qless.config.get(self.name .. '-heartbeat') or
+    Qless.config.get('heartbeat', 60))
+
+  -- Update the wait time statistics
+  -- Just does job:data('time') do the same as this?
+  local time = tonumber(
+    redis.call('hget', QlessJob.ns .. jid, 'time') or now)
+  local waiting = now - time
+  self:stat(now, 'wait', waiting)
+  redis.call('hset', QlessJob.ns .. jid,
+    'time', string.format("%.20f", now))
+
+  -- Add this job to the list of jobs handled by this worker
+  redis.call('zadd', 'ql:w:' .. worker .. ':jobs', expires, jid)
+
+  -- Update the jobs data, and add its locks, and return the job
+  job:update({
+    worker  = worker,
+    expires = expires,
+    state   = 'running'
+  })
+
+  self.locks.add(expires, jid)
+
+  local tracked = redis.call('zscore', 'ql:tracked', jid) ~= false
+  if tracked then
+    Qless.publish('popped', jid)
+  end
 end
 
 -- Update the stats for this queue
@@ -927,8 +923,14 @@ function QlessQueue:invalidate_locks(now, count)
         self.locks.remove(jid)
         self.scheduled.remove(jid)
 
-        local group = 'failed-retries-' .. Qless.job(jid):data()['queue']
         local job = Qless.job(jid)
+        local job_data = Qless.job(jid):data()
+        local queue = job_data['queue']
+        local group = 'failed-retries-' .. queue
+
+        job:release_throttle(now)
+        Qless.throttle(QlessQueue.ns .. queue):release(now, jid)
+
         job:history(now, 'failed', {group = group})
         redis.call('hmset', QlessJob.ns .. jid, 'state', 'failed',
           'worker', '',
