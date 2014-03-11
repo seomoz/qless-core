@@ -699,7 +699,7 @@ function QlessQueue:recur(now, jid, klass, raw_data, spec, ...)
     options.backlog = assert(tonumber(options.backlog  or 0),
       'Recur(): Arg "backlog" not a number: ' .. tostring(
         options.backlog))
-    options.throttles = assert(cjson.decode(options['throttles'] or '[]'),
+    options.throttles = assert(cjson.decode(options['throttles'] or '{}'),
       'Recur(): Arg "throttles" not JSON array: ' .. tostring(options['throttles']))
 
     local count, old_queue = unpack(redis.call('hmget', 'ql:r:' .. jid, 'count', 'queue'))
@@ -726,7 +726,7 @@ function QlessQueue:recur(now, jid, klass, raw_data, spec, ...)
       'interval' , interval,
       'retries'  , options.retries,
       'backlog'  , options.backlog,
-      'throttles', options.throttles)
+      'throttles', cjson.encode(options.throttles or {}))
     -- Now, we should schedule the next run of the job
     self.recurring.add(now + offset, jid)
 
@@ -762,6 +762,9 @@ function QlessQueue:check_recurring(now, count)
     -- get the last time each of them was run, and then increment
     -- it by its interval. While this time is less than now,
     -- we need to keep putting jobs on the queue
+    local r = redis.call('hmget', 'ql:r:' .. jid, 'klass', 'data', 'priority',
+        'tags', 'retries', 'interval', 'backlog', 'throttles')
+    redis.call('set', 'printline', cjson.encode(r))
     local klass, data, priority, tags, retries, interval, backlog, throttles = unpack(
       redis.call('hmget', 'ql:r:' .. jid, 'klass', 'data', 'priority',
         'tags', 'retries', 'interval', 'backlog', 'throttles'))

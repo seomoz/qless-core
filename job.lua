@@ -800,7 +800,7 @@ end
 
 function QlessJob:release_throttles(now)
   local throttles = redis.call('hget', QlessJob.ns .. self.jid, 'throttles')
-  throttles = cjson.decode(throttles or '[]')
+  throttles = cjson.decode(throttles or '{}')
 
   for _, tid in ipairs(throttles) do
     redis.call('set', 'printline', 'releasing throttle : ' .. tid)
@@ -809,8 +809,7 @@ function QlessJob:release_throttles(now)
 end
 
 function QlessJob:acquire_throttles(now)
-  local throttles = redis.call('hget', QlessJob.ns .. self.jid, 'throttles')
-  throttles = cjson.decode(throttles or '[]')
+  local throttles = cjson.decode(redis.call('hget', QlessJob.ns .. self.jid, 'throttles'))
 
   local acquired_all = true
   local acquired_throttles = {}
