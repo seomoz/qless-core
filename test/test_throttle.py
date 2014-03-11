@@ -205,5 +205,3 @@ class TestDependents(TestQless):
     self.lua('complete', 0, 'jid3', 'worker', 'queue', {})
     self.assertEqual(self.lua('throttle.locks', 0, 'tid'), [])
     self.assertEqual(self.lua('throttle.pending', 0, 'tid'), [])
-
-# class TestRecurring(TestQless):
