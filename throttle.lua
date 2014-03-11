@@ -50,7 +50,7 @@ function QlessThrottle:release(now, jid)
   self.locks.remove(jid)
   redis.call('set', 'printline', 'retrieving next job from pending on ' .. self.id)
   local next_jid = unpack(self:pending_pop(0, 0))
-  if next_jid and self:acquire(next_jid) then
+  if next_jid then
     local job = Qless.job(next_jid):data()
     local queue_obj = Qless.queue(job.queue)
     queue_obj.throttled.remove(job.jid)
@@ -74,6 +74,6 @@ end
 
 -- Returns true if the throttle has locks available, false otherwise.
 function QlessThrottle:available()
-  redis.call('set', 'printline', 'available ' .. self.maximum .. ' == 0 or ' .. self.locks.count() .. ' < self.maximum')
+  redis.call('set', 'printline', 'available ' .. self.maximum .. ' == 0 or ' .. self.locks.count() .. ' < ' .. self.maximum)
   return self.maximum == 0 or self.locks.count() < self.maximum
 end

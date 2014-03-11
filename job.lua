@@ -462,7 +462,6 @@ function QlessJob:retry(now, queue, worker, delay, group, message)
 
   -- Release the throttle for the job
   self:release_throttle(now)
-  self:acquire_throttle()
 
   -- Remove this job from the worker that was previously working it
   redis.call('zrem', 'ql:w:' .. worker .. ':jobs', self.jid)

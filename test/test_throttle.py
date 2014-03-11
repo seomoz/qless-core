@@ -25,50 +25,51 @@ class TestThrottle(TestQless):
     self.assertEqual(self.lua('throttle.get', 0, 'tid'), None)
 
 class TestAcquire(TestQless):
-  '''Test acquiring of a throttle lock'''
-  def test_acquire(self):
+  '''Test that job can specify a throttle'''
+  def test_specify_throttle(self):
     self.lua('put', 0, 'worker', 'queue', 'jid', 'klass', {}, 0, 'throttle', 'tid')
     self.assertEqual(self.lua('get', 0, 'jid')['throttle'], 'tid')
+
+  '''Test that a job can acquire a throttle'''
+  def test_acquire_throttle(self):
+    self.lua('put', 0, 'worker', 'queue', 'jid', 'klass', {}, 0, 'throttle', 'tid')
+    self.lua('pop', 0, 'queue', 'worker', 1)
+    self.assertEqual(self.lua('throttle.locks', 0, 'tid'), ['jid'])
 
   '''Test that acquiring of a throttle lock properly limits the number of jobs'''
   def test_limit_number_of_locks(self):
     self.lua('throttle.set', 0, 'tid', 1)
     self.lua('put', 0, 'worker', 'queue', 'jid1', 'klass', {}, 0, 'throttle', 'tid')
-    self.lua('put', 0, 'worker', 'queue', 'jid2', 'klass', {}, 0, 'throttle', 'tid')
-    self.lua('put', 0, 'worker', 'queue', 'jid3', 'klass', {}, 0, 'throttle', 'tid')
-    self.lua('put', 0, 'worker', 'queue', 'jid4', 'klass', {}, 0, 'throttle', 'tid')
+    self.lua('put', 1, 'worker', 'queue', 'jid2', 'klass', {}, 0, 'throttle', 'tid')
+    self.lua('put', 2, 'worker', 'queue', 'jid3', 'klass', {}, 0, 'throttle', 'tid')
+    self.lua('put', 3, 'worker', 'queue', 'jid4', 'klass', {}, 0, 'throttle', 'tid')
+    self.lua('pop', 0, 'queue', 'worker', 4)
     self.assertEqual(self.lua('throttle.locks', 0, 'tid'), ['jid1'])
     self.assertEqual(self.lua('throttle.pending', 0, 'tid'), ['jid2', 'jid3', 'jid4'])
 
 class TestRelease(TestQless):
-  '''Test that job retains lock while working'''
-  def test_retains_lock_while_working(self):
-    self.lua('throttle.set', 0, 'tid', 1)
-    self.lua('put', 0, 'worker', 'queue', 'jid', 'klass', {}, 0, 'throttle', 'tid')
-    self.assertEqual(self.lua('throttle.locks', 0, 'tid'), ['jid'])
-    self.lua('pop', 0, 'queue', 'worker', 1)
-    self.assertEqual(self.lua('throttle.locks', 0, 'tid'), ['jid'])
-    self.lua('complete', 0, 'jid', 'worker', 'queue', {})
-    self.assertEqual(self.lua('throttle.locks', 0, 'tid'), [])
-    self.assertEqual(self.lua('throttle.pending', 0, 'tid'), [])
-
   '''Test that when there are no pending jobs lock is properly released'''
   def test_no_pending_jobs(self):
     self.lua('put', 0, 'worker', 'queue', 'jid', 'klass', {}, 0, 'throttle', 'tid')
-    self.assertEqual(self.lua('throttle.locks', 0, 'tid'), ['jid'])
     self.lua('pop', 0, 'queue', 'worker', 1)
+    self.assertEqual(self.lua('throttle.locks', 0, 'tid'), ['jid'])
+    self.assertEqual(self.lua('throttle.pending', 0, 'tid'), [])
     self.lua('complete', 0, 'jid', 'worker', 'queue', {})
     self.assertEqual(self.lua('throttle.locks', 0, 'tid'), [])
+    self.assertEqual(self.lua('throttle.pending', 0, 'tid'), [])
 
   '''Test that releasing a lock properly another job in the work queue'''
   def test_next_job_is_moved_into_work_qeueue(self):
     self.lua('throttle.set', 0, 'tid', 1)
     self.lua('put', 0, 'worker', 'queue', 'jid1', 'klass', {}, 0, 'throttle', 'tid')
-    self.lua('put', 0, 'worker', 'queue', 'jid2', 'klass', {}, 0, 'throttle', 'tid')
+    self.lua('put', 1, 'worker', 'queue', 'jid2', 'klass', {}, 0, 'throttle', 'tid')
+    self.lua('pop', 2, 'queue', 'worker', 2)
     self.assertEqual(self.lua('throttle.locks', 0, 'tid'), ['jid1'])
     self.assertEqual(self.lua('throttle.pending', 0, 'tid'), ['jid2'])
-    self.lua('pop', 0, 'queue', 'worker', 1)
     self.lua('complete', 0, 'jid1', 'worker', 'queue', {})
+    # Lock should be empty until another job is popped
+    self.assertEqual(self.lua('throttle.locks', 0, 'tid'), [])
+    self.lua('pop', 2, 'queue', 'worker', 2)
     self.assertEqual(self.lua('throttle.locks', 0, 'tid'), ['jid2'])
     self.assertEqual(self.lua('throttle.pending', 0, 'tid'), [])
 
@@ -77,8 +78,8 @@ class TestRelease(TestQless):
   def test_on_complete_lock_is_released(self):
     self.lua('throttle.set', 0, 'tid', 1)
     self.lua('put', 0, 'worker', 'queue', 'jid', 'klass', {}, 0, 'throttle', 'tid')
-    self.assertEqual(self.lua('throttle.locks', 0, 'tid'), ['jid'])
     self.lua('pop', 0, 'queue', 'worker', 1)
+    self.assertEqual(self.lua('throttle.locks', 0, 'tid'), ['jid'])
     self.lua('complete', 0, 'jid', 'worker', 'queue', {})
     self.assertEqual(self.lua('throttle.locks', 0, 'tid'), [])
     self.assertEqual(self.lua('throttle.pending', 0, 'tid'), [])
@@ -87,8 +88,8 @@ class TestRelease(TestQless):
   def test_on_failure_lock_is_released(self):
     self.lua('throttle.set', 0, 'tid', 1)
     self.lua('put', 0, 'worker', 'queue', 'jid', 'klass', {}, 0, 'throttle', 'tid')
-    self.assertEqual(self.lua('throttle.locks', 0, 'tid'), ['jid'])
     self.lua('pop', 0, 'queue', 'worker', 1)
+    self.assertEqual(self.lua('throttle.locks', 0, 'tid'), ['jid'])
     self.lua('fail', 0, 'jid', 'worker', 'failed', 'i failed', {})
     self.assertEqual(self.lua('throttle.locks', 0, 'tid'), [])
     self.assertEqual(self.lua('throttle.pending', 0, 'tid'), [])
@@ -98,21 +99,45 @@ class TestRelease(TestQless):
   def test_on_retry_lock_is_released(self):
     self.lua('throttle.set', 0, 'tid', 1)
     self.lua('put', 0, 'worker', 'queue', 'jid1', 'klass', {}, 0, 'throttle', 'tid')
-    self.lua('put', 0, 'worker', 'queue', 'jid2', 'klass', {}, 0, 'throttle', 'tid')
-    self.assertEqual(self.lua('throttle.locks', 0, 'tid'), ['jid1'])
     self.lua('pop', 0, 'queue', 'worker', 1)
+    self.assertEqual(self.lua('throttle.locks', 0, 'tid'), ['jid1'])
     self.lua('retry', 0, 'jid1', 'queue', 'worker', 0, 'retry', 'retrying')
-    self.assertEqual(self.lua('throttle.locks', 0, 'tid'), ['jid2'])
-    self.assertEqual(self.lua('throttle.pending', 0, 'tid'), ['jid1'])
+    self.assertEqual(self.lua('throttle.locks', 0, 'tid'), [])
+    self.assertEqual(self.lua('throttle.pending', 0, 'tid'), [])
 
-  '''Test that when a job retries and no pending jobs it immediately acquires the lock again'''
+  '''Test that when a job retries it is able to reacquire the lock when next popped'''
+  def test_on_retry_lock_is_reacquired(self):
+    self.lua('throttle.set', 0, 'tid', 1)
+    self.lua('put', 0, 'worker', 'queue', 'jid1', 'klass', {}, 0, 'throttle', 'tid')
+    self.lua('pop', 0, 'queue', 'worker', 1)
+    self.assertEqual(self.lua('throttle.locks', 0, 'tid'), ['jid1'])
+    self.lua('retry', 0, 'jid1', 'queue', 'worker', 0, 'retry', 'retrying')
+    self.assertEqual(self.lua('throttle.locks', 0, 'tid'), [])
+    self.assertEqual(self.lua('throttle.pending', 0, 'tid'), [])
+
+  '''Test that when a job retries and no pending jobs it acquires the lock again on next pop'''
   def test_on_retry_no_pending_lock_is_reacquired(self):
     self.lua('throttle.set', 0, 'tid', 1)
     self.lua('put', 0, 'worker', 'queue', 'jid', 'klass', {}, 0, 'throttle', 'tid')
-    self.assertEqual(self.lua('throttle.locks', 0, 'tid'), ['jid'])
     self.lua('pop', 0, 'queue', 'worker', 1)
+    self.assertEqual(self.lua('throttle.locks', 0, 'tid'), ['jid'])
     self.lua('retry', 0, 'jid', 'queue', 'worker', 0, 'retry', 'retrying')
+    self.lua('pop', 0, 'queue', 'worker', 1)
     self.assertEqual(self.lua('throttle.locks', 0, 'tid'), ['jid'])
     self.assertEqual(self.lua('throttle.pending', 0, 'tid'), [])
+
+  '''Test that when a job retries and another job is pending, the pending job acquires the lock'''
+  def test_on_retry_no_pending_lock_is_reacquired(self):
+    self.lua('throttle.set', 0, 'tid', 1)
+    self.lua('put', 0, 'worker', 'queue', 'jid1', 'klass', {}, 0, 'throttle', 'tid')
+    self.lua('put', 1, 'worker', 'queue', 'jid2', 'klass', {}, 0, 'throttle', 'tid')
+    self.lua('pop', 2, 'queue', 'worker', 2)
+    self.assertEqual(self.lua('throttle.locks', 3, 'tid'), ['jid1'])
+    self.assertEqual(self.lua('throttle.pending', 7, 'tid'), ['jid2'])
+    self.lua('retry', 4, 'jid1', 'queue', 'worker', 0, 'retry', 'retrying')
+    self.assertEqual(self.lua('throttle.pending', 7, 'tid'), [])
+    self.lua('pop', 5, 'queue', 'worker', 2)
+    self.assertEqual(self.lua('throttle.locks', 6, 'tid'), ['jid2'])
+    self.assertEqual(self.lua('throttle.pending', 7, 'tid'), ['jid1'])
 
 # class TestRecurring(TestQless):

@@ -337,42 +337,48 @@ function QlessQueue:pop(now, worker, count)
   table.extend(jids, self.work.peek(count - #jids))
 
   local state
+  local popped = {}
   for index, jid in ipairs(jids) do
     local job = Qless.job(jid)
-    state = unpack(job:data('state'))
-    job:history(now, 'popped', {worker = worker})
+    if job:acquire_throttle() then
+      state = unpack(job:data('state'))
+      job:history(now, 'popped', {worker = worker})
 
-    -- Update the wait time statistics
-    local time = tonumber(
-      redis.call('hget', QlessJob.ns .. jid, 'time') or now)
-    local waiting = now - time
-    self:stat(now, 'wait', waiting)
-    redis.call('hset', QlessJob.ns .. jid,
-      'time', string.format("%.20f", now))
+      -- Update the wait time statistics
+      local time = tonumber(
+        redis.call('hget', QlessJob.ns .. jid, 'time') or now)
+      local waiting = now - time
+      self:stat(now, 'wait', waiting)
+      redis.call('hset', QlessJob.ns .. jid,
+        'time', string.format("%.20f", now))
 
-    -- Add this job to the list of jobs handled by this worker
-    redis.call('zadd', 'ql:w:' .. worker .. ':jobs', expires, jid)
+      -- Add this job to the list of jobs handled by this worker
+      redis.call('zadd', 'ql:w:' .. worker .. ':jobs', expires, jid)
 
-    -- Update the jobs data, and add its locks, and return the job
-    job:update({
-      worker  = worker,
-      expires = expires,
-      state   = 'running'
-    })
+      -- Update the jobs data, and add its locks, and return the job
+      job:update({
+        worker  = worker,
+        expires = expires,
+        state   = 'running'
+      })
 
-    self.locks.add(expires, jid)
+      self.locks.add(expires, jid)
 
-    local tracked = redis.call('zscore', 'ql:tracked', jid) ~= false
-    if tracked then
-      Qless.publish('popped', jid)
+      local tracked = redis.call('zscore', 'ql:tracked', jid) ~= false
+      if tracked then
+        Qless.publish('popped', jid)
+      end
+      popped[jid] = jid
+    else
+      job:history(now, 'throttled', {worker = worker})
     end
   end
 
   -- If we are returning any jobs, then we should remove them from the work
   -- queue
-  self.work.remove(unpack(jids))
+  self.work.remove(unpack(popped))
 
-  return jids
+  return popped
 end
 
 -- Update the stats for this queue
@@ -599,10 +605,8 @@ function QlessQueue:put(now, worker, jid, klass, raw_data, delay, ...)
     if redis.call('scard', QlessJob.ns .. jid .. '-dependencies') > 0 then
       self.depends.add(now, jid)
       redis.call('hset', QlessJob.ns .. jid, 'state', 'depends')
-    elseif job:acquire_throttle() then
-      self.work.add(now, priority, jid)
     else
-      self.throttled.add(jid)
+      self.work.add(now, priority, jid)
     end
   end
 
