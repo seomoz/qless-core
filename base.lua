@@ -84,35 +84,39 @@ function Qless.throttle(tid)
   throttle.locks = {
     count = function()
       return (redis.call('zcard', QlessThrottle.ns .. tid .. '-locks') or 0)
+    end, members = function()
+      return redis.call('zrange', QlessThrottle.ns .. tid .. '-locks', 0, -1)
     end, add = function(...)
       if #arg > 0 then
         redis.call('zadd', QlessThrottle.ns .. tid .. '-locks', unpack(arg))
       end
-    end, members = function()
-      return redis.call('zrange', QlessThrottle.ns .. tid .. '-locks', 0, -1)
     end, remove = function(...)
       if #arg > 0 then
         return redis.call('zrem', QlessThrottle.ns .. tid .. '-locks', unpack(arg))
       end
+    end, pop = function(min, max)
+      return redis.call('zremrangebyscore', QlessThrottle.ns .. tid .. '-locks', min, max)
     end
   }
 
   -- set of jids waiting on this throttle to become available.
   throttle.pending = {
     count = function()
-      redis.call('zcard', QlessThrottle.ns .. tid .. '-pending')
+      return (redis.call('zcard', QlessThrottle.ns .. tid .. '-pending') or 0)
+    end, members = function()
+      return redis.call('zrange', QlessThrottle.ns .. tid .. '-pending', 0, -1)
+    end, peek = function(min, max)
+      return redis.call('zrangebyscore', QlessThrottle.ns .. tid .. '-pending', min, max)
     end, add = function(...)
       if #arg > 0 then
         redis.call('zadd', QlessThrottle.ns .. tid .. '-pending', unpack(arg))
       end
-    end, members = function()
-      return redis.call('zrange', QlessThrottle.ns .. tid .. '-pending', 0, -1)
     end, remove = function(...)
       if #arg > 0 then
-        redis.call('zrem', QlessThrottle.ns .. tid .. '-pending', unpack(arg))
+        return redis.call('zrem', QlessThrottle.ns .. tid .. '-pending', unpack(arg))
       end
-    end, pop = function()
-      return redis.call('zremrangebyrank', QlessThrottle.ns .. tid .. '-pending', 0, 1)
+    end, pop = function(min, max)
+      return redis.call('zremrangebyscore', QlessThrottle.ns .. tid .. '-pending', min, max)
     end
   }
   return throttle

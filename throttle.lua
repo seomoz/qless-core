@@ -29,9 +29,11 @@ end
 -- Returns true of the job acquired the resource.
 function QlessThrottle:acquire(jid)
   if self:available() then
+    redis.call('set', 'printline', jid .. ' is acquiring the lock for ' .. self.id)
     self.locks.add(1, jid)
     return true
   else
+    redis.call('set', 'printline', jid .. ' failed acquiring the lock for ' .. self.id .. ' marked as pending')
     self.pending.add(1, jid)
     return false
   end
@@ -45,15 +47,33 @@ end
 -- queue into the work queue
 function QlessThrottle:release(now, jid)
   self.locks.remove(jid)
-  local pri, next_jid = self.pending.pop()
+
+  -- 0th index does not exist, thanks redis!
+  local next_jid = unpack(self:pending_pop(1, 1))
   if next_jid and self:acquire(next_jid) then
-    queue_obj = Qless.queue(Qless.job(next_jid).queue)
-    queue_obj.throttled.remove(next_jid)
-    queue_obj.work.add(now, next_jid)
+    local job = Qless.job(next_jid):data()
+    local queue_obj = Qless.queue(job.queue)
+    queue_obj.throttled.remove(job.jid)
+    queue_obj.work.add(now, job.priority, job.jid)
   end
+end
+
+function QlessThrottle:lock_pop(min, max)
+  local lock = Qless.throttle(self.id).locks
+  local jid = lock.peek(min,max)
+  lock.pop(min,max)
+  return jid
+end
+
+function QlessThrottle:pending_pop(min, max)
+  local pending = Qless.throttle(self.id).pending
+  local jids = pending.peek(min,max)
+  pending.pop(min,max)
+  return jids
 end
 
 -- Returns true if the throttle has locks available, false otherwise.
 function QlessThrottle:available()
+  redis.call('set', 'printline', 'available ' .. self.maximum .. ' == 0 or ' .. self.locks.count() .. ' < self.maximum')
   return self.maximum == 0 or self.locks.count() < self.maximum
 end
