@@ -641,3 +641,26 @@ class TestPop(TestQless):
         self.lua('fail', 3, 'a', 'worker', 'group', 'message', {})
         job = self.lua('pop', 4, 'queue', 'worker', 10)[0]
         self.assertEqual(job['jid'], 'b')
+
+    def test_throttled_added(self):
+        '''New jobs are added to throttled when at concurrency limit'''
+        self.lua('throttle.set', 0, 'ql:q:queue', 1)
+        self.lua('put', 0, 'worker', 'queue', 'jid1', 'klass', {}, 0)
+        self.lua('put', 1, 'worker', 'queue', 'jid2', 'klass', {}, 0)
+        self.lua('pop', 2, 'queue', 'worker', 2)
+        self.assertEqual(self.lua('throttle.locks', 3, 'ql:q:queue'), ['jid1'])
+        self.assertEqual(self.redis.zrange('ql:q:queue-throttled', 0, -1), ['jid2'])
+
+    def test_throttled_removed(self):
+        '''Throttled jobs are removed from throttled when concurrency available'''
+        self.lua('throttle.set', 0, 'ql:q:queue', 1)
+        self.lua('put', 0, 'worker', 'queue', 'jid1', 'klass', {}, 0)
+        self.lua('put', 1, 'worker', 'queue', 'jid2', 'klass', {}, 0)
+        self.lua('pop', 2, 'queue', 'worker', 2)
+        self.assertEqual(self.lua('throttle.locks', 3, 'ql:q:queue'), ['jid1'])
+        self.assertEqual(self.redis.zrange('ql:q:queue-throttled', 0, -1), ['jid2'])
+        self.lua('complete', 4, 'jid1', 'worker', 'queue', {})
+        self.assertEqual(self.redis.zrange('ql:q:queue-throttled', 0, -1), ['jid2'])
+        self.lua('pop', 5, 'queue', 'worker', 1)
+        self.assertEqual(self.lua('throttle.locks', 6, 'ql:q:queue'), ['jid2'])
+        self.assertEqual(self.redis.zrange('ql:q:queue-throttled', 0, -1), [])
