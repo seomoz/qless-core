@@ -860,6 +860,10 @@ function QlessQueue:check_scheduled(now, count)
 end
 
 function QlessQueue:check_throttled(now, count)
+  if not Qless.throttle(QlessQueue.ns .. self.name):available() then
+    return
+  end
+
   local throttled = self.throttled.peek(now, 0, count)
   for _, jid in ipairs(throttled) do
     local priority = tonumber(redis.call('hget', QlessJob.ns .. jid, 'priority') or 0)
@@ -1031,6 +1035,7 @@ function QlessQueue.counts(now, name)
       waiting   = queue.work.length(),
       stalled   = stalled,
       running   = queue.locks.length() - stalled,
+      throttled = queue.throttled.length(),
       scheduled = queue.scheduled.length(),
       depends   = queue.depends.length(),
       recurring = queue.recurring.length(),
