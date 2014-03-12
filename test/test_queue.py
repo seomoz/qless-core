@@ -649,7 +649,7 @@ class TestPop(TestQless):
         self.lua('put', 1, 'worker', 'queue', 'jid2', 'klass', {}, 0)
         self.lua('pop', 2, 'queue', 'worker', 2)
         self.assertEqual(self.lua('throttle.locks', 3, 'ql:q:queue'), ['jid1'])
-        self.assertEqual(self.redis.zrange('ql:q:queue-throttled', 0, -1), ['jid2'])
+        self.assertEqual(self.lua('throttle.pending', 3, 'ql:q:queue'), ['jid2'])
 
     def test_throttled_removed(self):
         '''Throttled jobs are removed from throttled when concurrency available'''
@@ -658,9 +658,9 @@ class TestPop(TestQless):
         self.lua('put', 1, 'worker', 'queue', 'jid2', 'klass', {}, 0)
         self.lua('pop', 2, 'queue', 'worker', 2)
         self.assertEqual(self.lua('throttle.locks', 3, 'ql:q:queue'), ['jid1'])
-        self.assertEqual(self.redis.zrange('ql:q:queue-throttled', 0, -1), ['jid2'])
+        self.assertEqual(self.lua('throttle.pending', 3, 'ql:q:queue'), ['jid2'])
         self.lua('complete', 4, 'jid1', 'worker', 'queue', {})
-        self.assertEqual(self.redis.zrange('ql:q:queue-throttled', 0, -1), ['jid2'])
+        self.assertEqual(self.lua('throttle.pending', 3, 'ql:q:queue'), ['jid2'])
         self.lua('pop', 5, 'queue', 'worker', 1)
         self.assertEqual(self.lua('throttle.locks', 6, 'ql:q:queue'), ['jid2'])
-        self.assertEqual(self.redis.zrange('ql:q:queue-throttled', 0, -1), [])
+        self.assertEqual(self.lua('throttle.pending', 3, 'ql:q:queue'), [])

@@ -304,6 +304,17 @@ function QlessQueue:pop(now, worker, count)
   redis.call('zadd', 'ql:workers', now, worker)
 
   local dead_jids = self:invalidate_locks(now, count) or {}
+  local popped = {}
+
+  for index, jid in ipairs(dead_jids) do
+    self:pop_job(now, worker, Qless.job(jid))
+    table.insert(popped, jid)
+  end
+
+  if not Qless.throttle(QlessQueue.ns .. self.name):available() then
+    return popped
+  end
+
   -- Now we've checked __all__ the locks for this queue the could
   -- have expired, and are no more than the number requested.
 
@@ -326,9 +337,6 @@ function QlessQueue:pop(now, worker, count)
   -- queue itself and the priorities therein
   local jids = self.work.peek(count - #dead_jids) or {}
 
-  local queue_throttle = Qless.throttle(QlessQueue.ns .. self.name)
-
-  local popped = {}
   for index, jid in ipairs(jids) do
     local job = Qless.job(jid)
     if job:acquire_throttles(now) then
@@ -339,16 +347,9 @@ function QlessQueue:pop(now, worker, count)
     end
   end
 
-  -- If we are returning any jobs, then remove popped jobs from
-  -- work queue
-  self.work.remove(unpack(popped))
-
-  -- Process dead jids after removing newly popped jids from work queue
-  -- This changes the order of returned jids
-  for index, jid in ipairs(dead_jids) do
-    self:pop_job(now, worker, Qless.job(jid))
-    table.insert(popped, jid)
-  end
+  -- All jobs should have acquired locks or be throttled,
+  -- ergo, remove all jids from work queue
+  self.work.remove(unpack(jids))
 
   return popped
 end
@@ -860,15 +861,10 @@ function QlessQueue:check_scheduled(now, count)
 end
 
 function QlessQueue:check_throttled(now, count)
-  if not Qless.throttle(QlessQueue.ns .. self.name):available() then
-    return
-  end
-
-  local throttled = self.throttled.peek(now, 0, count)
+  local throttled = self.throttled.peek(now, 0, count - 1)
   for _, jid in ipairs(throttled) do
     local priority = tonumber(redis.call('hget', QlessJob.ns .. jid, 'priority') or 0)
     self.work.add(now, priority, jid)
-    self.throttled.remove(jid)
     redis.call('hset', QlessJob.ns .. jid, 'state', 'waiting')
   end
 end

@@ -30,6 +30,7 @@ end
 function QlessThrottle:acquire(jid)
   if self:available() then
     redis.call('set', 'printline', jid .. ' acquired the lock for ' .. self.id)
+    self.pending.remove(jid)
     self.locks.add(1, jid)
     return true
   else
@@ -59,15 +60,6 @@ end
 function QlessThrottle:release(now, jid)
   redis.call('set', 'printline', jid .. ' is releasing lock on ' .. self.id)
   self.locks.remove(jid)
-
-  redis.call('set', 'printline', 'retrieving next job from pending on ' .. self.id)
-  local next_jid = unpack(self:pending_pop(0, 0))
-  if next_jid then
-    local job = Qless.job(next_jid):data()
-    local queue_obj = Qless.queue(job.queue)
-    queue_obj.throttled.remove(job.jid)
-    queue_obj.work.add(now, job.priority, job.jid)
-  end
 end
 
 function QlessThrottle:lock_pop(min, max)
