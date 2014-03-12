@@ -811,19 +811,26 @@ end
 function QlessJob:acquire_throttles(now)
   local throttles = cjson.decode(redis.call('hget', QlessJob.ns .. self.jid, 'throttles'))
 
-  local acquired_all = true
-  local acquired_throttles = {}
+  local all_locks_available = true
+
+  redis.call('set', 'printline', 'QlessJob:acquire_throttles - ' .. self.jid .. ' - checking availability')
   for _, tid in ipairs(throttles) do
-    acquired_all = acquired_all and Qless.throttle(tid):acquire(self.jid)
-    table.insert(acquired_throttles, tid)
+    redis.call('set', 'printline', 'QlessJob:acquire_throttles - ' .. self.jid .. ' - checking availability for ' .. tid)
+    all_locks_available = all_locks_available and Qless.throttle(tid):available()
+    redis.call('set', 'printline', 'QlessJob:acquire_throttles - ' .. self.jid .. ' - throttle available ' .. tid)
   end
 
-  if not acquired_all then
-    redis.call('set', 'printline', 'rolling back acquired locks')
-    for _, tid in ipairs(acquired_throttles) do
-      Qless.throttle(tid):rollback_acquire(self.jid)
-    end
+  redis.call('set', 'printline', 'QlessJob:acquire_throttles - ' .. self.jid .. ' - short circuit if we can not acquire locks ' .. tostring(all_locks_available))
+  if not all_locks_available then
+    return false
   end
 
-  return acquired_all
+  redis.call('set', 'printline', 'QlessJob:acquire_throttles - grabbing locks')
+  redis.call('set', 'printline', 'QlessJob:acquire_throttles - inside if')
+  for _, tid in ipairs(throttles) do
+    redis.call('set', 'printline', 'QlessJob:acquire_throttles - invoking QlessThrottle:acquire')
+    Qless.throttle(tid):acquire(self.jid)
+  end
+  redis.call('set', 'printline', 'QlessJob:acquire_throttles - successfully completed')
+  return true
 end

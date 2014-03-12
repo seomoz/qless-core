@@ -79,19 +79,21 @@ function Qless.queue(name)
 
 
   -- Access to the queue level throttled jobs.
-  -- We delegate down to a throttle here for the general queue methods.
-  local queue_throttle = Qless.throttle(QlessQueue.ns .. name)
   queue.throttled = {
-    peek = function(now, offset, count)
-      return queue_throttle.pending.peek(offset, count)
-    end, add = function(now, jid)
-      return queue_throttle.pending.add(jid)
+    length = function()
+      return (redis.call('zcard', queue:prefix('throttled')) or 0)
+    end, peek = function(now, min, max)
+      return redis.call('zrange', queue:prefix('throttled'), min, max)
+    end, add = function(...)
+      if #arg > 0 then
+        redis.call('zadd', queue:prefix('throttled'), unpack(arg))
+      end
     end, remove = function(...)
       if #arg > 0 then
-        return queue_throttle.pending.remove(unpack(arg))
+        return redis.call('zrem', queue:prefix('throttled'), unpack(arg))
       end
-    end, length = function()
-      return queue_throttle.pending.length()
+    end, pop = function(min, max)
+      return redis.call('zremrangebyrank', queue:prefix('throttled'), min, max)
     end
   }
 
@@ -311,6 +313,7 @@ function QlessQueue:pop(now, worker, count)
     table.insert(popped, jid)
   end
 
+  -- if queue is at max capacity don't pop any further jobs.
   if not Qless.throttle(QlessQueue.ns .. self.name):available() then
     return popped
   end
@@ -336,14 +339,15 @@ function QlessQueue:pop(now, worker, count)
   -- With these in place, we can expand this list of jids based on the work
   -- queue itself and the priorities therein
   local jids = self.work.peek(count - #dead_jids) or {}
-
+  redis.call('set', 'printline', 'Pop - before acquire')
   for index, jid in ipairs(jids) do
     local job = Qless.job(jid)
     if job:acquire_throttles(now) then
       self:pop_job(now, worker, job)
       table.insert(popped, jid)
     else
-      job:history(now, 'throttled', {worker = worker})
+      redis.call('set', 'printline', 'QlessQueue:pop - throttling ' .. job.jid)
+      self:throttle(now, job)
     end
   end
 
@@ -352,6 +356,19 @@ function QlessQueue:pop(now, worker, count)
   self.work.remove(unpack(jids))
 
   return popped
+end
+
+-- Throttle a job
+function QlessQueue:throttle(now, job)
+  self.throttled.add(now, job.jid)
+  redis.call('set', 'printline', 'QlessQueue:throttle - get state')
+  local state = unpack(job:data('state'))
+  redis.call('set', 'printline', 'QlessQueue:throttle - check state')
+  if state ~= 'throttled' then
+    redis.call('set', 'printline', 'QlessQueue:throttle - update job')
+    job:update({state = 'throttled'})
+    job:history(now, 'throttled', {queue = self.name})
+  end
 end
 
 function QlessQueue:pop_job(now, worker, job)
@@ -865,6 +882,7 @@ function QlessQueue:check_throttled(now, count)
   for _, jid in ipairs(throttled) do
     local priority = tonumber(redis.call('hget', QlessJob.ns .. jid, 'priority') or 0)
     self.work.add(now, priority, jid)
+    self.throttled.remove(jid)
     redis.call('hset', QlessJob.ns .. jid, 'state', 'waiting')
   end
 end

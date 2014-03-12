@@ -276,7 +276,7 @@ class TestThrottles(TestQless):
     self.assertEqual(self.lua('throttle.locks', 4, 'wid'), ['jid1'])
     self.assertEqual(self.lua('throttle.locks', 5, 'tid'), [])
     self.assertEqual(self.lua('throttle.locks', 6, 'ql:q:queue'), ['jid1'])
-    self.assertEqual(self.lua('get', 7, 'jid2')['state'], 'waiting')
+    self.assertEqual(self.lua('get', 7, 'jid2')['state'], 'throttled')
 
   def test_release_throttles_after_acquisition_on_completion(self):
     '''Can acquire locks for all throttles and then release them when complete'''
