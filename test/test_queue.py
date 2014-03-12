@@ -143,7 +143,8 @@ class TestQueue(TestQless):
         'running': 0,
         'depends': 0,
         'scheduled': 0,
-        'recurring': 0
+        'recurring': 0,
+        'throttled': 0
     }
 
     def setUp(self):
@@ -160,6 +161,18 @@ class TestQueue(TestQless):
         expires = job['expires'] + 10
         self.assertEqual(self.lua('queues', expires, 'queue'), expected)
         self.assertEqual(self.lua('queues', expires), [expected])
+
+    def test_throttled(self):
+        '''Discern throttled job counts correctly'''
+        expected = dict(self.expected)
+        expected['throttled'] = 1
+        expected['running'] = 1
+        self.lua('throttle.set', 0, 'ql:q:queue', 1)
+        self.lua('put', 1, 'worker', 'queue', 'jid1', 'klass', {}, 0)
+        self.lua('put', 2, 'worker', 'queue', 'jid2', 'klass', {}, 0)
+        self.lua('pop', 3, 'queue', 'worker', 10)
+        self.assertEqual(self.lua('queues', 4, 'queue'), expected)
+        self.assertEqual(self.lua('queues', 5), [expected])
 
     def test_waiting(self):
         '''Discern waiting job counts correctly'''
