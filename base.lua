@@ -82,7 +82,7 @@ function Qless.throttle(tid)
 
   -- set of jids which have acquired a lock on this throttle.
   throttle.locks = {
-    count = function()
+    length = function()
       return (redis.call('zcard', QlessThrottle.ns .. tid .. '-locks') or 0)
     end, members = function()
       return redis.call('zrange', QlessThrottle.ns .. tid .. '-locks', 0, -1)
@@ -101,7 +101,7 @@ function Qless.throttle(tid)
 
   -- set of jids waiting on this throttle to become available.
   throttle.pending = {
-    count = function()
+    length = function()
       return (redis.call('zcard', QlessThrottle.ns .. tid .. '-pending') or 0)
     end, members = function()
       return redis.call('zrange', QlessThrottle.ns .. tid .. '-pending', 0, -1)

@@ -77,18 +77,21 @@ function Qless.queue(name)
     end
   }
 
-  -- Access to our throttled jobs
+
+  -- Access to the queue level throttled jobs.
+  -- We delegate down to a throttle here for the general queue methods.
+  local queue_throttle = Qless.throttle(QlessQueue.ns .. name)
   queue.throttled = {
     peek = function(now, offset, count)
-      return redis.call('zrange', queue:prefix('throttled'), offset, offset + count - 1)
+      return queue_throttle.pending.peek(offset, count)
     end, add = function(now, jid)
-      redis.call('zadd', queue:prefix('throttled'), now, jid)
+      return queue_throttle.pending.add(jid)
     end, remove = function(...)
       if #arg > 0 then
-        return redis.call('zrem', queue:prefix('throttled'), unpack(arg))
+        return queue_throttle.pending.remove(unpack(arg))
       end
     end, length = function()
-      return redis.call('zcard', queue:prefix('throttled'))
+      return queue_throttle.pending.length()
     end
   }
 
@@ -313,6 +316,11 @@ function QlessQueue:pop(now, worker, count)
   -- insert them to ensure correctness when pulling off the next
   -- unit of work.
   self:check_scheduled(now, count - #dead_jids)
+
+  -- If we still need values in order to meet the demand, check our throttled
+  -- jobs. This has the side benefit of naturally updating other throttles
+  -- on the jobs checked.
+  self:check_throttled(now, count - #dead_jids)
 
   -- With these in place, we can expand this list of jids based on the work
   -- queue itself and the priorities therein
@@ -847,6 +855,16 @@ function QlessQueue:check_scheduled(now, count)
 
     -- We should also update them to have the state 'waiting'
     -- instead of 'scheduled'
+    redis.call('hset', QlessJob.ns .. jid, 'state', 'waiting')
+  end
+end
+
+function QlessQueue:check_throttled(now, count)
+  local throttled = self.throttled.peek(now, 0, count)
+  for _, jid in ipairs(throttled) do
+    local priority = tonumber(redis.call('hget', QlessJob.ns .. jid, 'priority') or 0)
+    self.work.add(now, priority, jid)
+    self.throttled.remove(jid)
     redis.call('hset', QlessJob.ns .. jid, 'state', 'waiting')
   end
 end
