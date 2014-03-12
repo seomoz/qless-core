@@ -40,6 +40,11 @@ function QlessThrottle:acquire(jid)
 end
 
 -- Rolls back an attempted lock acquisition.
+-- Since jobs can acquire multiple locks and the acquire
+-- behavior is to either add them to the lock or pend them
+-- this method handles the rolling back an acquired lock
+-- on a job that failed to acquire all of its locks.
+-- without placing another pending job into the queue.
 function QlessThrottle:rollback_acquire(jid)
   self.locks.remove(jid)
   self.pending.add(1, jid)
@@ -52,10 +57,10 @@ end
 -- the job will be moved from the throttled
 -- queue into the work queue
 function QlessThrottle:release(now, jid)
-  --redis.call('set', 'printline', jid .. ' is releasing lock on ' .. self.id)
+  redis.call('set', 'printline', jid .. ' is releasing lock on ' .. self.id)
   self.locks.remove(jid)
 
-  --redis.call('set', 'printline', 'retrieving next job from pending on ' .. self.id)
+  redis.call('set', 'printline', 'retrieving next job from pending on ' .. self.id)
   local next_jid = unpack(self:pending_pop(0, 0))
   if next_jid then
     local job = Qless.job(next_jid):data()
