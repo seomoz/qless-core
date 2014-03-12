@@ -25,7 +25,7 @@ QlessJob.__index = QlessJob
 
 -- throttle forward declaration
 local QlessThrottle = {
-  ns = Qless.ns .. 't:'
+  ns = Qless.ns .. 'th:'
 }
 QlessThrottle.__index = QlessThrottle
 

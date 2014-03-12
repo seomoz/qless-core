@@ -8,20 +8,24 @@ class TestThrottle(TestQless):
   '''Test setting throttle data'''
   def test_set(self):
     self.lua('throttle.set', 0, 'tid', 5)
-    self.assertEqual(self.redis.hmget('ql:t:tid', 'id')[0], 'tid')
-    self.assertEqual(self.redis.hmget('ql:t:tid', 'maximum')[0], '5')
+    self.assertEqual(self.redis.hmget('ql:th:tid', 'id')[0], 'tid')
+    self.assertEqual(self.redis.hmget('ql:th:tid', 'maximum')[0], '5')
 
   '''Test retrieving throttle data'''
   def test_get(self):
-    self.redis.hmset('ql:t:tid', {'id': 'tid', 'maximum' : 5})
+    self.redis.hmset('ql:th:tid', {'id': 'tid', 'maximum' : 5})
     self.assertEqual(self.lua('throttle.get', 0, 'tid'), {'id' : 'tid', 'maximum' : 5})
+
+  '''Test retrieving uninitiailized throttle data'''
+  def test_get(self):
+    self.assertEqual(self.lua('throttle.get', 0, 'tid'), {'id' : 'tid', 'maximum' : 0})
 
   '''Test deleting the throttle data'''
   def test_delete(self):
     self.lua('throttle.set', 0, 'tid', 5)
     self.assertEqual(self.lua('throttle.get', 0, 'tid'), {'id' : 'tid', 'maximum' : 5})
     self.lua('throttle.delete', 0, 'tid')
-    self.assertEqual(self.lua('throttle.get', 0, 'tid'), None)
+    self.assertEqual(self.lua('throttle.get', 0, 'tid'), {'id' : 'tid', 'maximum' : 0})
 
 class TestAcquire(TestQless):
   '''Test that a job has a default queue throttle'''

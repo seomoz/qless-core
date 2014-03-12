@@ -1,9 +1,9 @@
 -- Retrieve the data fro a throttled resource
 function QlessThrottle:data()
   local throttle = redis.call('hmget', QlessThrottle.ns .. self.id, 'id', 'maximum')
-  -- Return nil if we haven't found it
+  -- Return default if it doesn't exist
   if not throttle[1] then
-    return nil
+    return {id = self.id, maximum = 0}
   end
 
   local data = {
