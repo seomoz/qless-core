@@ -45,6 +45,6 @@ end
 
 -- Returns true if the throttle has locks available, false otherwise.
 function QlessThrottle:available()
-  redis.call('set', 'printline', 'available ' .. self.maximum .. ' == 0 or ' .. self.locks.length() .. ' < ' .. self.maximum)
+  redis.call('set', 'printline', self.id .. ' available ' .. self.maximum .. ' == 0 or ' .. self.locks.length() .. ' < ' .. self.maximum)
   return self.maximum == 0 or self.locks.length() < self.maximum
 end

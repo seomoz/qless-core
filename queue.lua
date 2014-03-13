@@ -318,6 +318,7 @@ function QlessQueue:pop(now, worker, count)
     return popped
   end
 
+  redis.call('set', 'printline', 'dead_jids : ' .. tostring(#dead_jids))
   -- Now we've checked __all__ the locks for this queue the could
   -- have expired, and are no more than the number requested.
 
@@ -339,10 +340,10 @@ function QlessQueue:pop(now, worker, count)
   -- With these in place, we can expand this list of jids based on the work
   -- queue itself and the priorities therein
   local jids = self.work.peek(count - #dead_jids) or {}
-  redis.call('set', 'printline', 'Pop - before acquire')
+
   for index, jid in ipairs(jids) do
     local job = Qless.job(jid)
-    if job:acquire_throttles(now) then
+    if job:throttles_acquire(now) then
       self:pop_job(now, worker, job)
       table.insert(popped, jid)
     else
@@ -879,16 +880,24 @@ end
 
 function QlessQueue:check_throttled(now, count)
   if count == 0 then
+    redis.call('set', 'printline', 'count 0 not popping any throttled jobs')
     return
   end
 
   -- minus 1 since its inclusive
   local throttled = self.throttled.peek(now, 0, count - 1)
+  redis.call('set', 'printline', 'throttling the following jobs ' .. cjson.encode(throttled))
   for _, jid in ipairs(throttled) do
-    local priority = tonumber(redis.call('hget', QlessJob.ns .. jid, 'priority') or 0)
-    self.work.add(now, priority, jid)
     self.throttled.remove(jid)
-    redis.call('hset', QlessJob.ns .. jid, 'state', 'waiting')
+    if Qless.job(jid):throttles_available() then
+      local priority = tonumber(redis.call('hget', QlessJob.ns .. jid, 'priority') or 0)
+      self.work.add(now, priority, jid)
+      self.throttled.remove(jid)
+    else
+      -- shift jid to end of throttled jobs
+      -- use current time to make sure it gets added to the end of the sorted set.
+      self.throttled.add(now, jid)
+    end
   end
 end
 
@@ -976,7 +985,7 @@ function QlessQueue:invalidate_locks(now, count)
         local queue = job_data['queue']
         local group = 'failed-retries-' .. queue
 
-        job:release_throttles(now)
+        job:throttles_release(now)
 
         job:history(now, 'failed', {group = group})
         redis.call('hmset', QlessJob.ns .. jid, 'state', 'failed',

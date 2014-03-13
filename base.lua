@@ -99,26 +99,6 @@ function Qless.throttle(tid)
     end
   }
 
-  -- set of jids waiting on this throttle to become available.
-  -- throttle.pending = {
-  --   length = function()
-  --     return (redis.call('zcard', QlessThrottle.ns .. tid .. '-pending') or 0)
-  --   end, members = function()
-  --     return redis.call('zrange', QlessThrottle.ns .. tid .. '-pending', 0, -1)
-  --   end, peek = function(min, max)
-  --     return redis.call('zrange', QlessThrottle.ns .. tid .. '-pending', min, max)
-  --   end, add = function(...)
-  --     if #arg > 0 then
-  --       redis.call('zadd', QlessThrottle.ns .. tid .. '-pending', unpack(arg))
-  --     end
-  --   end, remove = function(...)
-  --     if #arg > 0 then
-  --       return redis.call('zrem', QlessThrottle.ns .. tid .. '-pending', unpack(arg))
-  --     end
-  --   end, pop = function(min, max)
-  --     return redis.call('zremrangebyrank', QlessThrottle.ns .. tid .. '-pending', min, max)
-  --   end
-  -- }
   return throttle
 end
 
@@ -437,7 +417,7 @@ function Qless.cancel(now, ...)
         queue.depends.remove(jid)
       end
 
-      Qless.job(namespaced_jid):release_throttles(now)
+      Qless.job(namespaced_jid):throttles_release(now)
 
       -- We should probably go through all our dependencies and remove
       -- ourselves from the list of dependents
