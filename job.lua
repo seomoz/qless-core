@@ -816,13 +816,11 @@ function QlessJob:acquire_throttles(now)
   redis.call('set', 'printline', 'QlessJob:acquire_throttles - ' .. self.jid .. ' - checking availability')
   for _, tid in ipairs(throttles) do
     redis.call('set', 'printline', 'QlessJob:acquire_throttles - ' .. self.jid .. ' - checking availability for ' .. tid)
-    all_locks_available = all_locks_available and Qless.throttle(tid):available()
+    if not Qless.throttle(tid):available() then
+      redis.call('set', 'printline', 'QlessJob:acquire_throttles - ' .. self.jid .. ' - short circuit if we can not acquire locks ' .. tostring(all_locks_available))
+      return false
+    end
     redis.call('set', 'printline', 'QlessJob:acquire_throttles - ' .. self.jid .. ' - throttle available ' .. tid)
-  end
-
-  redis.call('set', 'printline', 'QlessJob:acquire_throttles - ' .. self.jid .. ' - short circuit if we can not acquire locks ' .. tostring(all_locks_available))
-  if not all_locks_available then
-    return false
   end
 
   redis.call('set', 'printline', 'QlessJob:acquire_throttles - grabbing locks')
