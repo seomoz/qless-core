@@ -832,7 +832,7 @@ end
 function QlessJob:throttles()
   -- memoize throttles for the job.
   if not self._throttles then
-    self._throttles = cjson.decode(redis.call('hget', QlessJob.ns .. self.jid, 'throttles'))
+    self._throttles = cjson.decode(redis.call('hget', QlessJob.ns .. self.jid, 'throttles') or '[]')
   end
 
   return self._throttles
