@@ -878,11 +878,12 @@ function QlessQueue:check_scheduled(now, count)
 end
 
 function QlessQueue:check_throttled(now, count)
-  if count == 0
+  if count == 0 then
     return
   end
-  
-  local throttled = self.throttled.peek(now, 0, count)
+
+  -- minus 1 since its inclusive
+  local throttled = self.throttled.peek(now, 0, count - 1)
   for _, jid in ipairs(throttled) do
     local priority = tonumber(redis.call('hget', QlessJob.ns .. jid, 'priority') or 0)
     self.work.add(now, priority, jid)
