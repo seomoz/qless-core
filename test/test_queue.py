@@ -1,7 +1,7 @@
 '''Test the queue functionality'''
 
 from common import TestQless
-
+import code
 
 class TestJobs(TestQless):
     '''We should be able to list jobs in various states for a given queue'''
@@ -677,3 +677,12 @@ class TestPop(TestQless):
         self.lua('pop', 7, 'queue', 'worker', 1)
         self.assertEqual(self.lua('throttle.locks', 8, 'ql:q:queue'), ['jid2'])
         self.assertEqual(self.lua('jobs', 9, 'throttled', 'queue'), [])
+
+    def test_throttled_additional_put(self):
+        '''put should attempt to throttle the job immediately'''
+        self.lua('throttle.set', 0, 'ql:q:queue', 1)
+        self.lua('put', 0, 'worker', 'queue', 'jid1', 'klass', {}, 0)
+        self.lua('pop', 1, 'queue', 'worker', 1)
+        self.lua('put', 2, 'worker', 'queue', 'jid2', 'klass', {}, 0)
+        self.assertEqual(self.lua('throttle.locks', 3, 'ql:q:queue'), ['jid1'])
+        self.assertEqual(self.lua('jobs', 4, 'throttled', 'queue'), ['jid2'])

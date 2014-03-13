@@ -631,9 +631,14 @@ function QlessQueue:put(now, worker, jid, klass, raw_data, delay, ...)
       self.scheduled.add(now + delay, jid)
     end
   else
+    -- to avoid false negatives when popping jobs check if the job should be
+    -- throttled immediately.
+    local job = Qless.job(jid)
     if redis.call('scard', QlessJob.ns .. jid .. '-dependencies') > 0 then
       self.depends.add(now, jid)
       redis.call('hset', QlessJob.ns .. jid, 'state', 'depends')
+    elseif not job:throttles_available() then
+      self:throttle(now, job)
     else
       self.work.add(now, priority, jid)
     end
