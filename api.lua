@@ -202,7 +202,7 @@ QlessAPI['queue.throttle.get'] = function(now, queue)
 end
 
 QlessAPI['queue.throttle.set'] = function(now, queue, max)
-  Qless.throttle(QlessQueue.ns .. queue):set({maximum = max})
+  Qless.throttle(QlessQueue.ns .. queue):set({maximum = max}, 0)
 end
 
 -- Throttle apis
