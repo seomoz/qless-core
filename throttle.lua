@@ -14,8 +14,11 @@ function QlessThrottle:data()
 end
 
 -- Set the data for a throttled resource
-function QlessThrottle:set(data)
+function QlessThrottle:set(data, expiration)
   redis.call('hmset', QlessThrottle.ns .. self.id, 'id', self.id, 'maximum', data.maximum)
+  if expiration > 0 then
+    redis.call('expire', QlessThrottle.ns .. self.id, expiration)
+  end
 end
 
 -- Delete a throttled resource

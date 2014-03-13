@@ -7,9 +7,15 @@ from common import TestQless
 class TestThrottle(TestQless):
   '''Test setting throttle data'''
   def test_set(self):
-    self.lua('throttle.set', 0, 'tid', 5)
+    self.lua('throttle.set', 0, 'tid', 5, 0)
     self.assertEqual(self.redis.hmget('ql:th:tid', 'id')[0], 'tid')
     self.assertEqual(self.redis.hmget('ql:th:tid', 'maximum')[0], '5')
+    self.assertEqual(self.redis.ttl('ql:th:tid'), None)
+
+  '''Test setting a expiring throttle'''
+  def test_set_with_expiration(self):
+    self.lua('throttle.set', 0, 'tid', 5, 1000)
+    self.assertNotEqual(self.redis.ttl('ql:th:tid'), None)
 
   '''Test retrieving throttle data'''
   def test_get(self):

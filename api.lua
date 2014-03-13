@@ -206,11 +206,12 @@ QlessAPI['queue.throttle.set'] = function(now, queue, max)
 end
 
 -- Throttle apis
-QlessAPI['throttle.set'] = function(now, tid, max)
+QlessAPI['throttle.set'] = function(now, tid, max, ...)
+  local expiration = unpack(arg)
   local data = {
     maximum = max
   }
-  Qless.throttle(tid):set(data)
+  Qless.throttle(tid):set(data, tonumber(expiration or 0))
 end
 
 QlessAPI['throttle.get'] = function(now, tid)
