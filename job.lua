@@ -803,20 +803,15 @@ function QlessJob:throttles_release(now)
   throttles = cjson.decode(throttles or '{}')
 
   for _, tid in ipairs(throttles) do
-    redis.call('set', 'printline', 'releasing throttle : ' .. tid)
     Qless.throttle(tid):release(now, self.jid)
   end
 end
 
 function QlessJob:throttles_available()
-  redis.call('set', 'printline', 'QlessJob:throttles_available - ' .. self.jid .. ' - checking throttle availability')
   for _, tid in ipairs(self:throttles()) do
-    redis.call('set', 'printline', 'QlessJob:throttles_available - ' .. self.jid .. ' - checking availability for ' .. tid)
     if not Qless.throttle(tid):available() then
-      redis.call('set', 'printline', 'QlessJob:throttles_available - ' .. self.jid .. ' - throttle not available ' .. tid)
       return false
     end
-    redis.call('set', 'printline', 'QlessJob:throttles_available - ' .. self.jid .. ' - throttle available ' .. tid)
   end
 
   return true
@@ -824,16 +819,13 @@ end
 
 function QlessJob:throttles_acquire(now)
   if not self:throttles_available() then
-    redis.call('set', 'printline', 'QlessJob:acquire_throttles - ' .. self.jid .. ' - throttles not avaible')
     return false
   end
 
   for _, tid in ipairs(self:throttles()) do
-    redis.call('set', 'printline', 'QlessJob:acquire_throttles - acquiring ' .. tid)
     Qless.throttle(tid):acquire(self.jid)
   end
 
-  redis.call('set', 'printline', 'QlessJob:acquire_throttles - throttles avaible')
   return true
 end
 

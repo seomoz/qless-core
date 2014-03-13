@@ -318,7 +318,6 @@ function QlessQueue:pop(now, worker, count)
     return popped
   end
 
-  redis.call('set', 'printline', 'dead_jids : ' .. tostring(#dead_jids))
   -- Now we've checked __all__ the locks for this queue the could
   -- have expired, and are no more than the number requested.
 
@@ -347,7 +346,6 @@ function QlessQueue:pop(now, worker, count)
       self:pop_job(now, worker, job)
       table.insert(popped, jid)
     else
-      redis.call('set', 'printline', 'QlessQueue:pop - throttling ' .. job.jid)
       self:throttle(now, job)
     end
   end
@@ -362,11 +360,8 @@ end
 -- Throttle a job
 function QlessQueue:throttle(now, job)
   self.throttled.add(now, job.jid)
-  redis.call('set', 'printline', 'QlessQueue:throttle - get state')
   local state = unpack(job:data('state'))
-  redis.call('set', 'printline', 'QlessQueue:throttle - check state')
   if state ~= 'throttled' then
-    redis.call('set', 'printline', 'QlessQueue:throttle - update job')
     job:update({state = 'throttled'})
     job:history(now, 'throttled', {queue = self.name})
   end
@@ -498,7 +493,6 @@ function QlessQueue:put(now, worker, jid, klass, raw_data, delay, ...)
   local throttles = assert(cjson.decode(options['throttles'] or '[]'),
     'Put(): Arg "throttles" not JSON array: ' .. tostring(options['throttles']))
 
-  redis.call('set', 'printline', 'throttles : ' .. tostring(options['throttles']))
   -- If the job has old dependencies, determine which dependencies are
   -- in the new dependencies but not in the old ones, and which are in the
   -- old ones but not in the new
@@ -796,7 +790,6 @@ function QlessQueue:check_recurring(now, count)
     -- we need to keep putting jobs on the queue
     local r = redis.call('hmget', 'ql:r:' .. jid, 'klass', 'data', 'priority',
         'tags', 'retries', 'interval', 'backlog', 'throttles')
-    redis.call('set', 'printline', cjson.encode(r))
     local klass, data, priority, tags, retries, interval, backlog, throttles = unpack(
       redis.call('hmget', 'ql:r:' .. jid, 'klass', 'data', 'priority',
         'tags', 'retries', 'interval', 'backlog', 'throttles'))
@@ -885,13 +878,11 @@ end
 
 function QlessQueue:check_throttled(now, count)
   if count == 0 then
-    redis.call('set', 'printline', 'count 0 not popping any throttled jobs')
     return
   end
 
   -- minus 1 since its inclusive
   local throttled = self.throttled.peek(now, 0, count - 1)
-  redis.call('set', 'printline', 'throttling the following jobs ' .. cjson.encode(throttled))
   for _, jid in ipairs(throttled) do
     self.throttled.remove(jid)
     if Qless.job(jid):throttles_available() then
