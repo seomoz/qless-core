@@ -172,8 +172,7 @@ class TestWorker(TestQless):
         '''When retried, it removes a job from the worker's data'''
         self.lua('put', 0, 'worker', 'queue', 'jid', 'klass', {}, 0)
         self.lua('pop', 0, 'queue', 'worker', 10)
-        self.lua(
-            'retry', 0, 'jid', 'queue', 'worker', 0)
+        self.lua('retry', 0, 'jid', 'queue', 'worker', 0)
         self.assertEqual(self.lua('workers', 3600, 'worker'), {
             'jobs': {},
             'stalled': {}

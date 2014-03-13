@@ -134,6 +134,7 @@ class TestComplete(TestQless):
             'state': 'complete',
             'tags': {},
             'tracked': False,
+            'throttles': ['ql:q:queue'],
             'worker': u''})
 
     def test_advance(self):
@@ -251,3 +252,66 @@ class TestCancel(TestQless):
         self.lua('pop', 2, 'queue', 'worker', 10)
         self.lua('cancel', 3, 'jid')
         self.assertEqual(self.lua('get', 4, 'jid'), None)
+
+
+class TestThrottles(TestQless):
+  '''Acquiring and releasing throttles'''
+  def test_acquire_throttles_acquires_all_throttles(self):
+    '''Can acquire locks for all throttles'''
+    # Should have throttles for queue and named throttles
+    self.lua('put', 0, 'worker', 'queue', 'jid', 'klass', {}, 0, 'throttles', ['tid', 'wid'])
+    self.lua('pop', 0, 'queue', 'worker', 1)
+    self.assertEqual(self.lua('throttle.locks', 0, 'tid'), ['jid'])
+    self.assertEqual(self.lua('throttle.locks', 0, 'wid'), ['jid'])
+    self.assertEqual(self.lua('throttle.locks', 0, 'ql:q:queue'), ['jid'])
+
+  def test_release_throttles_on_acquisition_failure(self):
+    '''Cancels locked throttles if locks can not be obtained for all locks'''
+    # Should have throttles for queue and named throttles
+    self.lua('throttle.set', 0, 'wid', 1)
+    self.lua('put', 1, 'worker', 'queue', 'jid1', 'klass', {}, 0, 'throttles', ['wid'])
+    self.lua('put', 2, 'worker', 'queue', 'jid2', 'klass', {}, 0, 'throttles', ['tid', 'wid'])
+    self.lua('pop', 3, 'queue', 'worker', 2)
+    self.assertEqual(self.lua('throttle.locks', 4, 'wid'), ['jid1'])
+    self.assertEqual(self.lua('throttle.locks', 5, 'tid'), [])
+    self.assertEqual(self.lua('throttle.locks', 6, 'ql:q:queue'), ['jid1'])
+    self.assertEqual(self.lua('get', 7, 'jid2')['state'], 'throttled')
+
+  def test_release_throttles_after_acquisition_on_completion(self):
+    '''Can acquire locks for all throttles and then release them when complete'''
+    # Should have throttles for queue and named throttles
+    self.lua('put', 0, 'worker', 'queue', 'jid', 'klass', {}, 0, 'throttles', ['tid', 'wid'])
+    self.lua('pop', 0, 'queue', 'worker', 1)
+    self.assertEqual(self.lua('throttle.locks', 0, 'tid'), ['jid'])
+    self.assertEqual(self.lua('throttle.locks', 0, 'wid'), ['jid'])
+    self.assertEqual(self.lua('throttle.locks', 0, 'ql:q:queue'), ['jid'])
+    self.lua('complete', 0, 'jid', 'worker', 'queue', {})
+    self.assertEqual(self.lua('throttle.locks', 0, 'tid'), [])
+    self.assertEqual(self.lua('throttle.locks', 0, 'wid'), [])
+    self.assertEqual(self.lua('throttle.locks', 0, 'ql:q:queue'), [])
+
+  def test_release_throttles_after_acquisition_on_retry(self):
+    '''Can acquire locks for all throttles and then release them on retry'''
+    # Should have throttles for queue and named throttles
+    self.lua('put', 0, 'worker', 'queue', 'jid', 'klass', {}, 0, 'throttles', ['tid', 'wid'])
+    self.lua('pop', 0, 'queue', 'worker', 1)
+    self.assertEqual(self.lua('throttle.locks', 0, 'tid'), ['jid'])
+    self.assertEqual(self.lua('throttle.locks', 0, 'wid'), ['jid'])
+    self.assertEqual(self.lua('throttle.locks', 0, 'ql:q:queue'), ['jid'])
+    self.lua('retry', 0, 'jid', 'queue', 'worker', 0, 'retry', 'retrying')
+    self.assertEqual(self.lua('throttle.locks', 0, 'tid'), [])
+    self.assertEqual(self.lua('throttle.locks', 0, 'wid'), [])
+    self.assertEqual(self.lua('throttle.locks', 0, 'ql:q:queue'), [])
+
+  def test_release_throttles_after_acquisition_on_fail(self):
+    '''Can acquire locks for all throttles and then release them on failure'''
+    # Should have throttles for queue and named throttles
+    self.lua('put', 0, 'worker', 'queue', 'jid', 'klass', {}, 0, 'throttles', ['tid', 'wid'])
+    self.lua('pop', 0, 'queue', 'worker', 1)
+    self.assertEqual(self.lua('throttle.locks', 0, 'tid'), ['jid'])
+    self.assertEqual(self.lua('throttle.locks', 0, 'wid'), ['jid'])
+    self.assertEqual(self.lua('throttle.locks', 0, 'ql:q:queue'), ['jid'])
+    self.lua('fail', 0, 'jid', 'worker', 'queue', {})
+    self.assertEqual(self.lua('throttle.locks', 0, 'tid'), [])
+    self.assertEqual(self.lua('throttle.locks', 0, 'wid'), [])
+    self.assertEqual(self.lua('throttle.locks', 0, 'ql:q:queue'), [])

@@ -260,9 +260,10 @@ class TestRecurring(TestQless):
             'state': 'running',
             'tags': ['foo'],
             'tracked': False,
+            'throttles': {},
             'worker': 'worker'})
         self.lua('recur', 60, 'queue', 'jid', 'class', {'foo': 'bar'},
-            'interval', 10, 0, 'priority', 5, 'tags', ['bar'], 'retries', 5)
+            'interval', 10, 0, 'priority', 5, 'tags', ['bar'], 'retries', 5, 'throttles', ['lala'])
         self.assertEqual(self.lua('pop', 60, 'queue', 'worker', 10)[0], {
             'data': '{"foo": "bar"}',
             'dependencies': {},
@@ -280,6 +281,7 @@ class TestRecurring(TestQless):
             'state': 'running',
             'tags': ['bar'],
             'tracked': False,
+            'throttles': ['lala'],
             'worker': 'worker'})
 
     def test_rerecur_move(self):
