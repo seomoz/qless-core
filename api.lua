@@ -225,6 +225,10 @@ end
 QlessAPI['throttle.locks'] = function(now, tid)
   return Qless.throttle(tid).locks.members()
 end
+
+QlessAPI['throttle.ttl'] = function(now, tid)
+  return Qless.throttle(tid):ttl()
+end
 -------------------------------------------------------------------------------
 -- Function lookup
 -------------------------------------------------------------------------------

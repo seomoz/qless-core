@@ -46,3 +46,8 @@ end
 function QlessThrottle:available()
   return self.maximum == 0 or self.locks.length() < self.maximum
 end
+
+-- Returns the TTL of the throttle
+function QlessThrottle:ttl()
+  return redis.call('ttl', QlessThrottle.ns .. self.id)
+end

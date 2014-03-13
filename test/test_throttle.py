@@ -17,6 +17,11 @@ class TestThrottle(TestQless):
     self.lua('throttle.set', 0, 'tid', 5, 1000)
     self.assertNotEqual(self.redis.ttl('ql:th:tid'), None)
 
+  '''Test retrieving throttle ttl'''
+  def test_retrieve_ttl(self):
+    self.lua('throttle.set', 0, 'tid', 5, 1000)
+    self.assertEqual(self.lua('throttle.ttl', 1, 'tid'), self.redis.ttl('ql:th:tid'))
+
   '''Test retrieving throttle data'''
   def test_get(self):
     self.redis.hmset('ql:th:tid', {'id': 'tid', 'maximum' : 5})
