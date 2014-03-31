@@ -386,7 +386,6 @@ function Qless.cancel(now, ...)
   -- If we've made it this far, then we are good to go. We can now just
   -- remove any trace of all these jobs, as they form a dependent clique
   for _, jid in ipairs(arg) do
-    local namespaced_jid = QlessJob.ns .. jid
     -- Find any stage it's associated with and remove its from that stage
     local state, queue, failure, worker = unpack(redis.call(
       'hmget', QlessJob.ns .. jid, 'state', 'queue', 'failure', 'worker'))
@@ -411,13 +410,10 @@ function Qless.cancel(now, ...)
       -- Remove it from that queue
       if queue then
         local queue = Qless.queue(queue)
-        queue.work.remove(jid)
-        queue.locks.remove(jid)
-        queue.scheduled.remove(jid)
-        queue.depends.remove(jid)
+        queue:remove_job(jid)
       end
 
-      Qless.job(namespaced_jid):throttles_release(now)
+      Qless.job(jid):throttles_release(now)
 
       -- We should probably go through all our dependencies and remove
       -- ourselves from the list of dependents
