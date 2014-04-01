@@ -1,7 +1,6 @@
 '''Test the queue functionality'''
 
 from common import TestQless
-import code
 
 class TestJobs(TestQless):
     '''We should be able to list jobs in various states for a given queue'''
@@ -616,8 +615,7 @@ class TestPop(TestQless):
         # But as we complete the jobs, we can pop more
         for jid in xrange(5):
             self.lua('complete', 10, jid, 'worker', 'queue', {})
-            self.assertEqual(
-                len(self.lua('pop', 10, 'queue', 'worker', 10)), 1)
+            self.assertEqual(len(self.lua('pop', 10, 'queue', 'worker', 10)), 1)
 
     def test_reduce_max_concurrency(self):
         '''We can reduce max_concurrency at any time'''
@@ -651,8 +649,10 @@ class TestPop(TestQless):
         self.lua('put', 0, 'worker', 'queue', 'a', 'klass', {}, 0)
         self.lua('put', 1, 'worker', 'queue', 'b', 'klass', {}, 0)
         self.lua('pop', 2, 'queue', 'worker', 10)
-        self.lua('fail', 3, 'a', 'worker', 'group', 'message', {})
-        job = self.lua('pop', 4, 'queue', 'worker', 10)[0]
+        self.assertEqual(self.lua('throttle.locks', 3, 'ql:q:queue'), ['a'])
+        self.assertEqual(self.lua('throttle.pending', 4, 'ql:q:queue'), ['b'])
+        self.lua('fail', 5, 'a', 'worker', 'group', 'message', {})
+        job = self.lua('pop', 6, 'queue', 'worker', 10)[0]
         self.assertEqual(job['jid'], 'b')
 
     def test_throttled_added(self):
@@ -671,12 +671,17 @@ class TestPop(TestQless):
         self.lua('put', 1, 'worker', 'queue', 'jid2', 'klass', {}, 0)
         self.lua('pop', 2, 'queue', 'worker', 2)
         self.assertEqual(self.lua('throttle.locks', 3, 'ql:q:queue'), ['jid1'])
-        self.assertEqual(self.lua('jobs', 4, 'throttled', 'queue'), ['jid2'])
-        self.lua('complete', 5, 'jid1', 'worker', 'queue', {})
-        self.assertEqual(self.lua('jobs', 6, 'throttled', 'queue'), ['jid2'])
-        self.lua('pop', 7, 'queue', 'worker', 1)
-        self.assertEqual(self.lua('throttle.locks', 8, 'ql:q:queue'), ['jid2'])
-        self.assertEqual(self.lua('jobs', 9, 'throttled', 'queue'), [])
+        self.assertEqual(self.lua('throttle.pending', 4, 'ql:q:queue'), ['jid2'])
+        self.assertEqual(self.lua('jobs', 5, 'throttled', 'queue'), ['jid2'])
+        self.assertEqual(self.lua('jobs', 5, 'running', 'queue'), ['jid1'])
+        self.lua('complete', 7, 'jid1', 'worker', 'queue', {})
+        # code.interact()
+        self.assertEqual(self.lua('jobs', 8, 'throttled', 'queue'), [])
+        self.lua('pop', 10, 'queue', 'worker', 1)
+        self.assertEqual(self.lua('throttle.locks',11, 'ql:q:queue'), ['jid2'])
+        self.assertEqual(self.lua('throttle.pending', 12, 'ql:q:queue'), [])
+        self.assertEqual(self.lua('jobs', 13, 'throttled', 'queue'), [])
+        self.assertEqual(self.lua('jobs', 5, 'running', 'queue'), ['jid2'])
 
     def test_throttled_additional_put(self):
         '''put should attempt to throttle the job immediately'''

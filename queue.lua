@@ -331,11 +331,6 @@ function QlessQueue:pop(now, worker, count)
   -- unit of work.
   self:check_scheduled(now, count - #dead_jids)
 
-  -- If we still need values in order to meet the demand, check our throttled
-  -- jobs. This has the side benefit of naturally updating other throttles
-  -- on the jobs checked.
-  self:check_throttled(now, count - #dead_jids)
-
   -- With these in place, we can expand this list of jids based on the work
   -- queue itself and the priorities therein
   local jids = self.work.peek(count - #dead_jids) or {}
@@ -359,6 +354,7 @@ end
 
 -- Throttle a job
 function QlessQueue:throttle(now, job)
+  job:throttle(now)
   self.throttled.add(now, job.jid)
   local state = unpack(job:data('state'))
   if state ~= 'throttled' then
@@ -380,8 +376,7 @@ function QlessQueue:pop_job(now, worker, job)
 
   -- Update the wait time statistics
   -- Just does job:data('time') do the same as this?
-  local time = tonumber(
-    redis.call('hget', QlessJob.ns .. jid, 'time') or now)
+  local time = tonumber(redis.call('hget', QlessJob.ns .. jid, 'time') or now)
   local waiting = now - time
   self:stat(now, 'wait', waiting)
   redis.call('hset', QlessJob.ns .. jid,
@@ -878,27 +873,6 @@ function QlessQueue:check_scheduled(now, count)
     -- We should also update them to have the state 'waiting'
     -- instead of 'scheduled'
     redis.call('hset', QlessJob.ns .. jid, 'state', 'waiting')
-  end
-end
-
-function QlessQueue:check_throttled(now, count)
-  if count == 0 then
-    return
-  end
-
-  -- minus 1 since its inclusive
-  local throttled = self.throttled.peek(now, 0, count - 1)
-  for _, jid in ipairs(throttled) do
-    self.throttled.remove(jid)
-    if Qless.job(jid):throttles_available() then
-      local priority = tonumber(redis.call('hget', QlessJob.ns .. jid, 'priority') or 0)
-      self.work.add(now, priority, jid)
-      self.throttled.remove(jid)
-    else
-      -- shift jid to end of throttled jobs
-      -- use current time to make sure it gets added to the end of the sorted set.
-      self.throttled.add(now, jid)
-    end
   end
 end
 

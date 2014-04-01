@@ -96,6 +96,27 @@ function Qless.throttle(tid)
       end
     end, pop = function(min, max)
       return redis.call('zremrangebyrank', QlessThrottle.ns .. tid .. '-locks', min, max)
+    end, peek = function(min, max)
+      return redis.call('zrange', QlessThrottle.ns .. tid .. '-locks', min, max)
+    end
+  }
+
+  -- set of jids which are waiting for the throttle to become available.
+  throttle.pending = {
+    length = function()
+      return (redis.call('zcard', QlessThrottle.ns .. tid .. '-pending') or 0)
+    end, members = function()
+        return redis.call('zrange', QlessThrottle.ns .. tid .. '-pending', 0, -1)
+    end, add = function(now, jid)
+      redis.call('zadd', QlessThrottle.ns .. tid .. '-pending', now, jid)
+    end, remove = function(...)
+      if #arg > 0 then
+        return redis.call('zrem', QlessThrottle.ns .. tid .. '-pending', unpack(arg))
+      end
+    end, pop = function(min, max)
+      return redis.call('zremrangebyrank', QlessThrottle.ns .. tid .. '-pending', min, max)
+    end, peek = function(min, max)
+      return redis.call('zrange', QlessThrottle.ns .. tid .. '-pending', min, max)
     end
   }
 
