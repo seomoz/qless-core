@@ -127,9 +127,7 @@ function QlessJob:complete(now, worker, queue, data, ...)
 
   -- Remove the job from the previous queue
   local queue_obj = Qless.queue(queue)
-  queue_obj.work.remove(self.jid)
-  queue_obj.locks.remove(self.jid)
-  queue_obj.scheduled.remove(self.jid)
+  queue_obj:remove_job(self.jid)
 
   self:throttles_release(now)
 
@@ -379,9 +377,7 @@ function QlessJob:fail(now, worker, group, message, data)
   -- Now remove the instance from the schedule, and work queues for the
   -- queue it's in
   local queue_obj = Qless.queue(queue)
-  queue_obj.work.remove(self.jid)
-  queue_obj.locks.remove(self.jid)
-  queue_obj.scheduled.remove(self.jid)
+  queue_obj:remove_job(self.jid)
 
   -- The reason that this appears here is that the above will fail if the
   -- job doesn't exist
@@ -800,7 +796,7 @@ end
 
 function QlessJob:throttles_release(now)
   local throttles = redis.call('hget', QlessJob.ns .. self.jid, 'throttles')
-  throttles = cjson.decode(throttles or '{}')
+  throttles = cjson.decode(throttles or '[]')
 
   for _, tid in ipairs(throttles) do
     Qless.throttle(tid):release(now, self.jid)

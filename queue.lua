@@ -526,10 +526,7 @@ function QlessQueue:put(now, worker, jid, klass, raw_data, delay, ...)
   -- If this item was previously in another queue, then we should remove it from there
   if oldqueue then
     local queue_obj = Qless.queue(oldqueue)
-    queue_obj.work.remove(jid)
-    queue_obj.locks.remove(jid)
-    queue_obj.depends.remove(jid)
-    queue_obj.scheduled.remove(jid)
+    queue_obj:remove_job(jid)
   end
 
   -- If this had previously been given out to a worker, make sure to remove it
@@ -777,6 +774,14 @@ end
 -------------------------------------------------------------------------------
 -- Housekeeping methods
 -------------------------------------------------------------------------------
+function QlessQueue:remove_job(jid)
+  self.work.remove(jid)
+  self.locks.remove(jid)
+  self.throttled.remove(jid)
+  self.depends.remove(jid)
+  self.scheduled.remove(jid)
+end
+
 -- Instantiate any recurring jobs that are ready
 function QlessQueue:check_recurring(now, count)
   -- This is how many jobs we've moved so far

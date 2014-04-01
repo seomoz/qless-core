@@ -94,6 +94,23 @@ class TestRelease(TestQless):
     self.assertEqual(self.lua('jobs', 10, 'throttled', 'queue'), [])
 
 
+  '''Test that cancelling a job properly adds another job in the work queue'''
+  def test_on_cancel_next_job_is_moved_into_work_queue(self):
+    self.lua('throttle.set', 0, 'tid', 1)
+    self.lua('put', 0, 'worker', 'queue', 'jid1', 'klass', {}, 0, 'throttles', ['tid'])
+    self.lua('put', 1, 'worker', 'queue', 'jid2', 'klass', {}, 0, 'throttles', ['tid'])
+    self.lua('pop', 2, 'queue', 'worker', 2)
+    self.assertEqual(self.lua('throttle.locks', 3, 'tid'), ['jid1'])
+    self.assertEqual(self.lua('jobs', 4, 'throttled', 'queue'), ['jid2'])
+    self.lua('cancel', 5, 'jid1', 'worker', 'queue', {})
+    # Lock should be empty until another job is popped
+    self.assertEqual(self.lua('throttle.locks', 6, 'tid'), [])
+    self.assertEqual(self.lua('jobs', 7, 'throttled', 'queue'), ['jid2'])
+    self.lua('pop', 8, 'queue', 'worker', 1)
+    self.assertEqual(self.lua('throttle.locks', 9, 'tid'), ['jid2'])
+    self.assertEqual(self.lua('jobs', 10, 'throttled', 'queue'), [])
+
+
   '''Test that when a job completes it properly releases the lock'''
   def test_on_complete_lock_is_released(self):
     self.lua('throttle.set', 0, 'tid', 1)
