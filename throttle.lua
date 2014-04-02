@@ -44,11 +44,9 @@ end
 -- Releases the lock taken by the specified jid.
 -- number of jobs released back into the queues is determined by the locks_available method.
 function QlessThrottle:release(now, jid)
-  redis.call('set', 'printline', self.id .. ' jid : ' .. jid .. ' removed from locks')
   self.locks.remove(jid)
 
   local available_locks = self:locks_available()
-  redis.call('set', 'printline', self.id .. ' pending count ' .. self.pending.length() .. ' available_locks ' .. available_locks)
   if self.pending.length() == 0 or available_locks < 1 then
     return
   end
@@ -56,7 +54,6 @@ function QlessThrottle:release(now, jid)
   -- subtract one to ensure we pop the correct amount. peek(0, 0) returns the first element
   -- peek(0,1) return the first two.
   for _, jid in ipairs(self.pending.peek(0, available_locks - 1)) do
-    redis.call('set', 'printline', self.id .. ' adding ' .. jid .. ' to work queue')
     local job = Qless.job(jid)
     local data = job:data()
     local queue = Qless.queue(data['queue'])
@@ -68,7 +65,6 @@ function QlessThrottle:release(now, jid)
   -- subtract one to ensure we pop the correct amount. pop(0, 0) pops the first element
   -- pop(0,1) pops the first two.
   local popped = self.pending.pop(0, available_locks - 1)
-  redis.call('set', 'printline', self.id .. ' popped ' .. popped .. ' jids')
 end
 
 -- Returns true if the throttle has locks available, false otherwise.

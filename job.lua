@@ -799,7 +799,6 @@ function QlessJob:throttles_release(now)
   throttles = cjson.decode(throttles or '[]')
 
   for _, tid in ipairs(throttles) do
-    redis.call('set', 'printline', self.jid .. ' releasing throttle ' .. 'tid')
     Qless.throttle(tid):release(now, self.jid)
   end
 end
@@ -831,7 +830,6 @@ function QlessJob:throttle(now)
   for _, tid in ipairs(self:throttles()) do
     local throttle = Qless.throttle(tid)
     if not throttle:available() then
-      redis.call('set', 'printline', 'pending ' .. self.jid .. ' for throttle ' .. tid)
       throttle:pend(now, self.jid)
       return
     end

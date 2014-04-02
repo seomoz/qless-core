@@ -274,7 +274,7 @@ class TestPut(TestQless):
     '''Test putting jobs into a queue'''
     # For reference:
     #
-    #   Put(now, jid, klass, data, delay,
+    #   put(now, jid, klass, data, delay,
     #       [priority, p],
     #       [tags, t],
     #       [retries, r],
