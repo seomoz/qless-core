@@ -675,7 +675,6 @@ class TestPop(TestQless):
         self.assertEqual(self.lua('jobs', 5, 'throttled', 'queue'), ['jid2'])
         self.assertEqual(self.lua('jobs', 5, 'running', 'queue'), ['jid1'])
         self.lua('complete', 7, 'jid1', 'worker', 'queue', {})
-        # code.interact()
         self.assertEqual(self.lua('jobs', 8, 'throttled', 'queue'), [])
         self.lua('pop', 10, 'queue', 'worker', 1)
         self.assertEqual(self.lua('throttle.locks',11, 'ql:q:queue'), ['jid2'])
