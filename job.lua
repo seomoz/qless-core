@@ -139,7 +139,7 @@ function QlessJob:complete(now, worker, queue, data, ...)
   local time = tonumber(
     redis.call('hget', QlessJob.ns .. self.jid, 'time') or now)
   local waiting = now - time
-  Qless.queue(queue):stat(now, 'run', waiting)
+  queue_obj:stat(now, 'run', waiting)
   redis.call('hset', QlessJob.ns .. self.jid,
     'time', string.format("%.20f", now))
 
@@ -823,6 +823,17 @@ function QlessJob:throttles_acquire(now)
   end
 
   return true
+end
+
+-- Finds the first unavailable throttle and adds the job to its pending job set.
+function QlessJob:throttle(now)
+  for _, tid in ipairs(self:throttles()) do
+    local throttle = Qless.throttle(tid)
+    if not throttle:available() then
+      throttle:pend(now, self.jid)
+      return
+    end
+  end
 end
 
 function QlessJob:throttles()
