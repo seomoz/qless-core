@@ -111,7 +111,6 @@ class TestRelease(TestQless):
     self.assertEqual(self.lua('jobs', 15, 'throttled', 'queue'), [])
     self.assertEqual(self.lua('jobs', 16, 'running', 'queue'), ['jid2'])
 
-
   '''Test that cancelling a job properly adds another job in the work queue'''
   def test_on_cancel_next_job_is_moved_into_work_queue(self):
     self.lua('throttle.set', 0, 'tid', 1)
