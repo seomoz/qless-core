@@ -77,6 +77,18 @@ class TestRelease(TestQless):
     self.assertEqual(self.lua('throttle.locks', 0, 'tid'), [])
     self.assertEqual(self.lua('jobs', 0, 'throttled', 'queue'), [])
 
+  '''Test that releasing a pending throttled job correctly cleans up'''
+  def test_on_release_pending_job_is_removed_from_set(self):
+    self.lua('throttle.set', 0, 'tid', 1)
+    self.lua('put', 1, 'worker', 'queue', 'jid1', 'klass', {}, 0, 'throttles', ['tid'])
+    self.lua('put', 2, 'worker', 'queue', 'jid2', 'klass', {}, 0, 'throttles', ['tid'])
+    self.lua('pop', 3, 'queue', 'worker', 2)
+    self.assertEqual(self.lua('throttle.locks', 4, 'tid'), ['jid1'])
+    self.assertEqual(self.lua('throttle.pending', 5, 'tid'), ['jid2'])
+    self.lua('cancel', 6, 'jid2', 'worker', 'queue', {})
+    self.assertEqual(self.lua('throttle.locks', 7, 'tid'), ['jid1'])
+    self.assertEqual(self.lua('throttle.pending', 8, 'tid'), [])
+
   '''Test that releasing a lock properly inserts another job in the work queue'''
   def test_next_job_is_moved_into_work_qeueue(self):
     self.lua('throttle.set', 0, 'tid', 1)
@@ -119,7 +131,6 @@ class TestRelease(TestQless):
     self.assertEqual(self.lua('throttle.pending', 12, 'tid'), [])
     self.assertEqual(self.lua('jobs', 13, 'throttled', 'queue'), [])
     self.assertEqual(self.lua('jobs', 14, 'running', 'queue'), ['jid2'])
-
 
   '''Test that when a job completes it properly releases the lock'''
   def test_on_complete_lock_is_released(self):

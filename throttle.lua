@@ -45,6 +45,7 @@ end
 -- number of jobs released back into the queues is determined by the locks_available method.
 function QlessThrottle:release(now, jid)
   self.locks.remove(jid)
+  self.pending.remove(jid)
 
   local available_locks = self:locks_available()
   if self.pending.length() == 0 or available_locks < 1 then
