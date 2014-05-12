@@ -78,7 +78,7 @@ class TestRelease(TestQless):
     self.assertEqual(self.lua('jobs', 0, 'throttled', 'queue'), [])
 
   '''Test that releasing a pending throttled job correctly cleans up'''
-  def test_on_release_pending_job_is_removed_from_set(self):
+  def test_on_release_pending_job_is_removed_from_throttle(self):
     self.lua('throttle.set', 0, 'tid', 1)
     self.lua('put', 1, 'worker', 'queue', 'jid1', 'klass', {}, 0, 'throttles', ['tid'])
     self.lua('put', 2, 'worker', 'queue', 'jid2', 'klass', {}, 0, 'throttles', ['tid'])
