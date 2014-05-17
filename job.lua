@@ -37,7 +37,9 @@ function QlessJob:data(...)
     dependents   = redis.call(
       'smembers', QlessJob.ns .. self.jid .. '-dependents'),
     dependencies = redis.call(
-      'smembers', QlessJob.ns .. self.jid .. '-dependencies')
+      'smembers', QlessJob.ns .. self.jid .. '-dependencies'),
+    scheduleddate = tonumber(redis.call(
+      'zscore', 'ql:q:' .. job[4] .. '-scheduled', self.jid)) or 0
   }
 
   if #arg > 0 then
