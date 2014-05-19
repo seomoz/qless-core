@@ -642,7 +642,7 @@ function QlessQueue:recur(now, jid, klass, raw_data, spec, ...)
     local offset   = assert(tonumber(arg[2]),
       'Recur(): Arg "offset" not a number: '   .. tostring(arg[2]))
     if interval <= 0 then
-      error('Recur(): Arg "interval" must be greater than or equal to 0')
+      error('Recur(): Arg "interval" must be greater than 0')
     end
 
     -- Read in all the optional parameters. All of these must come in
