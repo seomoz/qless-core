@@ -11,7 +11,7 @@ function QlessJob:data(...)
   local job = redis.call(
       'hmget', QlessJob.ns .. self.jid, 'jid', 'klass', 'state', 'queue',
       'worker', 'priority', 'expires', 'retries', 'remaining', 'data',
-      'tags', 'failure')
+      'tags', 'failure', 'spawned_from_jid')
 
   -- Return nil if we haven't found it
   if not job[1] then
@@ -19,24 +19,25 @@ function QlessJob:data(...)
   end
 
   local data = {
-    jid          = job[1],
-    klass        = job[2],
-    state        = job[3],
-    queue        = job[4],
-    worker       = job[5] or '',
-    tracked      = redis.call(
+    jid              = job[1],
+    klass            = job[2],
+    state            = job[3],
+    queue            = job[4],
+    worker           = job[5] or '',
+    tracked          = redis.call(
       'zscore', 'ql:tracked', self.jid) ~= false,
-    priority     = tonumber(job[6]),
-    expires      = tonumber(job[7]) or 0,
-    retries      = tonumber(job[8]),
-    remaining    = math.floor(tonumber(job[9])),
-    data         = job[10],
-    tags         = cjson.decode(job[11]),
-    history      = self:history(),
-    failure      = cjson.decode(job[12] or '{}'),
-    dependents   = redis.call(
+    priority         = tonumber(job[6]),
+    expires          = tonumber(job[7]) or 0,
+    retries          = tonumber(job[8]),
+    remaining        = math.floor(tonumber(job[9])),
+    data             = job[10],
+    tags             = cjson.decode(job[11]),
+    history          = self:history(),
+    failure          = cjson.decode(job[12] or '{}'),
+    spawned_from_jid = job[13],
+    dependents       = redis.call(
       'smembers', QlessJob.ns .. self.jid .. '-dependents'),
-    dependencies = redis.call(
+    dependencies     = redis.call(
       'smembers', QlessJob.ns .. self.jid .. '-dependencies')
   }
 

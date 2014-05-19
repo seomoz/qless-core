@@ -323,7 +323,8 @@ class TestPut(TestQless):
             'state': 'waiting',
             'tags': {},
             'tracked': False,
-            'worker': u''
+            'worker': u'',
+            'spawned_from_jid': False
         })
 
     def test_data_as_array(self):
@@ -395,7 +396,8 @@ class TestPut(TestQless):
             'state': 'waiting',
             'tags': {},
             'tracked': False,
-            'worker': u''})
+            'worker': u'', 
+            'spawned_from_jid': False})
 
     def test_move_update(self):
         '''When moving, ensure data's only changed when overridden'''
@@ -463,7 +465,8 @@ class TestPeek(TestQless):
             'state': 'waiting',
             'tags': {},
             'tracked': False,
-            'worker': u''
+            'worker': u'',
+            'spawned_from_jid': False
         }])
         # With several jobs in the queue, we should be able to see more
         self.lua('put', 2, 'worker', 'foo', 'jid2', 'klass', {}, 0)
@@ -549,7 +552,8 @@ class TestPop(TestQless):
             'state': 'running',
             'tags': {},
             'tracked': False,
-            'worker': 'worker'}])
+            'worker': 'worker',
+            'spawned_from_jid': False}])
 
     def test_pop_many(self):
         '''We should be able to pop off many jobs'''

@@ -764,18 +764,19 @@ function QlessQueue:check_recurring(now, count)
       
       -- First, let's save its data
       redis.call('hmset', QlessJob.ns .. child_jid,
-        'jid'      , child_jid,
-        'klass'    , klass,
-        'data'     , data,
-        'priority' , priority,
-        'tags'     , tags,
-        'state'    , 'waiting',
-        'worker'   , '',
-        'expires'  , 0,
-        'queue'    , self.name,
-        'retries'  , retries,
-        'remaining', retries,
-        'time'     , string.format("%.20f", score))
+        'jid'             , child_jid,
+        'klass'           , klass,
+        'data'            , data,
+        'priority'        , priority,
+        'tags'            , tags,
+        'state'           , 'waiting',
+        'worker'          , '',
+        'expires'         , 0,
+        'queue'           , self.name,
+        'retries'         , retries,
+        'remaining'       , retries,
+        'time'            , string.format("%.20f", score),
+        'spawned_from_jid', jid)
       Qless.job(child_jid):history(score, 'put', {q = self.name})
       
       -- Now, if a delay was provided, and if it's in the future,
