@@ -642,7 +642,7 @@ function QlessQueue:recur(now, jid, klass, raw_data, spec, ...)
     local offset   = assert(tonumber(arg[2]),
       'Recur(): Arg "offset" not a number: '   .. tostring(arg[2]))
     if interval <= 0 then
-      error('Recur(): Arg "interval" must be greater than or equal to 0')
+      error('Recur(): Arg "interval" must be greater than 0')
     end
 
     -- Read in all the optional parameters. All of these must come in
@@ -752,35 +752,37 @@ function QlessQueue:check_recurring(now, count)
     while (score <= now) and (moved < count) do
       local count = redis.call('hincrby', 'ql:r:' .. jid, 'count', 1)
       moved = moved + 1
+
+      local child_jid = jid .. '-' .. count
       
       -- Add this job to the list of jobs tagged with whatever tags were
       -- supplied
       for i, tag in ipairs(_tags) do
-        redis.call('zadd', 'ql:t:' .. tag, now, jid .. '-' .. count)
+        redis.call('zadd', 'ql:t:' .. tag, now, child_jid)
         redis.call('zincrby', 'ql:tags', 1, tag)
       end
       
       -- First, let's save its data
-      local child_jid = jid .. '-' .. count
       redis.call('hmset', QlessJob.ns .. child_jid,
-        'jid'      , jid .. '-' .. count,
-        'klass'    , klass,
-        'data'     , data,
-        'priority' , priority,
-        'tags'     , tags,
-        'state'    , 'waiting',
-        'worker'   , '',
-        'expires'  , 0,
-        'queue'    , self.name,
-        'retries'  , retries,
-        'remaining', retries,
-        'time'     , string.format("%.20f", score))
+        'jid'             , child_jid,
+        'klass'           , klass,
+        'data'            , data,
+        'priority'        , priority,
+        'tags'            , tags,
+        'state'           , 'waiting',
+        'worker'          , '',
+        'expires'         , 0,
+        'queue'           , self.name,
+        'retries'         , retries,
+        'remaining'       , retries,
+        'time'            , string.format("%.20f", score),
+        'spawned_from_jid', jid)
       Qless.job(child_jid):history(score, 'put', {q = self.name})
       
       -- Now, if a delay was provided, and if it's in the future,
       -- then we'll have to schedule it. Otherwise, we're just
       -- going to add it to the work queue.
-      self.work.add(score, priority, jid .. '-' .. count)
+      self.work.add(score, priority, child_jid)
       
       score = score + interval
       self.recurring.add(score, jid)
