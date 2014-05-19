@@ -752,18 +752,19 @@ function QlessQueue:check_recurring(now, count)
     while (score <= now) and (moved < count) do
       local count = redis.call('hincrby', 'ql:r:' .. jid, 'count', 1)
       moved = moved + 1
+
+      local child_jid = jid .. '-' .. count
       
       -- Add this job to the list of jobs tagged with whatever tags were
       -- supplied
       for i, tag in ipairs(_tags) do
-        redis.call('zadd', 'ql:t:' .. tag, now, jid .. '-' .. count)
+        redis.call('zadd', 'ql:t:' .. tag, now, child_jid)
         redis.call('zincrby', 'ql:tags', 1, tag)
       end
       
       -- First, let's save its data
-      local child_jid = jid .. '-' .. count
       redis.call('hmset', QlessJob.ns .. child_jid,
-        'jid'      , jid .. '-' .. count,
+        'jid'      , child_jid,
         'klass'    , klass,
         'data'     , data,
         'priority' , priority,
@@ -780,7 +781,7 @@ function QlessQueue:check_recurring(now, count)
       -- Now, if a delay was provided, and if it's in the future,
       -- then we'll have to schedule it. Otherwise, we're just
       -- going to add it to the work queue.
-      self.work.add(score, priority, jid .. '-' .. count)
+      self.work.add(score, priority, child_jid)
       
       score = score + interval
       self.recurring.add(score, jid)
