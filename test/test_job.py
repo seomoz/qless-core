@@ -3,7 +3,6 @@
 import redis
 from common import TestQless
 
-
 class TestJob(TestQless):
     '''Some general jobby things'''
     def test_malformed(self):
@@ -191,12 +190,14 @@ class TestComplete(TestQless):
         self.assertEqual(self.lua('tag', 3, 'get', 'abc', 0, 0)['jobs'], ['jid'])
         self.lua('cancel', 4, 'jid', 'worker', 'queue', {})
         self.assertEqual(self.lua('tag', 5, 'get', 'abc', 0, 0)['jobs'], {})
+        self.assertEqual(self.redis.zrange('ql:tags', 0, -1), [])
         # When complete
         self.lua('put', 6, 'worker', 'queue', 'jid', 'klass', {}, 0, 'tags', ['abc'])
         self.assertEqual(self.lua('tag', 7, 'get', 'abc', 0, 0)['jobs'], ['jid'])
         self.lua('pop', 8, 'queue', 'worker', 1)
         self.lua('complete', 9, 'jid', 'worker', 'queue', {})
         self.assertEqual(self.lua('tag', 10, 'get', 'abc', 0, 0)['jobs'], {})
+        self.assertEqual(self.redis.zrange('ql:tags', 0, -1), [])
 
 class TestCancel(TestQless):
     '''Canceling jobs'''

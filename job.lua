@@ -871,7 +871,7 @@ function QlessJob:remove_tag(tag)
   -- if the score for the specified tag is 0
   -- it means we have no jobs with this tag anymore
   -- and we should remove it from the set to prevent memory leaks.
-  if score == 0 then
+  if tonumber(score) == 0 then
     redis.call('zrem', 'ql:tags', tag)
   end
 end
