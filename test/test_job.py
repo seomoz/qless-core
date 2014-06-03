@@ -183,6 +183,23 @@ class TestComplete(TestQless):
         existing = [self.lua('get', 3, jid) for jid in range(10)]
         self.assertEqual([i for i in existing if i], [])
 
+    def test_expire_complete_tags_cleared(self):
+        '''Tag's should be removed once they no longer have any jobs'''
+        # Set all jobs to expire immediately
+        self.lua('config.set', 1, 'jobs-history', -1)
+        # When cancelled
+        self.lua('put', 2, 'worker', 'queue', 'jid', 'klass', {}, 0, 'tags', ['abc'])
+        self.assertEqual(self.lua('tag', 3, 'get', 'abc', 0, 0)['jobs'], ['jid'])
+        self.lua('cancel', 4, 'jid', 'worker', 'queue', {})
+        self.assertEqual(self.lua('tag', 5, 'get', 'abc', 0, 0)['jobs'], {})
+        self.assertEqual(self.redis.zrange('ql:tags', 0, -1), [])
+        # When complete
+        self.lua('put', 6, 'worker', 'queue', 'jid', 'klass', {}, 0, 'tags', ['abc'])
+        self.assertEqual(self.lua('tag', 7, 'get', 'abc', 0, 0)['jobs'], ['jid'])
+        self.lua('pop', 8, 'queue', 'worker', 1)
+        self.lua('complete', 9, 'jid', 'worker', 'queue', {})
+        self.assertEqual(self.lua('tag', 10, 'get', 'abc', 0, 0)['jobs'], {})
+        self.assertEqual(self.redis.zrange('ql:tags', 0, -1), [])
 
 class TestCancel(TestQless):
     '''Canceling jobs'''

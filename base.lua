@@ -66,14 +66,14 @@ end
 -- If no group is provided, this returns a JSON blob of the counts of the
 -- various groups of failures known. If a group is provided, it will report up
 -- to `limit` from `start` of the jobs affected by that issue.
--- 
+--
 --  # If no group, then...
 --  {
 --      'group1': 1,
 --      'group2': 5,
 --      ...
 --  }
---  
+--
 --  # If a group is provided, then...
 --  {
 --      'total': 20,
@@ -119,9 +119,9 @@ end
 -------------------------------------------------------------------------------
 -- Return all the job ids currently considered to be in the provided state
 -- in a particular queue. The response is a list of job ids:
--- 
+--
 --  [
---      jid1, 
+--      jid1,
 --      jid2,
 --      ...
 --  ]
@@ -167,7 +167,7 @@ end
 -- associated with that id, and 'untrack' stops tracking it. In this context,
 -- tracking is nothing more than saving the job to a list of jobs that are
 -- considered special.
--- 
+--
 --  {
 --      'jobs': [
 --          {
@@ -252,7 +252,7 @@ function Qless.tag(now, command, ...)
       tags = cjson.decode(tags)
       local _tags = {}
       for i,v in ipairs(tags) do _tags[v] = true end
-    
+
       -- Otherwise, add the job to the sorted set with that tags
       for i=2,#arg do
         local tag = arg[i]
@@ -260,10 +260,9 @@ function Qless.tag(now, command, ...)
           _tags[tag] = true
           table.insert(tags, tag)
         end
-        redis.call('zadd', 'ql:t:' .. tag, now, jid)
-        redis.call('zincrby', 'ql:tags', 1, tag)
+        Qless.job(jid):insert_tag(now, tag)
       end
-    
+
       redis.call('hset', QlessJob.ns .. jid, 'tags', cjson.encode(tags))
       return tags
     else
@@ -278,18 +277,17 @@ function Qless.tag(now, command, ...)
       tags = cjson.decode(tags)
       local _tags = {}
       for i,v in ipairs(tags) do _tags[v] = true end
-    
+
       -- Otherwise, add the job to the sorted set with that tags
       for i=2,#arg do
         local tag = arg[i]
         _tags[tag] = nil
-        redis.call('zrem', 'ql:t:' .. tag, jid)
-        redis.call('zincrby', 'ql:tags', -1, tag)
+        Qless.job(jid):remove_tag(tag)
       end
-    
+
       local results = {}
       for i,tag in ipairs(tags) do if _tags[tag] then table.insert(results, tag) end end
-    
+
       redis.call('hset', QlessJob.ns .. jid, 'tags', cjson.encode(results))
       return results
     else
@@ -371,15 +369,14 @@ function Qless.cancel(...)
         queue.depends.remove(jid)
       end
 
+      local job = Qless.job(jid)
+
       -- We should probably go through all our dependencies and remove
       -- ourselves from the list of dependents
       for i, j in ipairs(redis.call(
         'smembers', QlessJob.ns .. jid .. '-dependencies')) do
         redis.call('srem', QlessJob.ns .. j .. '-dependents', jid)
       end
-
-      -- Delete any notion of dependencies it has
-      redis.call('del', QlessJob.ns .. jid .. '-dependencies')
 
       -- If we're in the failed state, remove all of our data
       if state == 'failed' then
@@ -398,25 +395,15 @@ function Qless.cancel(...)
           'ql:s:stats:' .. bin .. ':' .. queue, 'failed', failed - 1)
       end
 
-      -- Remove it as a job that's tagged with this particular tag
-      local tags = cjson.decode(
-        redis.call('hget', QlessJob.ns .. jid, 'tags') or '{}')
-      for i, tag in ipairs(tags) do
-        redis.call('zrem', 'ql:t:' .. tag, jid)
-        redis.call('zincrby', 'ql:tags', -1, tag)
-      end
+      job:delete()
 
       -- If the job was being tracked, we should notify
       if redis.call('zscore', 'ql:tracked', jid) ~= false then
         Qless.publish('canceled', jid)
       end
-
-      -- Just go ahead and delete our data
-      redis.call('del', QlessJob.ns .. jid)
-      redis.call('del', QlessJob.ns .. jid .. '-history')
     end
   end
-  
+
   return arg
 end
 
