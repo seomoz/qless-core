@@ -346,7 +346,8 @@ function Qless.tag(now, command, ...)
       local results = {}
       for i,tag in ipairs(tags) do if _tags[tag] then table.insert(results, tag) end end
 
-      redis.call('hset', QlessJob.ns .. jid, 'tags', cjson.encode(results))
+      tags = cjson.encode(results)
+      redis.call('hset', QlessJob.ns .. jid, 'tags', tags)
       return results
     else
       error('Tag(): Job ' .. jid .. ' does not exist')
@@ -359,7 +360,7 @@ function Qless.tag(now, command, ...)
       'Tag(): Arg "count" not a number: ' .. tostring(arg[3]))
     return {
       total = redis.call('zcard', 'ql:t:' .. tag),
-      jobs  = redis.call('zrange', 'ql:t:' .. tag, offset, offset + count - 1) or cjson.decode('[]')
+      jobs  = redis.call('zrange', 'ql:t:' .. tag, offset, offset + count - 1)
     }
   elseif command == 'top' then
     local offset = assert(tonumber(arg[1] or 0) , 'Tag(): Arg "offset" not a number: ' .. tostring(arg[1]))
