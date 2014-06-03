@@ -72,12 +72,6 @@ end
 function Qless.throttle(tid)
   assert(tid, 'Throttle(): no tid provided')
   local throttle = QlessThrottle.data({id = tid})
-  if not throttle then
-    throttle = {
-      id = tid,
-      maximum = 0
-    }
-  end
   setmetatable(throttle, QlessThrottle)
 
   -- set of jids which have acquired a lock on this throttle.
@@ -324,8 +318,7 @@ function Qless.tag(now, command, ...)
           _tags[tag] = true
           table.insert(tags, tag)
         end
-        redis.call('zadd', 'ql:t:' .. tag, now, jid)
-        redis.call('zincrby', 'ql:tags', 1, tag)
+        Qless.job(jid):insert_tag(now, tag)
       end
 
       tags = cjson.encode(tags)
@@ -348,8 +341,7 @@ function Qless.tag(now, command, ...)
       for i=2,#arg do
         local tag = arg[i]
         _tags[tag] = nil
-        redis.call('zrem', 'ql:t:' .. tag, jid)
-        redis.call('zincrby', 'ql:tags', -1, tag)
+        Qless.job(jid):remove_tag(tag)
       end
 
       local results = {}
@@ -434,7 +426,9 @@ function Qless.cancel(now, ...)
         queue:remove_job(jid)
       end
 
-      Qless.job(jid):throttles_release(now)
+      local job = Qless.job(jid)
+
+      job:throttles_release(now)
 
       -- We should probably go through all our dependencies and remove
       -- ourselves from the list of dependents
@@ -442,9 +436,6 @@ function Qless.cancel(now, ...)
         'smembers', QlessJob.ns .. jid .. '-dependencies')) do
         redis.call('srem', QlessJob.ns .. j .. '-dependents', jid)
       end
-
-      -- Delete any notion of dependencies it has
-      redis.call('del', QlessJob.ns .. jid .. '-dependencies')
 
       -- If we're in the failed state, remove all of our data
       if state == 'failed' then
@@ -463,22 +454,12 @@ function Qless.cancel(now, ...)
           'ql:s:stats:' .. bin .. ':' .. queue, 'failed', failed - 1)
       end
 
-      -- Remove it as a job that's tagged with this particular tag
-      local tags = cjson.decode(
-        redis.call('hget', QlessJob.ns .. jid, 'tags') or '{}')
-      for i, tag in ipairs(tags) do
-        redis.call('zrem', 'ql:t:' .. tag, jid)
-        redis.call('zincrby', 'ql:tags', -1, tag)
-      end
+      job:delete()
 
       -- If the job was being tracked, we should notify
       if redis.call('zscore', 'ql:tracked', jid) ~= false then
         Qless.publish('canceled', jid)
       end
-
-      -- Just go ahead and delete our data
-      redis.call('del', QlessJob.ns .. jid)
-      redis.call('del', QlessJob.ns .. jid .. '-history')
     end
   end
 

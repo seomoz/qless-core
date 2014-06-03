@@ -240,29 +240,16 @@ function QlessJob:complete(now, worker, queue, data, ...)
     local jids = redis.call('zrangebyscore', 'ql:completed', 0, now - time)
     -- Any jobs that need to be expired... delete
     for index, jid in ipairs(jids) do
-      local tags = cjson.decode(
-        redis.call('hget', QlessJob.ns .. jid, 'tags') or '{}')
-      for i, tag in ipairs(tags) do
-        redis.call('zrem', 'ql:t:' .. tag, jid)
-        redis.call('zincrby', 'ql:tags', -1, tag)
-      end
-      redis.call('del', QlessJob.ns .. jid)
-      redis.call('del', QlessJob.ns .. jid .. '-history')
+      Qless.job(jid):delete()
     end
+
     -- And now remove those from the queued-for-cleanup queue
     redis.call('zremrangebyscore', 'ql:completed', 0, now - time)
 
     -- Now take the all by the most recent 'count' ids
     jids = redis.call('zrange', 'ql:completed', 0, (-1-count))
     for index, jid in ipairs(jids) do
-      local tags = cjson.decode(
-        redis.call('hget', QlessJob.ns .. jid, 'tags') or '{}')
-      for i, tag in ipairs(tags) do
-        redis.call('zrem', 'ql:t:' .. tag, jid)
-        redis.call('zincrby', 'ql:tags', -1, tag)
-      end
-      redis.call('del', QlessJob.ns .. jid)
-      redis.call('del', QlessJob.ns .. jid .. '-history')
+      Qless.job(jid):delete()
     end
     redis.call('zremrangebyrank', 'ql:completed', 0, (-1-count))
 
@@ -843,4 +830,48 @@ function QlessJob:throttles()
   end
 
   return self._throttles
+end
+
+-- Completely removes all the data
+-- associated with this job, use
+-- with care.
+function QlessJob:delete()
+  local tags = redis.call('hget', QlessJob.ns .. self.jid, 'tags') or '[]'
+  tags = cjson.decode(tags)
+  -- remove the jid from each tag
+  for i, tag in ipairs(tags) do
+    self:remove_tag(tag)
+  end
+  -- Delete the job's data
+  redis.call('del', QlessJob.ns .. self.jid)
+  -- Delete the job's history
+  redis.call('del', QlessJob.ns .. self.jid .. '-history')
+  -- Delete any notion of dependencies it has
+  redis.call('del', QlessJob.ns .. self.jid .. '-dependencies')
+end
+
+-- Inserts the jid into the specified tag.
+-- This should probably be moved to its own tag
+-- object.
+function QlessJob:insert_tag(now, tag)
+  redis.call('zadd', 'ql:t:' .. tag, now, self.jid)
+  redis.call('zincrby', 'ql:tags', 1, tag)
+end
+
+-- Removes the jid from the specified tag.
+-- this should probably be moved to its own tag
+-- object.
+function QlessJob:remove_tag(tag)
+  -- Remove the job from the specified tag
+  redis.call('zrem', 'ql:t:' .. tag, self.jid)
+
+  -- Decrement the tag in the set of all tags.
+  local score = redis.call('zincrby', 'ql:tags', -1, tag)
+
+  -- if the score for the specified tag is 0
+  -- it means we have no jobs with this tag anymore
+  -- and we should remove it from the set to prevent memory leaks.
+  if tonumber(score) == 0 then
+    redis.call('zrem', 'ql:tags', tag)
+  end
 end
