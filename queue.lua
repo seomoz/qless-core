@@ -550,8 +550,7 @@ function QlessQueue:put(now, worker, jid, klass, raw_data, delay, ...)
 
   -- Add this job to the list of jobs tagged with whatever tags were supplied
   for i, tag in ipairs(tags) do
-    redis.call('zadd', 'ql:t:' .. tag, now, jid)
-    redis.call('zincrby', 'ql:tags', 1, tag)
+    Qless.job(jid):insert_tag(now, tag)
   end
 
   -- If we're in the failed state, remove all of our data
@@ -820,8 +819,7 @@ function QlessQueue:check_recurring(now, count)
       -- Add this job to the list of jobs tagged with whatever tags were
       -- supplied
       for i, tag in ipairs(_tags) do
-        redis.call('zadd', 'ql:t:' .. tag, now, jid .. '-' .. count)
-        redis.call('zincrby', 'ql:tags', 1, tag)
+        Qless.job(jid .. '-' .. count):insert_tag(now, tag)
       end
 
       -- First, let's save its data

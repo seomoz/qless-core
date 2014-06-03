@@ -1,15 +1,18 @@
 -- Retrieve the data fro a throttled resource
 function QlessThrottle:data()
+  -- Default values for the data
+  local data = {
+    id = self.id,
+    maximum = 0
+  }
+
+  -- Retrieve data stored in redis
   local throttle = redis.call('hmget', QlessThrottle.ns .. self.id, 'id', 'maximum')
-  -- Return default if it doesn't exist
-  if not throttle[1] then
-    return {id = self.id, maximum = 0}
+
+  if throttle[2] then
+    data.maximum = tonumber(throttle[2])
   end
 
-  local data = {
-    id = throttle[1],
-    maximum = tonumber(throttle[2])
-  }
   return data
 end
 
