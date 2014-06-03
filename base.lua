@@ -321,7 +321,8 @@ function Qless.tag(now, command, ...)
         Qless.job(jid):insert_tag(now, tag)
       end
 
-      redis.call('hset', QlessJob.ns .. jid, 'tags', cjson.encode(tags))
+      tags = cjson.encode(tags)
+      redis.call('hset', QlessJob.ns .. jid, 'tags', tags)
       return tags
     else
       error('Tag(): Job ' .. jid .. ' does not exist')
