@@ -337,7 +337,7 @@ function Qless.tag(now, command, ...)
       local _tags = {}
       for i,v in ipairs(tags) do _tags[v] = true end
 
-      -- Otherwise, add the job to the sorted set with that tags
+      -- Otherwise, remove the job from the sorted set with that tags
       for i=2,#arg do
         local tag = arg[i]
         _tags[tag] = nil
