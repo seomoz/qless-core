@@ -807,16 +807,23 @@ end
 -- this should probably be moved to its own tag
 -- object.
 function QlessJob:remove_tag(tag)
+  -- namespace the tag
+  local namespaced_tag = 'ql:t:' .. tag
+
   -- Remove the job from the specified tag
-  redis.call('zrem', 'ql:t:' .. tag, self.jid)
+  redis.call('zrem', namespaced_tag, self.jid)
 
-  -- Decrement the tag in the set of all tags.
-  local score = redis.call('zincrby', 'ql:tags', -1, tag)
+  -- Check if any tags jids remain in the tag set.
+  local remaining = redis.call('zcard', namespaced_tag)
 
-  -- if the score for the specified tag is 0
-  -- it means we have no jobs with this tag anymore
-  -- and we should remove it from the set to prevent memory leaks.
-  if tonumber(score) == 0 then
+  -- If the number of jids in the tagged set
+  -- is 0 it means we have no jobs with this tag
+  -- and we should remove it from the set of all tags
+  -- to prevent memory leaks.
+  if tonumber(remaining) == 0 then
     redis.call('zrem', 'ql:tags', tag)
+  else
+    -- Decrement the tag in the set of all tags.
+    redis.call('zincrby', 'ql:tags', -1, tag)
   end
 end
