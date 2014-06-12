@@ -40,6 +40,19 @@ class TestJob(TestQless):
             {'q': 'queue', 'what': 'put', 'when': 98},
             {'q': 'queue', 'what': 'put', 'when': 99}])
 
+class TestRequeue(TestQless):
+    def test_requeue_existing_job(self):
+        '''Requeueing an existing job is identical to `put`'''
+        self.lua('put', 0, 'worker', 'queue', 'jid', 'klass', {}, 0)
+        self.lua('requeue', 1, 'worker', 'queue-2', 'jid', 'klass', {}, 0)
+        self.assertEqual(self.lua('get', 0, 'jid')['queue'], 'queue-2')
+
+    def test_requeue_cancelled_job(self):
+        '''Requeueing a cancelled (or non-existent) job fails'''
+        self.lua('put', 0, 'worker', 'queue', 'jid', 'klass', {}, 0)
+        self.lua('cancel', 1, 'jid')
+        self.assertRaisesRegexp(redis.ResponseError, r'does not exist',
+            self.lua, 'requeue', 2, 'worker', 'queue-2', 'jid', 'klass', {}, 0)
 
 class TestComplete(TestQless):
     '''Test how we complete jobs'''
