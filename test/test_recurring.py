@@ -262,13 +262,9 @@ class TestRecurring(TestQless):
             'state': 'running',
             'tags': ['foo'],
             'tracked': False,
-<<<<<<< HEAD
             'throttles': {},
-            'worker': 'worker'})
-=======
             'worker': 'worker',
             'spawned_from_jid': 'jid'})
->>>>>>> upstream-master
         self.lua('recur', 60, 'queue', 'jid', 'class', {'foo': 'bar'},
             'interval', 10, 0, 'priority', 5, 'tags', ['bar'], 'retries', 5, 'throttles', ['lala'])
         self.assertEqual(self.lua('pop', 60, 'queue', 'worker', 10)[0], {
@@ -288,13 +284,9 @@ class TestRecurring(TestQless):
             'state': 'running',
             'tags': ['bar'],
             'tracked': False,
-<<<<<<< HEAD
             'throttles': ['lala'],
-            'worker': 'worker'})
-=======
             'worker': 'worker',
             'spawned_from_jid': 'jid'})
->>>>>>> upstream-master
 
     def test_rerecur_move(self):
         '''Re-recurring a job in a new queue works like a move'''
