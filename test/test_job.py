@@ -133,7 +133,8 @@ class TestComplete(TestQless):
             'tags': {},
             'tracked': False,
             'throttles': ['ql:q:queue'],
-            'worker': u''})
+            'worker': u'',
+            'spawned_from_jid': False})
 
     def test_advance(self):
         '''Can complete and advance a job in one fell swooop'''
