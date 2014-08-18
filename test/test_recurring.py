@@ -60,6 +60,7 @@ class TestRecurring(TestQless):
         popped = self.lua('pop', 0, 'queue', 'worker', 10)
         self.assertEqual(len(popped), 1)
         self.assertEqual(popped[0]['jid'], 'jid-1')
+        self.assertEqual(popped[0]['spawned_from_jid'], 'jid')
 
         # If we wait 59 seconds, there won't be a job, but at 60, yes
         popped = self.lua('pop', 59, 'queue', 'worker', 10)
@@ -67,6 +68,7 @@ class TestRecurring(TestQless):
         popped = self.lua('pop', 61, 'queue', 'worker', 10)
         self.assertEqual(len(popped), 1)
         self.assertEqual(popped[0]['jid'], 'jid-2')
+        self.assertEqual(popped[0]['spawned_from_jid'], 'jid')
 
     def test_offset(self):
         '''We can set an offset from now for jobs to recur on'''
@@ -261,7 +263,8 @@ class TestRecurring(TestQless):
             'tags': ['foo'],
             'tracked': False,
             'throttles': {},
-            'worker': 'worker'})
+            'worker': 'worker',
+            'spawned_from_jid': 'jid'})
         self.lua('recur', 60, 'queue', 'jid', 'class', {'foo': 'bar'},
             'interval', 10, 0, 'priority', 5, 'tags', ['bar'], 'retries', 5, 'throttles', ['lala'])
         self.assertEqual(self.lua('pop', 60, 'queue', 'worker', 10)[0], {
@@ -282,7 +285,8 @@ class TestRecurring(TestQless):
             'tags': ['bar'],
             'tracked': False,
             'throttles': ['lala'],
-            'worker': 'worker'})
+            'worker': 'worker',
+            'spawned_from_jid': 'jid'})
 
     def test_rerecur_move(self):
         '''Re-recurring a job in a new queue works like a move'''

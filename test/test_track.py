@@ -36,6 +36,7 @@ class TestTrack(TestQless):
                 'throttles': ['ql:q:queue'],
                 'data': '{}',
                 'remaining': 5,
+                'spawned_from_jid': False,
                 'history': [{
                     'q': 'queue', 'what': 'put', 'when': 0
                 }]
