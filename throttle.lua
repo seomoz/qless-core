@@ -1,4 +1,4 @@
--- Retrieve the data fro a throttled resource
+-- Retrieve the data for a throttled resource
 function QlessThrottle:data()
   -- Default values for the data
   local data = {
