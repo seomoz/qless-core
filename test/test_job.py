@@ -158,6 +158,14 @@ class TestComplete(TestQless):
         self.assertEqual(
             self.lua('pop', 3, 'foo', 'worker', 10)[0]['jid'], 'jid')
 
+    def test_advance_empty_array_mangle(self):
+        '''Does not mangle empty arrays in job data when advancing'''
+        self.lua('put', 0, 'worker', 'queue', 'jid', 'klass', '[]', 0)
+        self.lua('pop', 1, 'queue', 'worker', 10)
+        self.lua('complete', 2, 'jid', 'worker', 'queue', '[]', 'next', 'foo')
+        self.assertEqual(
+            self.lua('pop', 3, 'foo', 'worker', 10)[0]['data'], '[]')
+
     def test_wrong_worker(self):
         '''Only the right worker can complete it'''
         self.lua('put', 0, 'worker', 'queue', 'jid', 'klass', {}, 0)
