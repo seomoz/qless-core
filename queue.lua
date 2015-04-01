@@ -128,6 +128,16 @@ function QlessQueue:prefix(group)
   end
 end
 
+function QlessQueue:redis_keys()
+  return {
+    self:prefix('work'),
+    self:prefix('recur'),
+    self:prefix('depends'),
+    self:prefix('locks'),
+    self:prefix('scheduled')
+  }
+end
+
 -- Stats(now, date)
 -- ---------------------
 -- Return the current statistics for a given queue on a given date. The
@@ -943,6 +953,11 @@ end
 -- Forget the provided queues. As in, remove them from the list of known queues
 function QlessQueue.deregister(...)
   redis.call('zrem', Qless.ns .. 'queues', unpack(arg))
+end
+
+-- Deletes all the redis keys for this queue.
+function QlessQueue:delete()
+  redis.call('del', unpack(self:redis_keys()))
 end
 
 -- Return information about a particular queue, or all queues

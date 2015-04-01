@@ -199,6 +199,13 @@ QlessAPI['queue.forget'] = function(now, ...)
   QlessQueue.deregister(unpack(arg))
 end
 
+QlessAPI['queue.delete'] = function(now, ...)
+  for i, queue_name in ipairs(arg) do
+    Qless.queue(queue_name):delete()
+  end
+  QlessQueue.deregister(unpack(arg))
+end
+
 -------------------------------------------------------------------------------
 -- Function lookup
 -------------------------------------------------------------------------------

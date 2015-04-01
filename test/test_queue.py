@@ -641,3 +641,50 @@ class TestPop(TestQless):
         self.lua('fail', 3, 'a', 'worker', 'group', 'message', {})
         job = self.lua('pop', 4, 'queue', 'worker', 10)[0]
         self.assertEqual(job['jid'], 'b')
+
+class TestQueueOperations(TestQless):
+    '''Test queue-level operations like delete and merge'''
+
+    def test_delete(self):
+        '''Delete deletes all redis keys for the queue(s) and deletes them from the queue list'''
+        self.put_jobs_in_queue_in_each_state('queue-1', 'jids-1')
+        self.put_jobs_in_queue_in_each_state('queue-2', 'jids-2')
+        self.assertEqual(self.current_queue_names(), ['queue-1', 'queue-2'])
+
+        self.lua('queue.delete', 8, 'queue-1', 'queue-2')
+
+        self.assertEqual(self.redis.keys("ql:q:queue*"), [])
+        self.assertEqual(self.current_queue_names(), [])
+
+    def current_queue_names(self):
+        return [queue["name"] for queue in self.lua("queues", 7)]
+
+    def put_jobs_in_queue_in_each_state(self, queue_name, jid_prefix):
+        # put a job into the queue-work sorted set
+        self.lua('put', 0, 'worker', queue_name, jid_prefix + 'a', 'klass', {}, 0)
+
+        # put a job into the queue-locks sorted set
+        self.lua('put', 1, 'worker', queue_name, jid_prefix + 'b', 'klass', {}, 0)
+        self.lua('pop', 2, queue_name, jid_prefix + 'worker', 1)
+
+        # put a job into the queue-scheduled sorted set
+        self.lua('put', 4, 'worker', queue_name, jid_prefix + 'c', 'klass', {}, 1000)
+
+        # put a job into the queue-depends sorted set
+        self.lua('put', 5, 'worker', queue_name, jid_prefix + 'd', 'klass', {}, 0, 'depends', [jid_prefix + 'c'])
+
+        # put a job into the queue-recur sorted set
+        self.lua('recur', 6, queue_name, jid_prefix + 'e', 'klass', {}, 'interval', 60, 0)
+
+        expected_keys = [
+            'ql:q:' + queue_name + '-scheduled',
+            'ql:q:' + queue_name + '-depends',
+            'ql:q:' + queue_name + '-work',
+            'ql:q:' + queue_name + '-locks',
+            'ql:q:' + queue_name + '-recur'
+        ]
+        actual_keys = self.redis.keys("ql:q:queue*")
+
+        for key in expected_keys:
+            self.assertIn(key, actual_keys)
+
