@@ -206,6 +206,10 @@ QlessAPI['queue.delete'] = function(now, ...)
   QlessQueue.deregister(unpack(arg))
 end
 
+QlessAPI['queue.merge'] = function(now, source_queue, destination_queue)
+  Qless.queue(source_queue):merge_into(now, Qless.queue(destination_queue))
+end
+
 -------------------------------------------------------------------------------
 -- Function lookup
 -------------------------------------------------------------------------------

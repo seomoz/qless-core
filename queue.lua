@@ -963,6 +963,24 @@ function QlessQueue:delete()
   redis.call('del', unpack(self:redis_keys()))
 end
 
+function QlessQueue:merge_into(now, destination_queue)
+  destination_queue:ensure_registered(now)
+  local destination_keys = destination_queue:redis_keys()
+
+  for i, source_key in ipairs(self:redis_keys()) do
+    local destination_key = destination_keys[i]
+
+    -- Renames are O(1) whereas zunionstore is O(N)+O(M log(M)),
+    -- So attempt a safe rename using renamenx, and only fall back
+    -- to zunionstore if the destination key is there.
+    if redis.call('renamenx', source_key, destination_key) == 0 then
+      redis.call('zunionstore', destination_key, 2, source_key, destination_key)
+    end
+  end
+
+  self:delete()
+end
+
 -- Return information about a particular queue, or all queues
 --  [
 --      {

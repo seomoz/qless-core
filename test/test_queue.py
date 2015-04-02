@@ -656,6 +656,66 @@ class TestQueueOperations(TestQless):
         self.assertEqual(self.redis.keys("ql:q:queue*"), [])
         self.assertEqual(self.current_queue_names(), [])
 
+    def test_can_merge_into_empty_queue(self):
+        '''merge can merge a queue into an empty queue'''
+        self.put_jobs_in_queue_in_each_state('queue-1', 'jids-1')
+
+        self.lua('queue.merge', 9, 'queue-1', 'queue-2')
+
+        self.assertEqual(self.lua("queues", 10), [
+            {
+                u'depends': 0,
+                u'name': 'queue-1',
+                u'paused': False,
+                u'recurring': 0,
+                u'running': 0,
+                u'scheduled': 0,
+                u'stalled': 0,
+                u'waiting': 0
+            },
+            {
+                u'depends': 1,
+                u'name': 'queue-2',
+                u'paused': False,
+                u'recurring': 1,
+                u'running': 1,
+                u'scheduled': 1,
+                u'stalled': 0,
+                u'waiting': 1
+            }
+        ])
+
+    def test_can_merge_into_non_empty_queue(self):
+        '''merge can merge a queue into a non-empty queue'''
+        self.maxDiff = None
+        self.put_jobs_in_queue_in_each_state('queue-1', 'jids-1')
+        self.put_jobs_in_queue_in_each_state('queue-2', 'jids-2')
+
+        self.lua('queue.merge', 9, 'queue-1', 'queue-2')
+
+        self.assertEqual(self.lua("queues", 10), [
+            {
+                u'depends': 0,
+                u'name': 'queue-1',
+                u'paused': False,
+                u'recurring': 0,
+                u'running': 0,
+                u'scheduled': 0,
+                u'stalled': 0,
+                u'waiting': 0
+            },
+            {
+                u'depends': 2,
+                u'name': 'queue-2',
+                u'paused': False,
+                u'recurring': 2,
+                u'running': 2,
+                u'scheduled': 2,
+                u'stalled': 0,
+                u'waiting': 2
+            }
+        ])
+
     def current_queue_names(self):
         return [queue["name"] for queue in self.lua("queues", 7)]
 
