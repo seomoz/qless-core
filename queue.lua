@@ -592,9 +592,7 @@ function QlessQueue:put(now, worker, jid, klass, raw_data, delay, ...)
   -- Lastly, we're going to make sure that this item is in the
   -- set of known queues. We should keep this sorted by the 
   -- order in which we saw each of these queues
-  if redis.call('zscore', 'ql:queues', self.name) == false then
-    redis.call('zadd', 'ql:queues', now, self.name)
-  end
+  self:ensure_registered(now)
 
   if redis.call('zscore', 'ql:tracked', jid) ~= false then
     Qless.publish('put', jid)
@@ -707,9 +705,7 @@ function QlessQueue:recur(now, jid, klass, raw_data, spec, ...)
     -- Lastly, we're going to make sure that this item is in the
     -- set of known queues. We should keep this sorted by the 
     -- order in which we saw each of these queues
-    if redis.call('zscore', 'ql:queues', self.name) == false then
-      redis.call('zadd', 'ql:queues', now, self.name)
-    end
+    self:ensure_registered(now)
     
     return jid
   else
@@ -953,6 +949,13 @@ end
 -- Forget the provided queues. As in, remove them from the list of known queues
 function QlessQueue.deregister(...)
   redis.call('zrem', Qless.ns .. 'queues', unpack(arg))
+end
+
+-- Registers the queue if it has not already been registered.
+function QlessQueue:ensure_registered(now)
+  if redis.call('zscore', 'ql:queues', self.name) == false then
+    redis.call('zadd', 'ql:queues', now, self.name)
+  end
 end
 
 -- Deletes all the redis keys for this queue.

@@ -165,9 +165,7 @@ function QlessJob:complete(now, worker, queue, raw_data, ...)
 
     -- We're going to make sure that this queue is in the
     -- set of known queues
-    if redis.call('zscore', 'ql:queues', nextq) == false then
-      redis.call('zadd', 'ql:queues', now, nextq)
-    end
+    Qless.queue(nextq):ensure_registered(now)
     
     redis.call('hmset', QlessJob.ns .. self.jid,
       'state', 'waiting',

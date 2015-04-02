@@ -62,9 +62,7 @@ function QlessRecurringJob:update(now, ...)
         Qless.queue(value).recurring.add(score, self.jid)
         redis.call('hset', 'ql:r:' .. self.jid, 'queue', value)
         -- If we don't already know about the queue, learn about it
-        if redis.call('zscore', 'ql:queues', value) == false then
-          redis.call('zadd', 'ql:queues', now, value)
-        end
+        Qless.queue(value):ensure_registered(now)
       elseif key == 'backlog' then
         value = assert(tonumber(value),
           'Recur(): Arg "backlog" not a number: ' .. tostring(value))
