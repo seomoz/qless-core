@@ -43,3 +43,12 @@ class TestQless(unittest.TestCase):
         except Exception as exc:
             self.assertFalse(True,
                 '%s raised, expected %s' % (type(exc).__name__, typ.__name__))
+
+    if 'assertIn' not in dir(unittest.TestCase):
+        def assertIn(self, member, container, msg=None):
+            """Just like self.assertTrue(a in b), but with a nicer default message."""
+            from pprint import saferepr
+            if member not in container:
+                standardMsg = '%s not found in %s' % (saferepr(member),
+                                                      saferepr(container))
+                self.fail(msg if msg else standardMsg)
