@@ -53,6 +53,24 @@ class TestRequeue(TestQless):
         self.assertRaisesRegexp(redis.ResponseError, r'does not exist',
             self.lua, 'requeue', 2, 'worker', 'queue-2', 'jid', 'klass', {}, 0)
 
+    def test_requeue_throttled_job(self):
+        '''Requeueing  a throttled job should maintain correct state'''
+        self.lua('put', 0, 'worker', 'queue', 'jid', 'klass', {}, 0, 'throttles', ['tid'])
+        original = self.lua('multiget', 1, 'jid')[0]
+        self.lua('requeue', 2, 'worker', 'queue-2', 'jid', 'klass', {}, 0, 'throttles', ['tid'])
+        updated = self.lua('multiget', 3, 'jid')[0]
+
+        # throttles and queue change during requeue
+        self.assertEqual(updated['throttles'], ['tid', 'ql:q:queue-2'])
+        self.assertEqual(updated['queue'], 'queue-2')
+        del updated['throttles']
+        del updated['queue']
+        del updated['history']
+        del original['throttles']
+        del original['queue']
+        del original['history']
+        self.assertEqual(updated, original)
+
 class TestComplete(TestQless):
     '''Test how we complete jobs'''
     def test_malformed(self):
