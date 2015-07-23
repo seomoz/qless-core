@@ -694,3 +694,71 @@ class TestPop(TestQless):
         self.lua('put', 2, 'worker', 'queue', 'jid2', 'klass', {}, 0)
         self.assertEqual(self.lua('throttle.locks', 3, 'ql:q:queue'), ['jid1'])
         self.assertEqual(self.lua('jobs', 4, 'throttled', 'queue'), ['jid2'])
+
+    def test_pop_no_retry(self):
+        '''Pop is not retried when limit unset'''
+        self.lua('throttle.set', 0, 'tid1', 1)
+        self.lua('throttle.set', 0, 'tid2', 1)
+
+        self.lua('put', 0, 'worker', 'queue', 'jid1', 'klass', {}, 0, 'throttles', ['tid1'])
+        self.lua('put', 1, 'worker', 'queue', 'jid2', 'klass', {}, 0, 'throttles', ['tid1'])
+        self.lua('put', 2, 'worker', 'queue', 'jid3', 'klass', {}, 0, 'throttles', ['tid2'])
+        self.lua('put', 3, 'worker', 'queue', 'jid4', 'klass', {}, 0, 'throttles', ['tid2'])
+
+        jobs = self.lua('pop', 4, 'queue', 'worker', 2)
+        self.assertEqual(['jid1'], [job['jid'] for job in jobs])
+        self.assertEqual(self.lua('throttle.locks', 5, 'tid1'), ['jid1'])
+        self.assertEqual(self.lua('throttle.locks', 6, 'tid2'), [])
+        self.assertEqual(self.lua('throttle.pending', 7, 'tid1'), ['jid2'])
+
+    def test_pop_retry(self):
+        '''Pop is retried when jobs get throttled'''
+        self.lua('config.set', 0, 'max-pop-retry', 99)
+        self.lua('throttle.set', 0, 'tid1', 1)
+        self.lua('throttle.set', 0, 'tid2', 1)
+
+        self.lua('put', 0, 'worker', 'queue', 'jid1', 'klass', {}, 0, 'throttles', ['tid1'])
+        self.lua('put', 1, 'worker', 'queue', 'jid2', 'klass', {}, 0, 'throttles', ['tid1'])
+        self.lua('put', 2, 'worker', 'queue', 'jid3', 'klass', {}, 0, 'throttles', ['tid2'])
+        self.lua('put', 3, 'worker', 'queue', 'jid4', 'klass', {}, 0, 'throttles', ['tid2'])
+
+        jobs = self.lua('pop', 4, 'queue', 'worker', 2)
+        self.assertEqual(['jid1', 'jid3'], [job['jid'] for job in jobs])
+        self.assertEqual(self.lua('throttle.locks', 5, 'tid1'), ['jid1'])
+        self.assertEqual(self.lua('throttle.locks', 6, 'tid2'), ['jid3'])
+        self.assertEqual(self.lua('throttle.pending', 7, 'tid1'), ['jid2'])
+
+    def test_pop_retry_queue_config(self):
+        '''Pop is retried using queue limit if set'''
+        self.lua('config.set', 0, 'max-pop-retry', 1)
+        self.lua('config.set', 0, 'queue-max-pop-retry', 2)
+        self.lua('throttle.set', 0, 'tid1', 1)
+        self.lua('throttle.set', 0, 'tid2', 1)
+
+        self.lua('put', 0, 'worker', 'queue', 'jid1', 'klass', {}, 0, 'throttles', ['tid1'])
+        self.lua('put', 1, 'worker', 'queue', 'jid2', 'klass', {}, 0, 'throttles', ['tid1'])
+        self.lua('put', 2, 'worker', 'queue', 'jid3', 'klass', {}, 0, 'throttles', ['tid2'])
+        self.lua('put', 3, 'worker', 'queue', 'jid4', 'klass', {}, 0, 'throttles', ['tid2'])
+
+        jobs = self.lua('pop', 4, 'queue', 'worker', 2)
+        self.assertEqual(['jid1', 'jid3'], [job['jid'] for job in jobs])
+        self.assertEqual(self.lua('throttle.locks', 5, 'tid1'), ['jid1'])
+        self.assertEqual(self.lua('throttle.locks', 6, 'tid2'), ['jid3'])
+        self.assertEqual(self.lua('throttle.pending', 7, 'tid1'), ['jid2'])
+
+    def test_pop_retry_upto_limit(self):
+        '''Pop is retried up to limit when jobs get throttled'''
+        self.lua('config.set', 0, 'max-pop-retry', 2)
+        self.lua('throttle.set', 0, 'tid1', 1)
+        self.lua('throttle.set', 0, 'tid2', 1)
+
+        self.lua('put', 0, 'worker', 'queue', 'jid1', 'klass', {}, 0, 'throttles', ['tid1'])
+        self.lua('put', 1, 'worker', 'queue', 'jid2', 'klass', {}, 0, 'throttles', ['tid1'])
+        self.lua('put', 2, 'worker', 'queue', 'jid3', 'klass', {}, 0, 'throttles', ['tid1'])
+        self.lua('put', 3, 'worker', 'queue', 'jid4', 'klass', {}, 0, 'throttles', ['tid2'])
+
+        jobs = self.lua('pop', 4, 'queue', 'worker', 2)
+        self.assertEqual(['jid1'], [job['jid'] for job in jobs])
+        self.assertEqual(self.lua('throttle.locks', 5, 'tid1'), ['jid1'])
+        self.assertEqual(self.lua('throttle.locks', 6, 'tid2'), [])
+        self.assertEqual(self.lua('throttle.pending', 7, 'tid1'), ['jid2', 'jid3'])
