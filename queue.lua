@@ -347,6 +347,12 @@ function QlessQueue:pop(now, worker, count)
 
     local jids = self.work.peek(count - #popped) or {}
 
+    -- If there is nothing in the work queue, then no need to keep looping
+    if #jids == 0 then
+      break
+    end
+
+
     for index, jid in ipairs(jids) do
       local job = Qless.job(jid)
       if job:throttles_acquire(now) then
