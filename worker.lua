@@ -6,7 +6,7 @@ end
 -- Provide data about all the workers, or if a specific worker is provided,
 -- then which jobs that worker is responsible for. If no worker is provided,
 -- expect a response of the form:
--- 
+--
 --  [
 --      # This is sorted by the recency of activity from that worker
 --      {
@@ -17,9 +17,9 @@ end
 --          ...
 --      }
 --  ]
--- 
+--
 -- If a worker id is provided, then expect a response of the form:
--- 
+--
 --  {
 --      'jobs': [
 --          jid1,

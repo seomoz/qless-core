@@ -56,11 +56,11 @@ end
 
 -- Complete a job and optionally put it in another queue, either scheduled or
 -- to be considered waiting immediately. It can also optionally accept other
--- jids on which this job will be considered dependent before it's considered 
+-- jids on which this job will be considered dependent before it's considered
 -- valid.
 --
 -- The variable-length arguments may be pairs of the form:
--- 
+--
 --      ('next'   , queue) : The queue to advance it to next
 --      ('delay'  , delay) : The delay for the next queue
 --      ('depends',        : Json of jobs it depends on in the new queue
@@ -75,7 +75,7 @@ function QlessJob:complete(now, worker, queue, raw_data, ...)
   -- Read in all the optional parameters
   local options = {}
   for i = 1, #arg, 2 do options[arg[i]] = arg[i + 1] end
-  
+
   -- Sanity check on optional args
   local nextq   = options['next']
   local delay   = assert(tonumber(options['delay'] or 0))
@@ -168,7 +168,7 @@ function QlessJob:complete(now, worker, queue, raw_data, ...)
     if redis.call('zscore', 'ql:queues', nextq) == false then
       redis.call('zadd', 'ql:queues', now, nextq)
     end
-    
+
     redis.call('hmset', QlessJob.ns .. self.jid,
       'state', 'waiting',
       'worker', '',
@@ -176,7 +176,7 @@ function QlessJob:complete(now, worker, queue, raw_data, ...)
       'queue', nextq,
       'expires', 0,
       'remaining', tonumber(retries))
-    
+
     if (delay > 0) and (#depends == 0) then
       queue_obj.scheduled.add(now + delay, self.jid)
       return 'scheduled'
@@ -224,18 +224,18 @@ function QlessJob:complete(now, worker, queue, raw_data, ...)
       'queue', '',
       'expires', 0,
       'remaining', tonumber(retries))
-    
+
     -- Do the completion dance
     local count = Qless.config.get('jobs-history-count')
     local time  = Qless.config.get('jobs-history')
-    
+
     -- These are the default values
     count = tonumber(count or 50000)
     time  = tonumber(time  or 7 * 24 * 60 * 60)
-    
+
     -- Schedule this job for destructination eventually
     redis.call('zadd', 'ql:completed', now, self.jid)
-    
+
     -- Now look at the expired job data. First, based on the current time
     local jids = redis.call('zrangebyscore', 'ql:completed', 0, now - time)
     -- Any jobs that need to be expired... delete
@@ -251,7 +251,7 @@ function QlessJob:complete(now, worker, queue, raw_data, ...)
     end
     -- And now remove those from the queued-for-cleanup queue
     redis.call('zremrangebyscore', 'ql:completed', 0, now - time)
-    
+
     -- Now take the all by the most recent 'count' ids
     jids = redis.call('zrange', 'ql:completed', 0, (-1-count))
     for index, jid in ipairs(jids) do
@@ -265,7 +265,7 @@ function QlessJob:complete(now, worker, queue, raw_data, ...)
       redis.call('del', QlessJob.ns .. jid .. '-history')
     end
     redis.call('zremrangebyrank', 'ql:completed', 0, (-1-count))
-    
+
     -- Alright, if this has any dependents, then we should go ahead
     -- and unstick those guys.
     for i, j in ipairs(redis.call(
@@ -289,10 +289,10 @@ function QlessJob:complete(now, worker, queue, raw_data, ...)
         end
       end
     end
-    
+
     -- Delete our dependents key
     redis.call('del', QlessJob.ns .. self.jid .. '-dependents')
-    
+
     return 'complete'
   end
 end
@@ -303,14 +303,14 @@ end
 -- specific message. By `group`, we mean some phrase that might be one of
 -- several categorical modes of failure. The `message` is something more
 -- job-specific, like perhaps a traceback.
--- 
+--
 -- This method should __not__ be used to note that a job has been dropped or
 -- has failed in a transient way. This method __should__ be used to note that
 -- a job has something really wrong with it that must be remedied.
--- 
+--
 -- The motivation behind the `group` is so that similar errors can be grouped
 -- together. Optionally, updated data can be provided for the job. A job in
--- any state can be marked as failed. If it has been given to a worker as a 
+-- any state can be marked as failed. If it has been given to a worker as a
 -- job, then its subsequent requests to heartbeat or complete that job will
 -- fail. Failed jobs are kept until they are canceled or completed.
 --
@@ -381,7 +381,7 @@ function QlessJob:fail(now, worker, group, message, data)
   queue_obj.locks.remove(self.jid)
   queue_obj.scheduled.remove(self.jid)
 
-  -- The reason that this appears here is that the above will fail if the 
+  -- The reason that this appears here is that the above will fail if the
   -- job doesn't exist
   if data then
     redis.call('hset', QlessJob.ns .. self.jid, 'data', cjson.encode(data))
@@ -418,7 +418,7 @@ end
 -- Throws an exception if:
 --      - the worker is not the worker with a lock on the job
 --      - the job is not actually running
--- 
+--
 -- Otherwise, it returns the number of retries remaining. If the allowed
 -- retries have been exhausted, then it is automatically failed, and a negative
 -- number is returned.
@@ -431,7 +431,7 @@ function QlessJob:retry(now, queue, worker, delay, group, message)
   assert(worker, 'Retry(): Arg "worker" missing')
   delay = assert(tonumber(delay or 0),
     'Retry(): Arg "delay" not a number: ' .. tostring(delay))
-  
+
   -- Let's see what the old priority, and tags were
   local oldqueue, state, retries, oldworker, priority, failure = unpack(
     redis.call('hmget', QlessJob.ns .. self.jid, 'queue', 'state',
@@ -464,7 +464,7 @@ function QlessJob:retry(now, queue, worker, delay, group, message)
     -- queue it's in
     local group = group or 'failed-retries-' .. queue
     self:history(now, 'failed', {['group'] = group})
-    
+
     redis.call('hmset', QlessJob.ns .. self.jid, 'state', 'failed',
       'worker', '',
       'expires', '')
@@ -488,7 +488,7 @@ function QlessJob:retry(now, queue, worker, delay, group, message)
         ['worker']  = unpack(self:data('worker'))
       }))
     end
-    
+
     -- Add this type of failure to the list of failures
     redis.call('sadd', 'ql:failures', group)
     -- And add this particular instance to the failed types
@@ -640,11 +640,11 @@ function QlessJob:heartbeat(now, worker, data)
       redis.call('hmset', QlessJob.ns .. self.jid,
         'expires', expires, 'worker', worker)
     end
-    
+
     -- Update hwen this job was last updated on that worker
     -- Add this job to the list of jobs handled by this worker
     redis.call('zadd', 'ql:w:' .. worker .. ':jobs', expires, self.jid)
-    
+
     -- And now we should just update the locks
     local queue = Qless.queue(
       redis.call('hget', QlessJob.ns .. self.jid, 'queue'))
