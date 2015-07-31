@@ -3,11 +3,11 @@ function QlessRecurringJob:data()
   local job = redis.call(
     'hmget', 'ql:r:' .. self.jid, 'jid', 'klass', 'state', 'queue',
     'priority', 'interval', 'retries', 'count', 'data', 'tags', 'backlog')
-  
+
   if not job[1] then
     return nil
   end
-  
+
   return {
     jid          = job[1],
     klass        = job[2],
@@ -30,7 +30,7 @@ end
 --      - data
 --      - klass
 --      - queue
---      - backlog 
+--      - backlog
 function QlessRecurringJob:update(now, ...)
   local options = {}
   -- Make sure that the job exists
@@ -88,10 +88,10 @@ function QlessRecurringJob:tag(...)
     tags = cjson.decode(tags)
     local _tags = {}
     for i,v in ipairs(tags) do _tags[v] = true end
-    
+
     -- Otherwise, add the job to the sorted set with that tags
     for i=1,#arg do if _tags[arg[i]] == nil then table.insert(tags, arg[i]) end end
-    
+
     tags = cjson.encode(tags)
     redis.call('hset', 'ql:r:' .. self.jid, 'tags', tags)
     return tags
