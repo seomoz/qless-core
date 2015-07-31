@@ -710,6 +710,8 @@ class TestPop(TestQless):
         self.assertEqual(self.lua('throttle.locks', 5, 'tid1'), ['jid1'])
         self.assertEqual(self.lua('throttle.locks', 6, 'tid2'), [])
         self.assertEqual(self.lua('throttle.pending', 7, 'tid1'), ['jid2'])
+        waiting_jobs = self.lua('peek', 8, 'queue', 99)
+        self.assertEqual([job['jid'] for job in waiting_jobs], ['jid3', 'jid4'])
 
     def test_pop_retry(self):
         '''Pop is retried when jobs get throttled'''
@@ -727,6 +729,8 @@ class TestPop(TestQless):
         self.assertEqual(self.lua('throttle.locks', 5, 'tid1'), ['jid1'])
         self.assertEqual(self.lua('throttle.locks', 6, 'tid2'), ['jid3'])
         self.assertEqual(self.lua('throttle.pending', 7, 'tid1'), ['jid2'])
+        waiting_jobs = self.lua('peek', 8, 'queue', 99)
+        self.assertEqual([job['jid'] for job in waiting_jobs], ['jid4'])
 
     def test_pop_retry_queue_config(self):
         '''Pop is retried using queue limit if set'''
@@ -762,3 +766,5 @@ class TestPop(TestQless):
         self.assertEqual(self.lua('throttle.locks', 5, 'tid1'), ['jid1'])
         self.assertEqual(self.lua('throttle.locks', 6, 'tid2'), [])
         self.assertEqual(self.lua('throttle.pending', 7, 'tid1'), ['jid2', 'jid3'])
+        waiting_jobs = self.lua('peek', 8, 'queue', 99)
+        self.assertEqual([job['jid'] for job in waiting_jobs], ['jid4'])
