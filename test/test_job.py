@@ -252,7 +252,7 @@ class TestCancel(TestQless):
         self.lua('pop', 1, 'queue', 'worker', 10)
         self.lua('heartbeat', 2, 'jid', 'worker', {})
         self.lua('cancel', 3, 'jid')
-        self.assertRaisesRegexp(redis.ResponseError, r'Job does not exist',
+        self.assertRaisesRegexp(redis.ResponseError, r'Job jid does not exist',
             self.lua, 'heartbeat', 4, 'jid', 'worker', {})
 
     def test_cancel_retries(self):
