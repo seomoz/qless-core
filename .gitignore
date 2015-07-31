@@ -1,3 +1,5 @@
-qless.lua
-qless-lib.lua
 *.pyc
+*~
+.vagrant
+qless-lib.lua
+qless.lua
