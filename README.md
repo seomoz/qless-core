@@ -54,10 +54,22 @@ installed:
 pip install redis nose
 ```
 
-To run the tests, there is a directive included in the makefile:
+To run all the tests, there is a directive included in the makefile:
 
 ```bash
 make test
+```
+
+You can run specific test files by passing the TEST environment variable to make:
+
+```bash
+make test TEST=test/test_worker.py
+```
+
+or for a single test case in that file:
+
+```bash
+make test TEST=test/test_worker.py:TestWorker.test_basic
 ```
 
 If you have Redis running somewhere other than `localhost:6379`, you can supply
@@ -107,7 +119,7 @@ the heartbeat should return `false` and the worker should yield.
 
 When a node attempts to heartbeat, the lua script should check to see if the
 node attempting to renew the lock is the same node that currently owns the
-lock. If so, then the lock's expiration should be pushed back accordingly, 
+lock. If so, then the lock's expiration should be pushed back accordingly,
 and the updated expiration returned. If not, an exception is raised.
 
 Stats
@@ -117,7 +129,7 @@ and job completion time (time completed - time popped). By 'statistics',
 I mean average, variange, count and a histogram. Stats for the number of
 failures and retries for a given queue are also available.
 
-Stats are grouped by day. In the case of job wait time, its stats are 
+Stats are grouped by day. In the case of job wait time, its stats are
 aggregated on the day when the job was popped. In the case of completion time,
 they are grouped by the day it was completed.
 
@@ -141,7 +153,7 @@ might have:
 	=============
 	upload error
 	widget failure
-	
+
 	ql:f:upload error
 	==================
 	deadbeef
@@ -211,45 +223,45 @@ job is stored in `ql:j:<jid>-dependents`. For example, `ql:j:<jid>`:
 		# This is the same id as identifies it in the key. It should be
 		# a hex value of a uuid
 		'jid'         : 'deadbeef...',
-		
+
 		# This is a 'type' identifier. Clients may choose to ignore it,
 		# or use it as a language-specific identifier for determining
 		# what code to run. For instance, it might be 'foo.bar.FooJob'
 		'type'        : '...',
-		
+
 		# This is the priority of the job -- lower means more priority.
 		# The default is 0
 		'priority'    : 0,
-		
+
 		# This is the user data associated with the job. (JSON blob)
 		'data'        : '{"hello": "how are you"}',
-		
+
 		# A JSON array of tags associated with this job
 		'tags'        : '["testing", "experimental"]',
-		
+
 		# The worker ID of the worker that owns it. Currently the worker
 		# id is <hostname>-<pid>
 		'worker'      : 'ec2-...-4925',
-		
+
 		# This is the time when it must next check in
 		'expires'     : 1352375209,
-		
+
 		# The current state of the job: 'waiting', 'pending', 'complete'
 		'state'       : 'waiting',
-		
+
 		# The queue that it's associated with. 'null' if complete
 		'queue'       : 'example',
-		
+
 		# The maximum number of retries this job is allowed per queue
 		'retries'     : 3,
 		# The number of retries remaining
 		'remaining'   : 3,
-		
+
 		# The jids that depend on this job's completion
 		'dependents'  : [...],
 		# The jids that this job is dependent upon
 		'dependencies': [...],
-		
+
 		# A list of all the things that have happened to a job. Each entry has
 		# the keys 'what' and 'when', but it may also have arbitrary keys
 		# associated with it.
@@ -274,11 +286,11 @@ A queue is a priority queue and consists of three parts:
 1. `ql:q:<name>-depends` -- sorted set of jobs in a queue, but waiting on
     other jobs
 
-When looking for a unit of work, the client should first choose from the 
+When looking for a unit of work, the client should first choose from the
 next expired lock. If none are expired, then we should next make sure that
 any jobs that should now be considered eligible (the scheduled time is in
-the past) are then inserted into the work queue. A sorted set of all the 
-known queues is maintained at `ql:queues`. Currently we're keeping it 
+the past) are then inserted into the work queue. A sorted set of all the
+known queues is maintained at `ql:queues`. Currently we're keeping it
 sorted based on the time when we first saw the queue, but that's a little
 bit at odd with only keeping queues around while they're being used.
 
@@ -293,7 +305,7 @@ an integer timestamp of midnight for that day:
 
 	<day> = time - (time % (24 * 60 * 60))
 
-Stats are stored under two hashes: `ql:s:wait:<day>:<queue>` and 
+Stats are stored under two hashes: `ql:s:wait:<day>:<queue>` and
 `ql:s:run:<day>:<queue>` respectively. Each has the keys:
 
 - `total` -- The total number of data points contained
@@ -363,8 +375,8 @@ something to be aware of when writing language bindings.
 
 Filesystem Access
 -----------------
-It's intended to be a common usecase that bindings provide a worker script or 
-binary that runs several worker subprocesses. These should run with their 
+It's intended to be a common usecase that bindings provide a worker script or
+binary that runs several worker subprocesses. These should run with their
 working directory as a sandbox.
 
 Forking Model

@@ -39,6 +39,46 @@ class TestThrottle(TestQless):
     self.lua('throttle.delete', 0, 'tid')
     self.assertEqual(self.lua('throttle.get', 0, 'tid'), {'id' : 'tid', 'maximum' : 0})
 
+  '''Test release properly removes the jid from the throttle'''
+  def test_release(self):
+    self.lua('throttle.set', 0, 'tid', 1)
+    self.lua('put', 0, 'worker', 'queue', 'jid1', 'klass', {}, 0, 'throttles', ['tid'])
+    self.lua('put', 1, 'worker', 'queue', 'jid2', 'klass', {}, 0, 'throttles', ['tid'])
+    self.lua('pop', 2, 'queue', 'worker', 2)
+    self.assertEqual(self.lua('throttle.locks', 3, 'tid'), ['jid1'])
+    self.assertEqual(self.lua('throttle.pending', 4, 'tid'), ['jid2'])
+    self.assertEqual(self.lua('jobs', 5, 'throttled', 'queue'), ['jid2'])
+    self.lua('throttle.release', 6, 'tid', 'jid1', 'jid2')
+    self.assertEqual(self.lua('throttle.locks', 7, 'tid'), [])
+    self.assertEqual(self.lua('throttle.pending', 8, 'tid'), [])
+    self.assertEqual(self.lua('peek', 9,'queue', 1)[0]['jid'], 'jid2')
+    self.lua('cancel', 10, 'jid1', 'worker', 'queue', {})
+    self.lua('cancel', 11, 'jid2', 'worker', 'queue', {})
+    self.assertEqual(self.lua('throttle.locks', 12, 'tid'), [])
+    self.assertEqual(self.lua('throttle.pending', 13, 'tid'), [])
+    self.assertEqual(self.lua('jobs', 13, 'throttled', 'queue'), [])
+    self.assertEqual(self.lua('jobs', 14, 'running', 'queue'), [])
+
+  '''Test release of pending jobs before lock holders'''
+  def test_release_pending_before_lock_holders(self):
+    self.lua('throttle.set', 0, 'tid', 1)
+    self.lua('put', 0, 'worker', 'queue', 'jid1', 'klass', {}, 0, 'throttles', ['tid'])
+    self.lua('put', 1, 'worker', 'queue', 'jid2', 'klass', {}, 0, 'throttles', ['tid'])
+    self.lua('pop', 2, 'queue', 'worker', 2)
+    self.assertEqual(self.lua('throttle.locks', 3, 'tid'), ['jid1'])
+    self.assertEqual(self.lua('throttle.pending', 4, 'tid'), ['jid2'])
+    self.assertEqual(self.lua('jobs', 5, 'throttled', 'queue'), ['jid2'])
+    self.lua('throttle.release', 6, 'tid', 'jid2', 'jid1')
+    self.assertEqual(self.lua('throttle.locks', 7, 'tid'), [])
+    self.assertEqual(self.lua('throttle.pending', 8, 'tid'), [])
+    self.assertEqual(self.lua('peek', 9,'queue', 1), {})
+    self.lua('cancel', 10, 'jid1', 'worker', 'queue', {})
+    self.lua('cancel', 11, 'jid2', 'worker', 'queue', {})
+    self.assertEqual(self.lua('throttle.locks', 12, 'tid'), [])
+    self.assertEqual(self.lua('throttle.pending', 13, 'tid'), [])
+    self.assertEqual(self.lua('jobs', 13, 'throttled', 'queue'), [])
+    self.assertEqual(self.lua('jobs', 14, 'running', 'queue'), [])
+
 class TestAcquire(TestQless):
   '''Test that a job has a default queue throttle'''
   def test_default_queue_throttle(self):
