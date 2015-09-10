@@ -239,6 +239,16 @@ end
 QlessAPI['throttle.ttl'] = function(now, tid)
   return Qless.throttle(tid):ttl()
 end
+
+-- releases the set of jids from the specified throttle.
+QlessAPI['throttle.release'] = function(now, tid, ...)
+  local jids = unpack(arg)
+  local throttle = Qless.throttle(tid)
+
+  for _, jid in ipairs(jids) do
+    throttle.release(jid)
+  end
+end
 -------------------------------------------------------------------------------
 -- Function lookup
 -------------------------------------------------------------------------------
