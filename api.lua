@@ -242,11 +242,10 @@ end
 
 -- releases the set of jids from the specified throttle.
 QlessAPI['throttle.release'] = function(now, tid, ...)
-  local jids = unpack(arg)
   local throttle = Qless.throttle(tid)
 
-  for _, jid in ipairs(jids) do
-    throttle.release(jid)
+  for _, jid in ipairs(arg) do
+    throttle:release(now, jid)
   end
 end
 -------------------------------------------------------------------------------
