@@ -21,8 +21,9 @@ submodules that are concatenated together into a `qless.lua` script. These are:
 - `base.lua` -- forward declarations and some uncategorized functions
 - `config.lua` -- all configuration interactions
 - `job.lua` -- the regular job class
-- `recurring.lua` -- the recurring job class
 - `queue.lua` -- the queue class
+- `recurring.lua` -- the recurring job class
+- `worker.lua` -- manage available workers
 - `api.lua` -- exposing the interfaces that the clients invoke, it's a very
 	thin wrapper around these classes
 
