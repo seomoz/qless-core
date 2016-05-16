@@ -458,7 +458,7 @@ function QlessQueue:put(now, worker, jid, klass, raw_data, delay, ...)
     local original = redis.call(
       'smembers', QlessJob.ns .. jid .. '-dependencies')
     for _, dep in pairs(original) do
-      if new[dep] == nil then
+      if new[dep] == nil or new[dep] == false then
         -- Remove k as a dependency
         redis.call('srem', QlessJob.ns .. dep .. '-dependents'  , jid)
         redis.call('srem', QlessJob.ns .. jid .. '-dependencies', dep)

@@ -90,7 +90,7 @@ function QlessRecurringJob:tag(...)
     for i,v in ipairs(tags) do _tags[v] = true end
 
     -- Otherwise, add the job to the sorted set with that tags
-    for i=1,#arg do if _tags[arg[i]] == nil then table.insert(tags, arg[i]) end end
+    for i=1,#arg do if _tags[arg[i]] == nil or _tags[arg[i]] == false then table.insert(tags, arg[i]) end end
 
     tags = cjson.encode(tags)
     redis.call('hset', 'ql:r:' .. self.jid, 'tags', tags)
