@@ -390,7 +390,8 @@ class TestPut(TestQless):
     def test_move(self):
         '''Move is described in terms of puts.'''
         self.lua('put', 0, 'worker', 'queue', 'jid', 'klass', {'foo': 'bar'}, 0)
-        self.lua('put', 0, 'worker', 'other', 'jid', 'klass', {'foo': 'bar'}, 0)
+        self.assertEqual(self.lua('get', 0, 'jid')['throttles'], ['ql:q:queue'])
+        self.lua('put', 0, 'worker', 'other', 'jid', 'klass', {'foo': 'bar'}, 0, 'throttles', ['ql:q:queue'])
         self.assertEqual(self.lua('get', 1, 'jid'), {
             'data': '{"foo": "bar"}',
             'dependencies': {},
