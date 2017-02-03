@@ -714,7 +714,7 @@ function QlessJob:timeout(now)
     self:history(now, 'timed-out')
     local queue = Qless.queue(queue_name)
     queue.locks.remove(self.jid)
-    queue.work.add(now, math.huge, self.jid)
+    queue.work.add(now, '+inf', self.jid)
     redis.call('hmset', QlessJob.ns .. self.jid,
       'state', 'stalled', 'expires', 0)
     local encoded = cjson.encode({
