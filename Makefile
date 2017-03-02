@@ -13,9 +13,28 @@ qless.lua: qless-lib.lua api.lua
 		egrep -v '^[[:space:]]*--[^\[]' | \
 		egrep -v '^--$$' >> qless.lua
 
-clean:
-	rm -f qless.lua qless-lib.lua
+REDIS_VERSION ?= stable
+REDIS_DIR = redis-$(REDIS_VERSION)
+REDIS_TAR = redis-$(REDIS_VERSION).tar.gz
+REDIS_BIN = $(REDIS_DIR)/src/redis-server
 
-.PHONY: test
+.PHONY: clean test redis
+clean:
+	rm -rf qless.lua qless-lib.lua $(REDIS_TAR) $(REDIS_DIR)
+
 test: qless.lua *.lua
 	nosetests --exe -v
+
+$(REDIS_TAR):
+	curl -O http://download.redis.io/releases/$(REDIS_TAR)
+
+$(REDIS_DIR): $(REDIS_TAR)
+	tar xvf $(REDIS_TAR)
+
+$(REDIS_BIN): $(REDIS_DIR)
+	cd $(REDIS_DIR) && make
+
+build-redis: $(REDIS_BIN)
+
+run-redis: $(REDIS_BIN)
+	$(REDIS_BIN) --daemonize yes
