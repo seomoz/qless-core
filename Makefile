@@ -34,7 +34,5 @@ $(REDIS_DIR): $(REDIS_TAR)
 $(REDIS_BIN): $(REDIS_DIR)
 	cd $(REDIS_DIR) && make
 
-build-redis: $(REDIS_BIN)
-
-run-redis: $(REDIS_BIN)
+redis: $(REDIS_BIN)
 	$(REDIS_BIN) --daemonize yes

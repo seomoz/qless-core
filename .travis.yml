@@ -5,8 +5,7 @@ python:
   - 2.7
   - pypy
 install:
-  - make build-redis
-  - make run-redis &
+  - make redis
   - pip install redis --use-mirrors
 env:
   - REDIS_VERSION=3.0.7
