@@ -10,7 +10,4 @@ install:
 env:
   - REDIS_VERSION=3.0.7
   - REDIS_VERSION=3.2.8
-matrix:
-  allow_failures:
-    - env: REDIS_VERSION=3.2.8
 script: make test
