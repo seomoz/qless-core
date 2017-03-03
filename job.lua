@@ -672,7 +672,7 @@ function QlessJob:priority(priority)
   -- Get the queue the job is currently in, if any
   local queue = redis.call('hget', QlessJob.ns .. self.jid, 'queue')
 
-  if queue == nil then
+  if queue == nil or queue == false then
     -- If the job doesn't exist, throw an error
     error('Priority(): Job ' .. self.jid .. ' does not exist')
   elseif queue == '' then
@@ -705,7 +705,7 @@ end
 function QlessJob:timeout(now)
   local queue_name, state, worker = unpack(redis.call('hmget',
     QlessJob.ns .. self.jid, 'queue', 'state', 'worker'))
-  if queue_name == nil then
+  if queue_name == nil or queue_name == false then
     error('Timeout(): Job ' .. self.jid .. ' does not exist')
   elseif state ~= 'running' then
     error('Timeout(): Job ' .. self.jid .. ' not running')
@@ -789,7 +789,7 @@ function QlessJob:history(now, what, item)
       -- We'll always keep the first item around
       local obj = redis.call('lpop', QlessJob.ns .. self.jid .. '-history')
       redis.call('ltrim', QlessJob.ns .. self.jid .. '-history', -count + 2, -1)
-      if obj ~= nil then
+      if obj ~= nil and obj ~= false then
         redis.call('lpush', QlessJob.ns .. self.jid .. '-history', obj)
       end
     end

@@ -256,7 +256,7 @@ function Qless.tag(now, command, ...)
       -- Otherwise, add the job to the sorted set with that tags
       for i=2,#arg do
         local tag = arg[i]
-        if _tags[tag] == nil then
+        if _tags[tag] == nil or _tags[tag] == false then
           _tags[tag] = true
           table.insert(tags, tag)
         end
@@ -331,7 +331,7 @@ function Qless.cancel(...)
   -- make sure that this operation will be ok
   for i, jid in ipairs(arg) do
     for j, dep in ipairs(dependents[jid]) do
-      if dependents[dep] == nil then
+      if dependents[dep] == nil or dependents[dep] == false then
         error('Cancel(): ' .. jid .. ' is a dependency of ' .. dep ..
            ' but is not mentioned to be canceled')
       end
