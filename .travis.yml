@@ -1,11 +1,16 @@
 sudo: false
-services:
-  - redis-server
 language: python
 python:
   - 2.6
   - 2.7
   - pypy
 install:
+  - make redis
   - pip install redis --use-mirrors
-script:  make test
+env:
+  - REDIS_VERSION=3.0.7
+  - REDIS_VERSION=3.2.8
+matrix:
+  allow_failures:
+    - env: REDIS_VERSION=3.2.8
+script: make test
