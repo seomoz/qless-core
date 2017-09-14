@@ -25,8 +25,11 @@ function Qless.queue(name)
         return redis.call('zrem', queue:prefix('work'), unpack(arg))
       end
     end, add = function(now, priority, jid)
+      if priority ~= '+inf' then
+        priority = priority - (now / 10000000000)
+      end
       return redis.call('zadd',
-        queue:prefix('work'), priority - (now / 10000000000), jid)
+        queue:prefix('work'), priority, jid)
     end, score = function(jid)
       return redis.call('zscore', queue:prefix('work'), jid)
     end, length = function()
@@ -38,10 +41,10 @@ function Qless.queue(name)
   queue.locks = {
     expired = function(now, offset, count)
       return redis.call('zrangebyscore',
-        queue:prefix('locks'), -math.huge, now, 'LIMIT', offset, count)
+        queue:prefix('locks'), '-inf', now, 'LIMIT', offset, count)
     end, peek = function(now, offset, count)
       return redis.call('zrangebyscore', queue:prefix('locks'),
-        now, math.huge, 'LIMIT', offset, count)
+        now, '+inf', 'LIMIT', offset, count)
     end, add = function(expires, jid)
       redis.call('zadd', queue:prefix('locks'), expires, jid)
     end, remove = function(...)
@@ -49,7 +52,7 @@ function Qless.queue(name)
         return redis.call('zrem', queue:prefix('locks'), unpack(arg))
       end
     end, running = function(now)
-      return redis.call('zcount', queue:prefix('locks'), now, math.huge)
+      return redis.call('zcount', queue:prefix('locks'), now, '+inf')
     end, length = function(now)
       -- If a 'now' is provided, we're interested in how many are before
       -- that time
