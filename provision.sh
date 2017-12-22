@@ -23,15 +23,16 @@ sudo apt-get install -y libhiredis-dev libevent-dev python-pip python-dev
 
     # Download and install the thing
     cd /tmp
-    wget http://download.redis.io/releases/redis-2.8.19.tar.gz
-    tar xf redis-2.8.19.tar.gz
+    export REDIS_VERSION=2.8.24
+    wget http://download.redis.io/releases/redis-$REDIS_VERSION.tar.gz
+    tar xf redis-$REDIS_VERSION.tar.gz
     (
-        cd redis-2.8.19
+        cd redis-$REDIS_VERSION
         make
         sudo make install
         sudo service redis start
     )
-    sudo rm -r redis-2.8.19{,.tar.gz}
+    sudo rm -r redis-$REDIS_VERSION{,.tar.gz}
 )
 
 # Install python dependencies
