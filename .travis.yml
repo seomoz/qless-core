@@ -9,4 +9,5 @@ env:
   - REDIS_VERSION=2.8.24
   - REDIS_VERSION=3.0.7
   - REDIS_VERSION=3.2.11
+  - REDIS_VERSION=4.0.6
 script: make test
