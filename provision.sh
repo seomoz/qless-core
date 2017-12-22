@@ -39,3 +39,5 @@ sudo apt-get install -y libhiredis-dev libevent-dev python-pip python-dev
     cd /vagrant/
     sudo pip install -r requirements.txt
 )
+
+echo $'\ncd /vagrant' >> $HOME/.bashrc
