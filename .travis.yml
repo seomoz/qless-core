@@ -7,6 +7,7 @@ install:
   - make redis
   - pip install redis
 env:
+  - REDIS_VERSION=2.8.24
   - REDIS_VERSION=3.0.7
   - REDIS_VERSION=3.2.11
 script: make test
