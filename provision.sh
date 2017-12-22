@@ -23,7 +23,7 @@ sudo apt-get install -y libhiredis-dev libevent-dev python-pip python-dev
 
     # Download and install the thing
     cd /tmp
-    export REDIS_VERSION=2.8.24
+    export REDIS_VERSION=4.0.6
     wget http://download.redis.io/releases/redis-$REDIS_VERSION.tar.gz
     tar xf redis-$REDIS_VERSION.tar.gz
     (
