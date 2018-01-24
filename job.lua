@@ -652,6 +652,9 @@ function QlessJob:heartbeat(now, worker, data)
     -- Add this job to the list of jobs handled by this worker
     redis.call('zadd', 'ql:w:' .. worker .. ':jobs', expires, self.jid)
 
+    -- Make sure we this worker to the list of seen workers
+    redis.call('zadd', 'ql:workers', now, worker)
+
     -- And now we should just update the locks
     local queue = Qless.queue(
       redis.call('hget', QlessJob.ns .. self.jid, 'queue'))
