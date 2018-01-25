@@ -24,6 +24,24 @@ class TestWorker(TestQless):
             'stalled': 0
         }])
 
+    def test_worker_registration_lapse(self):
+        '''Workers that fail to check in expire from the list of active workers'''
+        self.lua('config.set', 0, 'max-worker-age', 10)
+        self.lua('pop', 1, 'queue', 'worker', 1)
+        self.assertEqual(self.lua('workers', 15), {})
+
+    def test_worker_heartbeat_registration(self):
+        '''Heartbeating registers a worker as being active.'''
+        self.lua('config.set', 0, 'max-worker-age', 10)
+        self.lua('put', 0, 'worker', 'queue', 'jid', 'klass', {}, 0)
+        self.lua('pop', 1, 'queue', 'worker', 1)
+        self.lua('heartbeat', 10, 'jid', 'worker', {})
+        self.assertEqual(self.lua('workers', 15), [{
+            'name': 'worker',
+            'jobs': 1,
+            'stalled': 0,
+        }])
+
     def test_stalled(self):
         '''We should be able to detect stalled jobs'''
         self.lua('put', 0, 'worker', 'queue', 'jid', 'klass', {}, 0)
