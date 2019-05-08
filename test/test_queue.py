@@ -132,6 +132,17 @@ class TestJobs(TestQless):
         self.assertEqual(
             self.lua('jobs', 100, 'running', 'queue', 50, 50), jids[50:])
 
+    def test_pagination_waiting(self):
+        '''Jobs should be able to provide paginated result for waiting'''
+        jids = map(str, range(100))
+        for jid in jids:
+            self.lua('put', jid, 'worker', 'queue', jid, 'klass', {}, 0)
+        # Get two pages and ensure they're what we expect
+        self.assertEqual(
+            self.lua('jobs', 100, 'waiting', 'queue',  0, 50), jids[:50])
+        self.assertEqual(
+            self.lua('jobs', 100, 'waiting', 'queue', 50, 50), jids[50:])
+
 
 class TestQueue(TestQless):
     '''Test queue info tests'''

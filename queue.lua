@@ -10,13 +10,13 @@ function Qless.queue(name)
 
   -- Access to our work
   queue.work = {
-    peek = function(count)
+    peek = function(now, offset, count)
       if count == 0 then
         return {}
       end
       local jids = {}
       for index, jid in ipairs(redis.call(
-        'zrevrange', queue:prefix('work'), 0, count - 1)) do
+        'zrevrange', queue:prefix('work'), offset, offset + count - 1)) do
         table.insert(jids, jid)
       end
       return jids
@@ -247,7 +247,7 @@ function QlessQueue:peek(now, count)
 
   -- With these in place, we can expand this list of jids based on the work
   -- queue itself and the priorities therein
-  table.extend(jids, self.work.peek(count - #jids))
+  table.extend(jids, self.work.peek(now, 0, count - #jids))
 
   return jids
 end
@@ -322,7 +322,7 @@ function QlessQueue:pop(now, worker, count)
 
   -- With these in place, we can expand this list of jids based on the work
   -- queue itself and the priorities therein
-  table.extend(jids, self.work.peek(count - #jids))
+  table.extend(jids, self.work.peek(now, 0, count - #jids))
 
   local state
   for index, jid in ipairs(jids) do
