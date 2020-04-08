@@ -132,6 +132,21 @@ class TestEvents(TestQless):
             'data': '{"message":"Job exhausted retries in queue \\"queue\\"","jid":"jid","group":"failed-retries-queue","event":"failed","worker":"worker"}'
         }])
 
+    def test_failed_retries_tracked(self):
+        '''We should hear chatter when a tagged job fails from retries'''
+        self.lua('config.set', 0, 'grace-period', 0)
+        self.lua('put', 0, 'worker', 'queue', 'jid', 'klass', {}, 0, 'retries', 0)
+        self.lua('track', 0, 'track', 'jid')
+        job = self.lua('pop', 0, 'queue', 'worker', 10)[0]
+        with self.lua:
+            self.assertEqual(self.lua(
+                'retry', 0, 'jid', 'queue', 'worker', 0, 'group', 'message'), -1)
+        self.assertEqual(self.lua('get', 0, 'jid')['state'], 'failed')
+        self.assertEqual(self.lua.log, [{
+			'channel': 'ql:failed',
+			'data': 'jid'
+		}])
+
     def test_advance(self):
         '''We should hear chatter when completing and advancing a job'''
         self.lua('put', 0, 'worker', 'queue', 'jid', 'klass', {}, 0)

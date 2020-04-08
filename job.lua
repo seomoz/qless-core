@@ -493,6 +493,10 @@ function QlessJob:retry(now, queue, worker, delay, group, message)
       }))
     end
 
+    if redis.call('zscore', 'ql:tracked', self.jid) ~= false then
+      Qless.publish('failed', self.jid)
+    end
+
     -- Add this type of failure to the list of failures
     redis.call('sadd', 'ql:failures', group)
     -- And add this particular instance to the failed types
