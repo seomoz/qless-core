@@ -324,10 +324,8 @@ function QlessQueue:pop(now, worker, count)
   -- queue itself and the priorities therein
   table.extend(jids, self.work.peek(count - #jids))
 
-  local state
   for index, jid in ipairs(jids) do
     local job = Qless.job(jid)
-    state = unpack(job:data('state'))
     job:history(now, 'popped', {worker = worker})
 
     -- Update the wait time statistics
