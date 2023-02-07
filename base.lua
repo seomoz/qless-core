@@ -146,6 +146,8 @@ function Qless.jobs(now, state, ...)
       return queue.locks.peek(now, offset, count)
     elseif state == 'stalled' then
       return queue.locks.expired(now, offset, count)
+    elseif state == 'waiting' then
+      return queue.work.peek(now, offset, count)
     elseif state == 'scheduled' then
       queue:check_scheduled(now, queue.scheduled.length())
       return queue.scheduled.peek(now, offset, count)
