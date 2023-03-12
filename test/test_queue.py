@@ -362,16 +362,16 @@ class TestPut(TestQless):
         '''Dependencies are reflected in job data'''
         self.lua('put', 12345, 'worker', 'queue', 'a', 'klass', {}, 0)
         self.lua('put', 12345, 'worker', 'queue', 'b', 'klass', {}, 0, 'depends', ['a'])
-        self.assertEqual(self.lua('get', 12345, 'a')['dependents'], ['b'])
-        self.assertEqual(self.lua('get', 12345, 'b')['dependencies'], ['a'])
+        self.assertEqual(sorted(self.lua('get', 12345, 'a')['dependents']), ['b'])
+        self.assertEqual(sorted(self.lua('get', 12345, 'b')['dependencies']), ['a'])
         self.assertEqual(self.lua('get', 12345, 'b')['state'], 'depends')
 
     def test_put_depends_with_delay(self):
         '''When we put a job with a depends and a delay it is reflected in the job data'''
         self.lua('put', 12345, 'worker', 'queue', 'a', 'klass', {}, 0)
         self.lua('put', 12345, 'worker', 'queue', 'b', 'klass', {}, 1, 'depends', ['a'])
-        self.assertEqual(self.lua('get', 12345, 'a')['dependents'], ['b'])
-        self.assertEqual(self.lua('get', 12345, 'b')['dependencies'], ['a'])
+        self.assertEqual(sorted(self.lua('get', 12345, 'a')['dependents']), ['b'])
+        self.assertEqual(sorted(self.lua('get', 12345, 'b')['dependencies']), ['a'])
         self.assertEqual(self.lua('get', 12345, 'b')['state'], 'depends')
 
     def test_move(self):
@@ -420,14 +420,14 @@ class TestPut(TestQless):
         self.lua('put', 0, 'worker', 'queue', 'b', 'klass', {}, 0)
         self.lua('put', 0, 'worker', 'queue', 'c', 'klass', {}, 0, 'depends', ['a'])
         self.lua('put', 0, 'worker', 'other', 'c', 'klass', {}, 0)
-        self.assertEqual(self.lua('get', 0, 'a')['dependents'], ['c'])
+        self.assertEqual(sorted(self.lua('get', 0, 'a')['dependents']), ['c'])
         self.assertEqual(self.lua('get', 0, 'b')['dependents'], {})
-        self.assertEqual(self.lua('get', 0, 'c')['dependencies'], ['a'])
+        self.assertEqual(sorted(self.lua('get', 0, 'c')['dependencies']), ['a'])
         # But if we move and update depends, then it should correctly reflect
         self.lua('put', 0, 'worker', 'queue', 'c', 'klass', {}, 0, 'depends', ['b'])
         self.assertEqual(self.lua('get', 0, 'a')['dependents'], {})
-        self.assertEqual(self.lua('get', 0, 'b')['dependents'], ['c'])
-        self.assertEqual(self.lua('get', 0, 'c')['dependencies'], ['b'])
+        self.assertEqual(sorted(self.lua('get', 0, 'b')['dependents']), ['c'])
+        self.assertEqual(sorted(self.lua('get', 0, 'c')['dependencies']), ['b'])
 
 
 class TestPeek(TestQless):
