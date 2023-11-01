@@ -66,11 +66,12 @@ end
 --      ('depends',        : Json of jobs it depends on in the new queue
 --          '["jid1", "jid2", ...]')
 ---
-function QlessJob:complete(now, worker, queue, raw_data, ...)
+function QlessJob:complete(now, worker, queue, data, ...)
   assert(worker, 'Complete(): Arg "worker" missing')
   assert(queue , 'Complete(): Arg "queue" missing')
-  local data = assert(cjson.decode(raw_data),
-    'Complete(): Arg "data" missing or not JSON: ' .. tostring(raw_data))
+  if data then
+    assert(cjson.decode(data), 'Complete(): Arg "data" not JSON: ' .. tostring(data))
+  end
 
   -- Read in all the optional parameters
   local options = {}
@@ -122,8 +123,8 @@ function QlessJob:complete(now, worker, queue, raw_data, ...)
   --          update history
   self:history(now, 'done')
 
-  if raw_data then
-    redis.call('hset', QlessJob.ns .. self.jid, 'data', raw_data)
+  if data then
+    redis.call('hset', QlessJob.ns .. self.jid, 'data', data)
   end
 
   -- Remove the job from the previous queue
@@ -334,7 +335,7 @@ function QlessJob:fail(now, worker, group, message, data)
   local bin = now - (now % 86400)
 
   if data then
-    data = cjson.decode(data)
+    assert(cjson.decode(data), 'Fail(): Arg "data" not JSON: ' .. tostring(data))
   end
 
   -- First things first, we should get the history
@@ -386,7 +387,7 @@ function QlessJob:fail(now, worker, group, message, data)
   -- The reason that this appears here is that the above will fail if the
   -- job doesn't exist
   if data then
-    redis.call('hset', QlessJob.ns .. self.jid, 'data', cjson.encode(data))
+    redis.call('hset', QlessJob.ns .. self.jid, 'data', data)
   end
 
   redis.call('hmset', QlessJob.ns .. self.jid,
@@ -623,7 +624,7 @@ function QlessJob:heartbeat(now, worker, data)
     Qless.config.get('heartbeat', 60))
 
   if data then
-    data = cjson.decode(data)
+    assert(cjson.decode(data), 'Heartbeat(): Arg "data" not JSON: ' .. tostring(data))
   end
 
   -- First, let's see if the worker still owns this job, and there is a
@@ -643,10 +644,8 @@ function QlessJob:heartbeat(now, worker, data)
   else
     -- Otherwise, optionally update the user data, and the heartbeat
     if data then
-      -- I don't know if this is wise, but I'm decoding and encoding
-      -- the user data to hopefully ensure its sanity
       redis.call('hmset', QlessJob.ns .. self.jid, 'expires',
-        expires, 'worker', worker, 'data', cjson.encode(data))
+        expires, 'worker', worker, 'data', data)
     else
       redis.call('hmset', QlessJob.ns .. self.jid,
         'expires', expires, 'worker', worker)

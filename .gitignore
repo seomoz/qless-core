@@ -3,3 +3,6 @@
 .vagrant
 qless-lib.lua
 qless.lua
+/env
+/.idea
+
