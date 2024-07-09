@@ -62,8 +62,8 @@ class TestDependencies(TestQless):
             'depends', ['a'], 'next', 'queue')
         # Ensure that it shows up everywhere it should
         self.assertEqual(self.lua('get', 4, 'b')['state'], 'depends')
-        self.assertEqual(self.lua('get', 5, 'b')['dependencies'], ['a'])
-        self.assertEqual(self.lua('get', 6, 'a')['dependents'], ['b'])
+        self.assertEqual(sorted(self.lua('get', 5, 'b')['dependencies']), ['a'])
+        self.assertEqual(sorted(self.lua('get', 6, 'a')['dependents']), ['b'])
         # Only one job should be available
         self.assertEqual(len(self.lua('peek', 7, 'queue', 10)), 1)
 
@@ -154,7 +154,7 @@ class TestDependencies(TestQless):
         self.lua('put', 1, 'worker', 'queue', 'b', 'klass', {}, 0)
         self.lua('put', 2, 'worker', 'queue', 'c', 'klass', {}, 0, 'depends', ['a'])
         self.lua('depends', 3, 'c', 'on', 'b')
-        self.assertEqual(self.lua('get', 4, 'c')['dependencies'], ['a', 'b'])
+        self.assertEqual(sorted(self.lua('get', 4, 'c')['dependencies']), ['a', 'b'])
 
     def test_remove_dependency(self):
         '''We can remove dependencies'''
@@ -176,9 +176,9 @@ class TestDependencies(TestQless):
         self.lua('put', 1, 'worker', 'queue', 'b', 'klass', {}, 0)
         self.lua('put', 2, 'worker', 'queue', 'c', 'klass', {}, 0, 'depends', ['a'])
         self.lua('put', 3, 'worker', 'queue', 'c', 'klass', {}, 0, 'depends', ['b'])
-        self.assertEqual(self.lua('get', 4, 'c')['dependencies'], ['b'])
+        self.assertEqual(sorted(self.lua('get', 4, 'c')['dependencies']), ['b'])
         self.assertEqual(self.lua('get', 5, 'a')['dependents'], {})
-        self.assertEqual(self.lua('get', 6, 'b')['dependents'], ['c'])
+        self.assertEqual(sorted(self.lua('get', 6, 'b')['dependents']), ['c'])
         # Also, let's make sure that its effective dependencies are changed
         self.lua('pop', 7, 'queue', 'worker', 10)
         self.lua('complete', 8, 'a', 'worker', 'queue', {})
