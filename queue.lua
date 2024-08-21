@@ -247,7 +247,7 @@ function QlessQueue:peek(now, count)
 
   -- With these in place, we can expand this list of jids based on the work
   -- queue itself and the priorities therein
-  table.extend(jids, self.work.peek(count - #jids))
+  extend_table(jids, self.work.peek(count - #jids))
 
   return jids
 end
@@ -322,7 +322,7 @@ function QlessQueue:pop(now, worker, count)
 
   -- With these in place, we can expand this list of jids based on the work
   -- queue itself and the priorities therein
-  table.extend(jids, self.work.peek(count - #jids))
+  extend_table(jids, self.work.peek(count - #jids))
 
   local state
   for index, jid in ipairs(jids) do
