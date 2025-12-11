@@ -18,7 +18,7 @@ function QlessRecurringJob:data()
     retries      = tonumber(job[7]),
     count        = tonumber(job[8]),
     data         = job[9],
-    tags         = cjson.decode(job[10]),
+    tags         = json_decode(job[10]),
     backlog      = tonumber(job[11] or 0)
   }
 end
@@ -50,7 +50,7 @@ function QlessRecurringJob:update(now, ...)
         end
         redis.call('hset', 'ql:r:' .. self.jid, key, value)
       elseif key == 'data' then
-        assert(cjson.decode(value), 'Recur(): Arg "data" is not JSON-encoded: ' .. tostring(value))
+        assert(json_decode(value), 'Recur(): Arg "data" is not JSON-encoded: ' .. tostring(value))
         redis.call('hset', 'ql:r:' .. self.jid, 'data', value)
       elseif key == 'klass' then
         redis.call('hset', 'ql:r:' .. self.jid, 'klass', value)
@@ -85,14 +85,14 @@ function QlessRecurringJob:tag(...)
   -- If the job has been canceled / deleted, then return false
   if tags then
     -- Decode the json blob, convert to dictionary
-    tags = cjson.decode(tags)
+    tags = json_decode(tags)
     local _tags = {}
     for i,v in ipairs(tags) do _tags[v] = true end
 
     -- Otherwise, add the job to the sorted set with that tags
     for i=1,#arg do if _tags[arg[i]] == nil or _tags[arg[i]] == false then table.insert(tags, arg[i]) end end
 
-    tags = cjson.encode(tags)
+    tags = json_encode(tags)
     redis.call('hset', 'ql:r:' .. self.jid, 'tags', tags)
     return tags
   else
@@ -107,7 +107,7 @@ function QlessRecurringJob:untag(...)
   -- If the job has been canceled / deleted, then return false
   if tags then
     -- Decode the json blob, convert to dictionary
-    tags = cjson.decode(tags)
+    tags = json_decode(tags)
     local _tags    = {}
     -- Make a hash
     for i,v in ipairs(tags) do _tags[v] = true end
@@ -117,7 +117,7 @@ function QlessRecurringJob:untag(...)
     local results = {}
     for i, tag in ipairs(tags) do if _tags[tag] then table.insert(results, tag) end end
     -- json encode them, set, and return
-    tags = cjson.encode(results)
+    tags = json_encode(results)
     redis.call('hset', 'ql:r:' .. self.jid, 'tags', tags)
     return tags
   else

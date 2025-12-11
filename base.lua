@@ -1,6 +1,10 @@
 -------------------------------------------------------------------------------
 -- Forward declarations to make everything happy
 -------------------------------------------------------------------------------
+-- Define local aliases for cjson to satisfy Redis 6+ Lua sandbox
+local json_encode = cjson.encode
+local json_decode = cjson.decode
+
 local Qless = {
   ns = 'ql:'
 }

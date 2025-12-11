@@ -415,7 +415,7 @@ end
 function QlessQueue:put(now, worker, jid, klass, raw_data, delay, ...)
   assert(jid  , 'Put(): Arg "jid" missing')
   assert(klass, 'Put(): Arg "klass" missing')
-  local data = assert(cjson.decode(raw_data),
+  local data = assert(json_decode(raw_data),
     'Put(): Arg "data" missing or not JSON: ' .. tostring(raw_data))
   delay = assert(tonumber(delay),
     'Put(): Arg "delay" not a number: ' .. tostring(delay))
@@ -436,17 +436,17 @@ function QlessQueue:put(now, worker, jid, klass, raw_data, delay, ...)
 
   -- If there are old tags, then we should remove the tags this job has
   if tags then
-    Qless.tag(now, 'remove', jid, unpack(cjson.decode(tags)))
+    Qless.tag(now, 'remove', jid, unpack(json_decode(tags)))
   end
 
   -- Sanity check on optional args
   retries  = assert(tonumber(options['retries']  or retries or 5) ,
     'Put(): Arg "retries" not a number: ' .. tostring(options['retries']))
-  tags     = assert(cjson.decode(options['tags'] or tags or '[]' ),
+  tags     = assert(json_decode(options['tags'] or tags or '[]' ),
     'Put(): Arg "tags" not JSON'          .. tostring(options['tags']))
   priority = assert(tonumber(options['priority'] or priority or 0),
     'Put(): Arg "priority" not a number'  .. tostring(options['priority']))
-  local depends = assert(cjson.decode(options['depends'] or '[]') ,
+  local depends = assert(json_decode(options['depends'] or '[]') ,
     'Put(): Arg "depends" not JSON: '     .. tostring(options['depends']))
 
   -- If the job has old dependencies, determine which dependencies are
@@ -470,7 +470,7 @@ function QlessQueue:put(now, worker, jid, klass, raw_data, delay, ...)
   end
 
   -- Send out a log message
-  Qless.publish('log', cjson.encode({
+  Qless.publish('log', json_encode({
     jid   = jid,
     event = 'put',
     queue = self.name
@@ -496,7 +496,7 @@ function QlessQueue:put(now, worker, jid, klass, raw_data, delay, ...)
     -- to the last owner of the job
     if oldworker ~= worker then
       -- We need to inform whatever worker had that job
-      local encoded = cjson.encode({
+      local encoded = json_encode({
         jid    = jid,
         event  = 'lock_lost',
         worker = oldworker
@@ -520,7 +520,7 @@ function QlessQueue:put(now, worker, jid, klass, raw_data, delay, ...)
 
   -- If we're in the failed state, remove all of our data
   if state == 'failed' then
-    failure = cjson.decode(failure)
+    failure = json_decode(failure)
     -- We need to make this remove it from the failed queues
     redis.call('lrem', 'ql:f:' .. failure.group, 0, jid)
     if redis.call('llen', 'ql:f:' .. failure.group) == 0 then
@@ -540,7 +540,7 @@ function QlessQueue:put(now, worker, jid, klass, raw_data, delay, ...)
     'klass'    , klass,
     'data'     , raw_data,
     'priority' , priority,
-    'tags'     , cjson.encode(tags),
+    'tags'     , json_encode(tags),
     'state'    , ((delay > 0) and 'scheduled') or 'waiting',
     'worker'   , '',
     'expires'  , 0,
@@ -634,7 +634,7 @@ function QlessQueue:recur(now, jid, klass, raw_data, spec, ...)
   assert(jid  , 'RecurringJob On(): Arg "jid" missing')
   assert(klass, 'RecurringJob On(): Arg "klass" missing')
   assert(spec , 'RecurringJob On(): Arg "spec" missing')
-  local data = assert(cjson.decode(raw_data),
+  local data = assert(json_decode(raw_data),
     'RecurringJob On(): Arg "data" not JSON: ' .. tostring(raw_data))
 
   -- At some point in the future, we may have different types of recurring
@@ -657,7 +657,7 @@ function QlessQueue:recur(now, jid, klass, raw_data, spec, ...)
     -- Read in all the optional parameters
     local options = {}
     for i = 3, #arg, 2 do options[arg[i]] = arg[i + 1] end
-    options.tags = assert(cjson.decode(options.tags or '{}'),
+    options.tags = assert(json_decode(options.tags or '{}'),
       'Recur(): Arg "tags" must be JSON string array: ' .. tostring(
         options.tags))
     options.priority = assert(tonumber(options.priority or 0),
@@ -685,7 +685,7 @@ function QlessQueue:recur(now, jid, klass, raw_data, spec, ...)
       'klass'   , klass,
       'data'    , raw_data,
       'priority', options.priority,
-      'tags'    , cjson.encode(options.tags or {}),
+      'tags'    , json_encode(options.tags or {}),
       'state'   , 'recur',
       'queue'   , self.name,
       'type'    , 'interval',
@@ -732,7 +732,7 @@ function QlessQueue:check_recurring(now, count)
     local klass, data, priority, tags, retries, interval, backlog = unpack(
       redis.call('hmget', 'ql:r:' .. jid, 'klass', 'data', 'priority',
         'tags', 'retries', 'interval', 'backlog'))
-    local _tags = cjson.decode(tags)
+    local _tags = json_decode(tags)
     local score = math.floor(tonumber(self.recurring.score(jid)))
     interval = tonumber(interval)
 
@@ -861,7 +861,7 @@ function QlessQueue:invalidate_locks(now, count)
 
       -- Send a message to let the worker know that its lost its lock on
       -- the job
-      local encoded = cjson.encode({
+      local encoded = json_encode({
         jid    = jid,
         event  = 'lock_lost',
         worker = worker
@@ -903,7 +903,7 @@ function QlessQueue:invalidate_locks(now, count)
           'expires', '')
         -- If the failure has not already been set, then set it
         redis.call('hset', QlessJob.ns .. jid,
-        'failure', cjson.encode({
+        'failure', json_encode({
           ['group']   = group,
           ['message'] =
             'Job exhausted retries in queue "' .. self.name .. '"',
@@ -919,7 +919,7 @@ function QlessQueue:invalidate_locks(now, count)
         if redis.call('zscore', 'ql:tracked', jid) ~= false then
           Qless.publish('failed', jid)
         end
-        Qless.publish('log', cjson.encode({
+        Qless.publish('log', json_encode({
           jid     = jid,
           event   = 'failed',
           group   = group,
