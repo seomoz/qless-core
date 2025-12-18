@@ -1,6 +1,10 @@
 -------------------------------------------------------------------------------
 -- Forward declarations to make everything happy
 -------------------------------------------------------------------------------
+-- Define local aliases for cjson to satisfy Redis 6+ Lua sandbox
+local json_encode = cjson.encode
+local json_decode = cjson.decode
+
 local Qless = {
   ns = 'ql:'
 }
@@ -31,7 +35,7 @@ QlessRecurringJob.__index = QlessRecurringJob
 Qless.config = {}
 
 -- Extend a table. This comes up quite frequently
-function table.extend(self, other)
+local function table_extend(self, other)
   for i, v in ipairs(other) do
     table.insert(self, v)
   end

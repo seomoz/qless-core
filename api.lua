@@ -11,7 +11,7 @@ function QlessAPI.get(now, jid)
   if not data then
     return nil
   end
-  return cjson.encode(data)
+  return json_encode(data)
 end
 
 -- Return json blob of data or nil for each jid provided
@@ -20,13 +20,13 @@ function QlessAPI.multiget(now, ...)
   for i, jid in ipairs(arg) do
     table.insert(results, Qless.job(jid):data())
   end
-  return cjson.encode(results)
+  return json_encode(results)
 end
 
 -- Public access
 QlessAPI['config.get'] = function(now, key)
   if not key then
-    return cjson.encode(Qless.config.get(key))
+    return json_encode(Qless.config.get(key))
   else
     return Qless.config.get(key)
   end
@@ -43,7 +43,7 @@ end
 
 -- Get information about a queue or queues
 QlessAPI.queues = function(now, queue)
-  return cjson.encode(QlessQueue.counts(now, queue))
+  return json_encode(QlessQueue.counts(now, queue))
 end
 
 QlessAPI.complete = function(now, jid, worker, queue, data, ...)
@@ -51,7 +51,7 @@ QlessAPI.complete = function(now, jid, worker, queue, data, ...)
 end
 
 QlessAPI.failed = function(now, group, start, limit)
-  return cjson.encode(Qless.failed(group, start, limit))
+  return json_encode(Qless.failed(group, start, limit))
 end
 
 QlessAPI.fail = function(now, jid, worker, group, message, data)
@@ -75,19 +75,19 @@ QlessAPI.heartbeat = function(now, jid, worker, data)
 end
 
 QlessAPI.workers = function(now, worker)
-  return cjson.encode(QlessWorker.counts(now, worker))
+  return json_encode(QlessWorker.counts(now, worker))
 end
 
 QlessAPI.track = function(now, command, jid)
-  return cjson.encode(Qless.track(now, command, jid))
+  return json_encode(Qless.track(now, command, jid))
 end
 
 QlessAPI.tag = function(now, command, ...)
-  return cjson.encode(Qless.tag(now, command, unpack(arg)))
+  return json_encode(Qless.tag(now, command, unpack(arg)))
 end
 
 QlessAPI.stats = function(now, queue, date)
-  return cjson.encode(Qless.queue(queue):stats(now, date))
+  return json_encode(Qless.queue(queue):stats(now, date))
 end
 
 QlessAPI.priority = function(now, jid, priority)
@@ -99,7 +99,7 @@ QlessAPI.log = function(now, jid, message, data)
   assert(jid, "Log(): Argument 'jid' missing")
   assert(message, "Log(): Argument 'message' missing")
   if data then
-    data = assert(cjson.decode(data),
+    data = assert(json_decode(data),
       "Log(): Argument 'data' not cjson: " .. tostring(data))
   end
 
@@ -114,7 +114,7 @@ QlessAPI.peek = function(now, queue, count)
   for i, jid in ipairs(jids) do
     table.insert(response, Qless.job(jid):data())
   end
-  return cjson.encode(response)
+  return json_encode(response)
 end
 
 QlessAPI.pop = function(now, queue, worker, count)
@@ -123,7 +123,7 @@ QlessAPI.pop = function(now, queue, worker, count)
   for i, jid in ipairs(jids) do
     table.insert(response, Qless.job(jid):data())
   end
-  return cjson.encode(response)
+  return json_encode(response)
 end
 
 QlessAPI.pause = function(now, ...)
@@ -172,7 +172,7 @@ QlessAPI['recur.get'] = function(now, jid)
   if not data then
     return nil
   end
-  return cjson.encode(data)
+  return json_encode(data)
 end
 
 QlessAPI['recur.update'] = function(now, jid, ...)
