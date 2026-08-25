@@ -290,7 +290,7 @@ function QlessQueue:pop(now, worker, count)
     return {}
   end
 
-  -- Make sure we this worker to the list of seen workers
+  -- Make sure we add this worker to the list of seen workers
   redis.call('zadd', 'ql:workers', now, worker)
 
   -- Check our max concurrency, and limit the count
@@ -507,7 +507,7 @@ function QlessQueue:put(now, worker, jid, klass, raw_data, delay, ...)
   end
 
   -- If the job was previously in the 'completed' state, then we should
-  -- remove it from being enqueued for destructination
+  -- remove it from being enqueued for destruction
   if state == 'complete' then
     redis.call('zrem', 'ql:completed', jid)
   end
@@ -740,7 +740,7 @@ function QlessQueue:check_recurring(now, count)
     -- time since the last pop
     backlog = tonumber(backlog or 0)
     if backlog ~= 0 then
-      -- Check how many jobs we could concievably generate
+      -- Check how many jobs we could conceivably generate
       local num = ((now - score) / interval)
       if num > backlog then
         -- Update the score
@@ -834,7 +834,7 @@ function QlessQueue:invalidate_locks(now, count)
     -- consider the worker dust in the wind
     local grace_period = tonumber(Qless.config.get('grace-period'))
 
-    -- Whether or not we've already sent a coutesy message
+    -- Whether or not we've already sent a courtesy message
     local courtesy_sent = tonumber(
       redis.call('hget', QlessJob.ns .. jid, 'grace') or 0)
 
@@ -859,7 +859,7 @@ function QlessQueue:invalidate_locks(now, count)
       Qless.job(jid):history(now, 'timed-out')
       redis.call('hset', QlessJob.ns .. jid, 'grace', 1)
 
-      -- Send a message to let the worker know that its lost its lock on
+      -- Send a message to let the worker know that it's lost its lock on
       -- the job
       local encoded = json_encode({
         jid    = jid,

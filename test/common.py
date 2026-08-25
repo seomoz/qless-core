@@ -22,7 +22,7 @@ class TestQless(unittest.TestCase):
         for args in examples:
             try:
                 # The reason that we're not using assertRaises is that the error
-                # message that is produces is unnecessarily vague, and offers no
+                # message that it produces is unnecessarily vague, and offers no
                 # indication of what arguments actually failed to raise the
                 # exception
                 function(*args)

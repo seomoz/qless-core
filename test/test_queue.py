@@ -405,7 +405,7 @@ class TestPut(TestQless):
             ('priority', 1, 2),
             ('tags', ['foo'], ['bar']),
             ('retries', 2, 3)]:
-            # First, when not overriding the value, it should stay the sam3
+            # First, when not overriding the value, it should stay the same
             # even after moving
             self.lua('put', 0, 'worker', 'queue', key, 'klass', {}, 0, key, value)
             self.lua('put', 0, 'worker', 'other', key, 'klass', {}, 0)
@@ -414,7 +414,7 @@ class TestPut(TestQless):
             self.lua('put', 0, 'worker', 'queue', key, 'klass', {}, 0, key, update)
             self.assertEqual(self.lua('get', 0, key)[key], update)
 
-        # Updating dependecies has to be special-cased a little bit. Without
+        # Updating dependencies has to be special-cased a little bit. Without
         # overriding dependencies, they should be carried through the move
         self.lua('put', 0, 'worker', 'queue', 'a', 'klass', {}, 0)
         self.lua('put', 0, 'worker', 'queue', 'b', 'klass', {}, 0)
@@ -475,7 +475,7 @@ class TestPeek(TestQless):
 
     def test_priority(self):
         '''Peeking honors job priorities'''
-        # We'll inserts some jobs with different priorities
+        # We'll insert some jobs with different priorities
         for jid in xrange(-10, 10):
             self.lua(
                 'put', 0, 'worker', 'queue', jid, 'klass', {}, 0, 'priority', jid)
@@ -570,7 +570,7 @@ class TestPop(TestQless):
 
     def test_priority(self):
         '''Popping should honor priority'''
-        # We'll inserts some jobs with different priorities
+        # We'll insert some jobs with different priorities
         for jid in xrange(-10, 10):
             self.lua(
                 'put', 0, 'worker', 'queue', jid, 'klass', {}, 0, 'priority', jid)
@@ -595,7 +595,7 @@ class TestPop(TestQless):
         self.assertEqual(self.lua('pop', 1, 'other', 'worker', 10)[0]['jid'], 'jid')
 
     def test_max_concurrency(self):
-        '''We can control the maxinum number of jobs available in a queue'''
+        '''We can control the maximum number of jobs available in a queue'''
         self.lua('config.set', 0, 'queue-max-concurrency', 5)
         for jid in xrange(10):
             self.lua('put', jid, 'worker', 'queue', jid, 'klass', {}, 0)
@@ -608,7 +608,7 @@ class TestPop(TestQless):
 
     def test_reduce_max_concurrency(self):
         '''We can reduce max_concurrency at any time'''
-        # We'll put and pop a bunch of jobs, then restruct concurrency and
+        # We'll put and pop a bunch of jobs, then restrict concurrency and
         # validate that jobs can't be popped until we dip below that level
         for jid in xrange(100):
             self.lua('put', jid, 'worker', 'queue', jid, 'klass', {}, 0)

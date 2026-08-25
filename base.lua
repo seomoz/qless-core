@@ -9,7 +9,7 @@ local Qless = {
   ns = 'ql:'
 }
 
--- Queue forward delcaration
+-- Queue forward declaration
 local QlessQueue = {
   ns = Qless.ns .. 'q:'
 }

@@ -2,15 +2,15 @@ Qless Core
 ==========
 [![Build Status](https://travis-ci.org/seomoz/qless-core.png)](https://travis-ci.org/seomoz/qless-core)
 
-This is the set of all the lua scripts that comprise the qless library. We've
-begun migrating away from the system of having one lua script per command to
+This is the set of all the Lua scripts that comprise the Qless library. We've
+begun migrating away from the system of having one Lua script per command to
 a more object-oriented approach where all code is contained in a single unified
-lua script.
+Lua script.
 
 There are a few reasons for making this choice, but essentially it was getting
 too difficult to maintain and there was a lot of duplicated code in different
 sections. This also happens to have the added benefit of allowing you to build
-on top of the qless core library __within your own lua scripts__ through
+on top of the Qless core library __within your own Lua scripts__ through
 composition.
 
 Building
@@ -34,9 +34,9 @@ though all it does is cat these files out in a particular order:
 make qless.lua
 ```
 
-If you'd like to use _just_ the core library within your lua script, you can
-get lua script that contains all the classes, but none of the wrapping layer
-that the qless clients use:
+If you'd like to use _just_ the core library within your Lua script, you can
+get a Lua script that contains all the classes, but none of the wrapping layer
+that the Qless clients use:
 
 ```bash
 make qless-lib.lua
@@ -45,10 +45,10 @@ make qless-lib.lua
 Testing
 -------
 Historically, tests have appeared only in the language-specific bindings of
-qless, but that has become a tedious process. Not to mention the fact that
+Qless, but that has become a tedious process. Not to mention the fact that
 it's a steep barrier to entry for writing new clients. In light of that, we
-now include tests directly in `qless-core`, written in python. To run these,
-you will need python and the `nose` and `redis` libraries. If you have `pip`
+now include tests directly in `qless-core`, written in Python. To run these,
+you will need Python and the `nose` and `redis` libraries. If you have `pip`
 installed:
 
 ```python
@@ -74,7 +74,7 @@ Conventions
 No more `KEYS`
 --------------
 When originally developing this, I wrote some functions using the `KEYS`
-portion of the lua scripts, but eventually realized that to do so didn't make
+portion of the Lua scripts, but eventually realized that to do so didn't make
 any sense. For just about all operations there's no way to determine a priori
 which Redis keys would be touched, and so I abandoned that idea. However, in
 many cases there were vestigial `KEYS` in use, but that has now changed. No
@@ -106,7 +106,7 @@ If a worker attempts to heartbeat a job, it may optionally provide an updated
 JSON blob to describe the job. If the job has been given to another worker,
 the heartbeat should return `false` and the worker should yield.
 
-When a node attempts to heartbeat, the lua script should check to see if the
+When a node attempts to heartbeat, the Lua script should check to see if the
 node attempting to renew the lock is the same node that currently owns the
 lock. If so, then the lock's expiration should be pushed back accordingly,
 and the updated expiration returned. If not, an exception is raised.
@@ -115,7 +115,7 @@ Stats
 -----
 Qless also collects statistics for job wait time (time popped - time put),
 and job completion time (time completed - time popped). By 'statistics',
-I mean average, variange, count and a histogram. Stats for the number of
+I mean average, variance, count and a histogram. Stats for the number of
 failures and retries for a given queue are also available.
 
 Stats are grouped by day. In the case of job wait time, its stats are
@@ -132,7 +132,7 @@ set, `ql:tracked`.
 Failures
 --------
 Failures are stored in such a way that we can quickly summarize the number of
-failures of a given type, but also which items have succumb to that type of
+failures of a given type, but also which items have succumbed to that type of
 failure. With that in mind, there is a Redis set, `ql:failures` whose members
 are the names of the various failure lists. Each type of failure then has its
 own list of instance ids that encountered such a failure. For example, we
@@ -285,7 +285,7 @@ any jobs that should now be considered eligible (the scheduled time is in
 the past) are then inserted into the work queue. A sorted set of all the
 known queues is maintained at `ql:queues`. Currently we're keeping it
 sorted based on the time when we first saw the queue, but that's a little
-bit at odd with only keeping queues around while they're being used.
+bit at odds with only keeping queues around while they're being used.
 
 When a job is completed, it removes itself as a dependency of all the jobs
 that depend on it. If it was the last job that a job depended on, it is then
@@ -333,8 +333,8 @@ Implementing Clients
 ====================
 There are a few nuanced aspects of implementing bindings for your particular
 language that are worth bringing up. The canonical example for bindings should
-be the [python](https://github.com/seomoz/qless-py) and
-[ruby](https://github.com/seomoz/qless) bindings.
+be the [Python](https://github.com/seomoz/qless-py) and
+[Ruby](https://github.com/seomoz/qless) bindings.
 
 Structure
 ---------
@@ -370,7 +370,7 @@ something to be aware of when writing language bindings.
 
 Filesystem Access
 -----------------
-It's intended to be a common usecase that bindings provide a worker script or
+It's intended to be a common use case that bindings provide a worker script or
 binary that runs several worker subprocesses. These should run with their
 working directory as a sandbox.
 
@@ -410,14 +410,14 @@ should support two modes of popping: ordered and round-robin. Consider queues
 	B: 2
 	C: 3
 
-In an ordered verion, the order in which the queues are specified has
+In an ordered version, the order in which the queues are specified has
 significance in the order in which jobs are popped. For example, if our queued
 were ordered `C, B, A` in the worker, we'd pop jobs off:
 
 	C, C, C, B, B, A, A, A, A, A
 
 In the round-robin implementation, a worker pops off a job from each queue as
-it progress through all queues:
+it progresses through all queues:
 
 	C, B, A, C, B, A, C, A, A, A
 

@@ -20,7 +20,7 @@ class TestLocks(TestQless):
         self.lua('config.set', 0, 'grace-period', 0)
 
     def test_move(self):
-        '''Moving ajob should expire any existing locks'''
+        '''Moving a job should expire any existing locks'''
         self.lua('put', 0, 'worker', 'queue', 'jid', 'klass', {}, 0)
         self.lua('pop', 1, 'queue', 'worker', 10)
         self.lua('heartbeat', 2, 'jid', 'worker', {})
@@ -80,7 +80,7 @@ class TestLocks(TestQless):
         self.lua('put', 0, 'worker', 'queue', 'jid', 'klass', {}, 0)
         self.assertRaisesRegexp(redis.ResponseError, r'waiting',
             self.lua, 'heartbeat',  1, 'jid', 'worker', {})
-        # Pop is and it should work
+        # Pop it and it should work
         self.lua('pop', 2, 'queue', 'worker', 10)
         self.lua('heartbeat', 3, 'jid', 'worker', {})
 
@@ -213,7 +213,7 @@ class TestRetry(TestQless):
         self.assertRaisesRegexp(redis.ResponseError, r'not currently running',
             self.lua, 'retry', 0, 'jid', 'queue', 'worker', 0)
 
-    def test_retry_otherowner(self):
+    def test_retry_other_owner(self):
         '''Cannot retry a job owned by another worker'''
         self.lua('put', 0, 'worker', 'queue', 'jid', 'klass', {}, 0)
         self.lua('pop', 0, 'queue', 'worker', 10)
@@ -337,7 +337,7 @@ class TestGracePeriod(TestQless):
 
     def setUp(self):
         TestQless.setUp(self)
-        # Ensure whe know what the grace period is
+        # Ensure we know what the grace period is
         self.lua('config.set', 0, 'grace-period', self.grace)
 
     def test_basic(self):

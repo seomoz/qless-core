@@ -42,13 +42,13 @@ class TestJob(TestQless):
 
 class TestRequeue(TestQless):
     def test_requeue_existing_job(self):
-        '''Requeueing an existing job is identical to `put`'''
+        '''Requeuing an existing job is identical to `put`'''
         self.lua('put', 0, 'worker', 'queue', 'jid', 'klass', {}, 0)
         self.lua('requeue', 1, 'worker', 'queue-2', 'jid', 'klass', {}, 0)
         self.assertEqual(self.lua('get', 0, 'jid')['queue'], 'queue-2')
 
-    def test_requeue_cancelled_job(self):
-        '''Requeueing a cancelled (or non-existent) job fails'''
+    def test_requeue_canceled_job(self):
+        '''Requeuing a canceled (or non-existent) job fails'''
         self.lua('put', 0, 'worker', 'queue', 'jid', 'klass', {}, 0)
         self.lua('cancel', 1, 'jid')
         self.assertRaisesRegexp(redis.ResponseError, r'does not exist',
@@ -151,7 +151,7 @@ class TestComplete(TestQless):
             'spawned_from_jid': False})
 
     def test_advance(self):
-        '''Can complete and advance a job in one fell swooop'''
+        '''Can complete and advance a job in one fell swoop'''
         self.lua('put', 0, 'worker', 'queue', 'jid', 'klass', {}, 0)
         self.lua('pop', 1, 'queue', 'worker', 10)
         self.lua('complete', 2, 'jid', 'worker', 'queue', {}, 'next', 'foo')

@@ -1,4 +1,4 @@
-'''Check some general functionality surrounding the the API'''
+'''Check some general functionality surrounding the API'''
 
 import redis
 from common import TestQless

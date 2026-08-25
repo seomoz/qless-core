@@ -234,7 +234,7 @@ function QlessJob:complete(now, worker, queue, raw_data, ...)
     count = tonumber(count or 50000)
     time  = tonumber(time  or 7 * 24 * 60 * 60)
 
-    -- Schedule this job for destructination eventually
+    -- Schedule this job for destruction eventually
     redis.call('zadd', 'ql:completed', now, self.jid)
 
     -- Now look at the expired job data. First, based on the current time
@@ -405,7 +405,7 @@ function QlessJob:fail(now, worker, group, message, data)
   -- And add this particular instance to the failed groups
   redis.call('lpush', 'ql:f:' .. group, self.jid)
 
-  -- Here is where we'd intcrement stats about the particular stage
+  -- Here is where we'd increment stats about the particular stage
   -- and possibly the workers
 
   return self.jid
@@ -612,7 +612,7 @@ end
 --      - the job's been canceled
 --      - the job's not running
 function QlessJob:heartbeat(now, worker, data)
-  assert(worker, 'Heatbeat(): Arg "worker" missing')
+  assert(worker, 'Heartbeat(): Arg "worker" missing')
 
   -- We should find the heartbeat interval for this queue
   -- heartbeat. First, though, we need to find the queue
@@ -652,7 +652,7 @@ function QlessJob:heartbeat(now, worker, data)
         'expires', expires, 'worker', worker)
     end
 
-    -- Update hwen this job was last updated on that worker
+    -- Update when this job was last updated on that worker
     -- Add this job to the list of jobs handled by this worker
     redis.call('zadd', 'ql:w:' .. worker .. ':jobs', expires, self.jid)
 
