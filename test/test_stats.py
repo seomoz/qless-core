@@ -72,7 +72,7 @@ class TestStats(TestQless):
         self.assertEqual(stats['failures'], 1)
 
     def test_failed_cancel(self):
-        '''If we fail a job, and then cancel it, stats reflects 0 failed job'''
+        '''If we fail a job, and then cancel it, stats reflects 0 failed jobs'''
         self.lua('put', 0, 'worker', 'queue', 'jid', 'klass', {}, 0)
         self.lua('pop', 0, 'queue', 'worker', 1)
         self.lua('fail', 0, 'jid', 'worker', 'group', 'message', {})
@@ -95,7 +95,7 @@ class TestStats(TestQless):
         self.lua('put', 0, 'worker', 'queue', 'jid', 'klass', {}, 0)
         self.lua('pop', 0, 'queue', 'worker', 1)
         self.lua('fail', 0, 'jid', 'worker', 'group', 'message', {})
-        # Put it somehwere 1.5 days later
+        # Put it somewhere 1.5 days later
         self.lua('put', 129600, 'worker', 'queue', 'jid', 'klass', {}, 0)
         self.assertEqual(self.lua('stats', 0, 'queue', 0)['failed'], 0)
         self.assertEqual(self.lua('stats', 0, 'queue', 129600)['failed'], 0)

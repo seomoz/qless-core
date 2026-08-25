@@ -6,7 +6,7 @@ from common import TestQless
 
 class TestTrack(TestQless):
     '''Test our tracking abilities'''
-    def test_malfomed(self):
+    def test_malformed(self):
         '''Enumerate all the ways that it can be malformed'''
         self.assertMalformed(self.lua, [
             ('track', 0, 'track'),

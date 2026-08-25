@@ -1,6 +1,6 @@
 -------------------------------------------------------------------------------
--- This is the analog of the 'main' function when invoking qless directly, as
--- apposed to for use within another library
+-- This is the analog of the 'main' function when invoking Qless directly, as
+-- opposed to for use within another library
 -------------------------------------------------------------------------------
 local QlessAPI = {}
 
@@ -203,7 +203,7 @@ end
 -- Function lookup
 -------------------------------------------------------------------------------
 
--- None of the qless function calls accept keys
+-- None of the Qless function calls accept keys
 if #KEYS > 0 then error('No Keys should be provided') end
 
 -- The first argument must be the function that we intend to call, and it must

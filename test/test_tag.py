@@ -54,7 +54,7 @@ class TestTag(TestQless):
         self.assertEqual(self.lua('get', 0, 'jid')['tags'], ['foo'])
 
     def test_get(self):
-        '''Should be able to get jobs taggs with a particular tag'''
+        '''Should be able to get jobs tags with a particular tag'''
         self.lua('put', 0, 'worker', 'queue', 'foo', 'klass', {}, 0,
             'tags', ['foo', 'both'])
         self.lua('put', 0, 'worker', 'queue', 'bar', 'klass', {}, 0,

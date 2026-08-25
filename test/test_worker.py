@@ -75,7 +75,7 @@ class TestWorker(TestQless):
             'stalled': {}
         })
 
-    def test_cancelled(self):
+    def test_canceled(self):
         '''Canceling a job removes it from the worker's stats'''
         self.lua('put', 0, 'worker', 'queue', 'jid', 'klass', {}, 0)
         self.lua('pop', 1, 'queue', 'worker', 10)
@@ -115,7 +115,7 @@ class TestWorker(TestQless):
         }])
 
     def test_complete(self):
-        '''When a job completes, it should be remove from the worker's jobs'''
+        '''When a job completes, it should be removed from the worker's jobs'''
         self.lua('put', 0, 'worker', 'queue', 'jid', 'klass', {}, 0)
         self.lua('pop', 1, 'queue', 'worker', 10)
         self.assertEqual(self.lua('workers', 2, 'worker'), {

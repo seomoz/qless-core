@@ -61,7 +61,7 @@ class TestFail(TestQless):
         self.lua('put', 0, 'worker', 'queue', 'jid', 'klass', {}, 0)
         self.assertRaisesRegexp(redis.ResponseError, r'waiting',
             self.lua, 'fail', 1, 'jid', 'worker', 'group', 'message', {})
-        # Pop is and it should work
+        # Pop it and it should work
         self.lua('pop', 2, 'queue', 'worker', 10)
         self.lua('fail', 3, 'jid', 'worker', 'group', 'message', {})
 

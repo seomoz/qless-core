@@ -175,7 +175,7 @@ class TestEvents(TestQless):
         }])
 
     def test_put(self):
-        '''We should hear chatter when a job is put into a queueu'''
+        '''We should hear chatter when a job is put into a queue'''
         with self.lua:
             self.lua('put', 0, 'worker', 'queue', 'jid', 'klass', {}, 0)
         self.assertEqual(self.lua.log, [{
@@ -233,17 +233,17 @@ class TestEvents(TestQless):
     def test_cancel_running(self):
         '''We should hear chatter about canceling running jobs'''
         self.lua('put', 0, 'worker', 'q', 'jid', 'klass', {}, 0)
-        self.lua('pop', 0, 'q', 'wrk', 10)
+        self.lua('pop', 0, 'q', 'worker-1', 10)
         with self.lua:
             self.lua('cancel', 0, 'jid')
         self.assertEqual(self.lua.log, [{
             'channel': 'ql:log',
             'data':
-                '{"jid":"jid","queue":"q","event":"canceled","worker":"wrk"}'
+                '{"jid":"jid","queue":"q","event":"canceled","worker":"worker-1"}'
         }, {
-            'channel': 'ql:w:wrk',
+            'channel': 'ql:w:worker-1',
             'data':
-                '{"jid":"jid","queue":"q","event":"canceled","worker":"wrk"}'
+                '{"jid":"jid","queue":"q","event":"canceled","worker":"worker-1"}'
         }])
 
     def test_cancel_depends(self):

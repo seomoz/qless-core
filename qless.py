@@ -1,5 +1,5 @@
 '''Some helper functions for running tests. This should not be confused with
-the python qless bindings.'''
+the Python Qless bindings.'''
 
 try:
     import simplejson as json
@@ -21,11 +21,11 @@ class QlessRecorder(object):
         self.log = []
 
     def raw(self, *args, **kwargs):
-        '''Submit raw data to the lua script, untransformed'''
+        '''Submit raw data to the Lua script, untransformed'''
         return self._lua(*args, **kwargs)
 
     def __call__(self, *args):
-        '''Invoke the lua script with no keys, and some simple transforms'''
+        '''Invoke the Lua script with no keys, and some simple transforms'''
         transformed = []
         for arg in args:
             if isinstance(arg, dict) or isinstance(arg, list):

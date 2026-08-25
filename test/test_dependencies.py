@@ -56,7 +56,7 @@ class TestDependencies(TestQless):
         '''Can also add dependencies upon completion'''
         self.lua('put', 0, 'worker', 'queue', 'b', 'klass', {}, 0)
         self.lua('put', 1, 'worker', 'queue', 'a', 'klass', {}, 0)
-        # Pop 'b', and then complete it it and make it depend on 'a'
+        # Pop 'b', and then complete it and make it depend on 'a'
         self.lua('pop', 2, 'queue', 'worker', 1)
         self.lua('complete', 3, 'b', 'worker', 'queue', {},
             'depends', ['a'], 'next', 'queue')
@@ -86,7 +86,7 @@ class TestDependencies(TestQless):
         self.assertEqual(self.lua('peek', 2, 'queue', 10)[0]['jid'], 'b')
 
     def test_cancel_dependency_chain(self):
-        '''If an entire dependency chain is cancelled together, it's ok'''
+        '''If an entire dependency chain is canceled together, it's ok'''
         self.lua('put', 0, 'worker', 'queue', 'a', 'klass', {}, 0)
         self.lua('put', 1, 'worker', 'queue', 'b', 'klass', {}, 0, 'depends', ['a'])
         self.lua('cancel', 2, 'a', 'b')
@@ -163,11 +163,11 @@ class TestDependencies(TestQless):
             self.lua('put', jid, 'worker', 'queue', jid, 'klass', {}, 0)
         # This job depends on all of the above
         self.lua('put', 100, 'worker', 'queue', 'jid', 'klass', {}, 0, 'depends', jids)
-        # Now, we'll remove dependences one at a time
+        # Now, we'll remove dependencies one at a time
         for jid in jids:
             self.assertEqual(self.lua('get', 100, 'jid')['state'], 'depends')
             self.lua('depends', 100, 'jid', 'off', jid)
-        # With all of these dependencies cancelled, this job should be ready
+        # With all of these dependencies canceled, this job should be ready
         self.assertEqual(self.lua('get', 100, 'jid')['state'], 'waiting')
 
     def test_reput_dependency(self):
