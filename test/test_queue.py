@@ -30,7 +30,7 @@ class TestJobs(TestQless):
 
     def test_complete(self):
         '''Verify we can list complete jobs'''
-        jids = map(str, range(10))
+        jids = list(map(str, range(10)))
         for jid in jids:
             self.lua('put', jid, 'worker', 'queue', jid, 'klass', {}, 0)
             self.lua('pop', jid, 'queue', 'worker', 10)
@@ -41,7 +41,7 @@ class TestJobs(TestQless):
 
     def test_running(self):
         '''Verify that we can get a list of running jobs in a queue'''
-        jids = map(str, range(10))
+        jids = list(map(str, range(10)))
         for jid in jids:
             self.lua('put', jid, 'worker', 'queue', jid, 'klass', {}, 0)
             self.lua('pop', jid, 'queue', 'worker', 10)
@@ -52,7 +52,7 @@ class TestJobs(TestQless):
     def test_stalled(self):
         '''Verify that we can get a list of stalled jobs in a queue'''
         self.lua('config.set', 0, 'heartbeat', 10)
-        jids = map(str, range(10))
+        jids = list(map(str, range(10)))
         for jid in jids:
             self.lua('put', jid, 'worker', 'queue', jid, 'klass', {}, 0)
             self.lua('pop', jid, 'queue', 'worker', 10)
@@ -62,7 +62,7 @@ class TestJobs(TestQless):
 
     def test_scheduled(self):
         '''Verify that we can get a list of scheduled jobs in a queue'''
-        jids = map(str, range(1, 11))
+        jids = list(map(str, range(1, 11)))
         for jid in jids:
             self.lua('put', jid, 'worker', 'queue', jid, 'klass', {}, jid)
             scheduled = self.lua('jobs', 0, 'scheduled', 'queue')
@@ -72,7 +72,7 @@ class TestJobs(TestQless):
     def test_depends(self):
         '''Verify that we can get a list of dependent jobs in a queue'''
         self.lua('put', 0, 'worker', 'queue', 'a', 'klass', {}, 0)
-        jids = map(str, range(0, 10))
+        jids = list(map(str, range(0, 10)))
         for jid in jids:
             self.lua(
                 'put', jid, 'worker', 'queue', jid, 'klass', {}, 0, 'depends', ['a'])
@@ -82,7 +82,7 @@ class TestJobs(TestQless):
 
     def test_recurring(self):
         '''Verify that we can get a list of recurring jobs in a queue'''
-        jids = map(str, range(0, 10))
+        jids = list(map(str, range(0, 10)))
         for jid in jids:
             self.lua(
                 'recur', jid, 'queue', jid, 'klass', {}, 'interval', 60, 0)
@@ -92,7 +92,7 @@ class TestJobs(TestQless):
 
     def test_recurring_offset(self):
         '''Recurring jobs with a future offset should be included'''
-        jids = map(str, range(0, 10))
+        jids = list(map(str, range(0, 10)))
         for jid in jids:
             self.lua(
                 'recur', jid, 'queue', jid, 'klass', {}, 'interval', 60, 10)
@@ -107,7 +107,7 @@ class TestJobs(TestQless):
 
     def test_pagination_complete(self):
         '''Jobs should be able to provide paginated results for complete'''
-        jids = map(str, range(100))
+        jids = list(map(str, range(100)))
         for jid in jids:
             self.lua('put', jid, 'worker', 'queue', jid, 'klass', {}, 0)
             self.lua('pop', jid, 'queue', 'worker', 10)
@@ -121,7 +121,7 @@ class TestJobs(TestQless):
 
     def test_pagination_running(self):
         '''Jobs should be able to provide paginated result for running'''
-        jids = map(str, range(100))
+        jids = list(map(str, range(100)))
         self.lua('config.set', 0, 'heartbeat', 1000)
         for jid in jids:
             self.lua('put', jid, 'worker', 'queue', jid, 'klass', {}, 0)
@@ -214,7 +214,7 @@ class TestQueue(TestQless):
 
     def test_pause(self):
         '''Can pause and unpause a queue'''
-        jids = map(str, range(10))
+        jids = list(map(str, range(10)))
         for jid in jids:
             self.lua('put', 0, 'worker', 'queue', jid, 'klass', {}, 0)
         # After pausing, we can't get the jobs, and the state reflects it
@@ -476,21 +476,21 @@ class TestPeek(TestQless):
     def test_priority(self):
         '''Peeking honors job priorities'''
         # We'll inserts some jobs with different priorities
-        for jid in xrange(-10, 10):
+        for jid in range(-10, 10):
             self.lua(
                 'put', 0, 'worker', 'queue', jid, 'klass', {}, 0, 'priority', jid)
 
         # Peek at the jobs, and they should be in the right order
         jids = [job['jid'] for job in self.lua('peek', 1, 'queue', 100)]
-        self.assertEqual(jids, map(str, range(9, -11, -1)))
+        self.assertEqual(jids, list(map(str, range(9, -11, -1))))
 
     def test_time_order(self):
         '''Honor the time that jobs were put, priority constant'''
         # Put 100 jobs on with different times
-        for time in xrange(100):
+        for time in range(100):
             self.lua('put', time, 'worker', 'queue', time, 'klass', {}, 0)
         jids = [job['jid'] for job in self.lua('peek', 200, 'queue', 100)]
-        self.assertEqual(jids, map(str, range(100)))
+        self.assertEqual(jids, list(map(str, range(100))))
 
     def test_move(self):
         '''When we move a job, it should be visible in the new, not old'''
@@ -562,30 +562,30 @@ class TestPop(TestQless):
         # This should only pop the first 7
         self.assertEqual(
             [job['jid'] for job in self.lua('pop', 100, 'queue', 'worker', 7)],
-            map(str, range(7)))
+            list(map(str, range(7))))
         # This should only leave 3 left
         self.assertEqual(
             [job['jid'] for job in self.lua('pop', 100, 'queue', 'worker', 10)],
-            map(str, range(7, 10)))
+            list(map(str, range(7, 10))))
 
     def test_priority(self):
         '''Popping should honor priority'''
         # We'll inserts some jobs with different priorities
-        for jid in xrange(-10, 10):
+        for jid in range(-10, 10):
             self.lua(
                 'put', 0, 'worker', 'queue', jid, 'klass', {}, 0, 'priority', jid)
 
         # Peek at the jobs, and they should be in the right order
         jids = [job['jid'] for job in self.lua('pop', 1, 'queue', 'worker', 100)]
-        self.assertEqual(jids, map(str, range(9, -11, -1)))
+        self.assertEqual(jids, list(map(str, range(9, -11, -1))))
 
     def test_time_order(self):
         '''Honor the time jobs were inserted, priority held constant'''
         # Put 100 jobs on with different times
-        for time in xrange(100):
+        for time in range(100):
             self.lua('put', time, 'worker', 'queue', time, 'klass', {}, 0)
         jids = [job['jid'] for job in self.lua('pop', 200, 'queue', 'worker', 100)]
-        self.assertEqual(jids, map(str, range(100)))
+        self.assertEqual(jids, list(map(str, range(100))))
 
     def test_move(self):
         '''When we move a job, it should be visible in the new, not old'''
@@ -597,11 +597,11 @@ class TestPop(TestQless):
     def test_max_concurrency(self):
         '''We can control the maxinum number of jobs available in a queue'''
         self.lua('config.set', 0, 'queue-max-concurrency', 5)
-        for jid in xrange(10):
+        for jid in range(10):
             self.lua('put', jid, 'worker', 'queue', jid, 'klass', {}, 0)
         self.assertEqual(len(self.lua('pop', 10, 'queue', 'worker', 10)), 5)
         # But as we complete the jobs, we can pop more
-        for jid in xrange(5):
+        for jid in range(5):
             self.lua('complete', 10, jid, 'worker', 'queue', {})
             self.assertEqual(
                 len(self.lua('pop', 10, 'queue', 'worker', 10)), 1)
@@ -610,11 +610,11 @@ class TestPop(TestQless):
         '''We can reduce max_concurrency at any time'''
         # We'll put and pop a bunch of jobs, then restruct concurrency and
         # validate that jobs can't be popped until we dip below that level
-        for jid in xrange(100):
+        for jid in range(100):
             self.lua('put', jid, 'worker', 'queue', jid, 'klass', {}, 0)
         self.lua('pop', 100, 'queue', 'worker', 10)
         self.lua('config.set', 100, 'queue-max-concurrency', 5)
-        for jid in xrange(6):
+        for jid in range(6):
             self.assertEqual(
                 len(self.lua('pop', 100, 'queue', 'worker', 10)), 0)
             self.lua('complete', 100, jid, 'worker', 'queue', {})

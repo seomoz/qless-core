@@ -98,7 +98,7 @@ class TestEvents(TestQless):
         self.lua('put', 0, 'worker', 'queue', 'jid', 'klass', {}, 0)
         self.lua('track', 0, 'track', 'jid')
         job = self.lua('pop', 0, 'queue', 'worker', 10)[0]
-        print self.lua('config.get', 0, 'grace-period')
+        print(self.lua('config.get', 0, 'grace-period'))
         with self.lua:
             self.lua('pop', job['expires'] + 10, 'queue', 'worker', 10)
         self.assertEqual(self.lua.log, [{

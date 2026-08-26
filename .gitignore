@@ -1,5 +1,6 @@
 *.pyc
 *~
 .vagrant
+.venv
 qless-lib.lua
 qless.lua

@@ -25,7 +25,7 @@ class TestJob(TestQless):
 
     def test_log_nonexistent(self):
         '''If a job doesn't exist, logging throws an error'''
-        self.assertRaisesRegexp(redis.ResponseError, r'does not exist',
+        self.assertRaisesRegex(redis.ResponseError, r'does not exist',
             self.lua, 'log', 0, 'jid', 'foo', {'foo': 'bar'})
 
     def test_history(self):
@@ -51,7 +51,7 @@ class TestRequeue(TestQless):
         '''Requeueing a cancelled (or non-existent) job fails'''
         self.lua('put', 0, 'worker', 'queue', 'jid', 'klass', {}, 0)
         self.lua('cancel', 1, 'jid')
-        self.assertRaisesRegexp(redis.ResponseError, r'does not exist',
+        self.assertRaisesRegex(redis.ResponseError, r'does not exist',
             self.lua, 'requeue', 2, 'worker', 'queue-2', 'jid', 'klass', {}, 0)
 
 class TestComplete(TestQless):
@@ -74,7 +74,7 @@ class TestComplete(TestQless):
     def test_complete_waiting(self):
         '''Only popped jobs can be completed'''
         self.lua('put', 0, 'worker', 'queue', 'jid', 'klass', {}, 0)
-        self.assertRaisesRegexp(redis.ResponseError, r'waiting',
+        self.assertRaisesRegex(redis.ResponseError, r'waiting',
             self.lua, 'complete', 1, 'jid', 'worker', 'queue', {})
         # Pop it and it should work
         self.lua('pop', 2, 'queue', 'worker', 10)
@@ -84,18 +84,18 @@ class TestComplete(TestQless):
         '''Cannot complete a dependent job'''
         self.lua('put', 0, 'worker', 'queue', 'a', 'klass', {}, 0)
         self.lua('put', 0, 'worker', 'queue', 'b', 'klass', {}, 0, 'depends', ['a'])
-        self.assertRaisesRegexp(redis.ResponseError, r'depends',
+        self.assertRaisesRegex(redis.ResponseError, r'depends',
             self.lua, 'complete', 1, 'b', 'worker', 'queue', {})
 
     def test_complete_scheduled(self):
         '''Cannot complete a scheduled job'''
         self.lua('put', 0, 'worker', 'queue', 'jid', 'klass', {}, 1)
-        self.assertRaisesRegexp(redis.ResponseError, r'scheduled',
+        self.assertRaisesRegex(redis.ResponseError, r'scheduled',
             self.lua, 'complete', 1, 'jid', 'worker', 'queue', {})
 
     def test_complete_nonexistent(self):
         '''Cannot complete a job that doesn't exist'''
-        self.assertRaisesRegexp(redis.ResponseError, r'does not exist',
+        self.assertRaisesRegex(redis.ResponseError, r'does not exist',
             self.lua, 'complete', 1, 'jid', 'worker', 'queue', {})
         self.lua('put', 0, 'worker', 'queue', 'jid', 'klass', {}, 0)
         self.lua('pop', 0, 'queue', 'worker', 10)
@@ -106,7 +106,7 @@ class TestComplete(TestQless):
         self.lua('put', 0, 'worker', 'queue', 'jid', 'klass', {}, 0)
         self.lua('pop', 0, 'queue', 'worker', 10)
         self.lua('fail', 1, 'jid', 'worker', 'group', 'message', {})
-        self.assertRaisesRegexp(redis.ResponseError, r'failed',
+        self.assertRaisesRegex(redis.ResponseError, r'failed',
             self.lua, 'complete', 0, 'jid', 'worker', 'queue', {})
 
     def test_complete_previously_failed(self):
@@ -170,14 +170,14 @@ class TestComplete(TestQless):
         '''Only the right worker can complete it'''
         self.lua('put', 0, 'worker', 'queue', 'jid', 'klass', {}, 0)
         self.lua('pop', 1, 'queue', 'worker', 10)
-        self.assertRaisesRegexp(redis.ResponseError, r'another worker',
+        self.assertRaisesRegex(redis.ResponseError, r'another worker',
             self.lua, 'complete', 2, 'jid', 'another', 'queue', {})
 
     def test_wrong_queue(self):
         '''A job can only be completed in the queue it's in'''
         self.lua('put', 0, 'worker', 'queue', 'jid', 'klass', {}, 0)
         self.lua('pop', 1, 'queue', 'worker', 10)
-        self.assertRaisesRegexp(redis.ResponseError, r'another queue',
+        self.assertRaisesRegex(redis.ResponseError, r'another queue',
             self.lua, 'complete', 2, 'jid', 'worker', 'another-queue', {})
 
     def test_expire_complete_count(self):
@@ -225,7 +225,7 @@ class TestCancel(TestQless):
         '''Cannot cancel jobs if they still have dependencies'''
         self.lua('put', 0, 'worker', 'queue', 'a', 'klass', {}, 0)
         self.lua('put', 0, 'worker', 'queue', 'b', 'klass', {}, 0, 'depends', ['a'])
-        self.assertRaisesRegexp(redis.ResponseError, r'dependency',
+        self.assertRaisesRegex(redis.ResponseError, r'dependency',
             self.lua, 'cancel', 0, 'a')
 
     def test_cancel_scheduled(self):
@@ -252,7 +252,7 @@ class TestCancel(TestQless):
         self.lua('pop', 1, 'queue', 'worker', 10)
         self.lua('heartbeat', 2, 'jid', 'worker', {})
         self.lua('cancel', 3, 'jid')
-        self.assertRaisesRegexp(redis.ResponseError, r'Job jid does not exist',
+        self.assertRaisesRegex(redis.ResponseError, r'Job jid does not exist',
             self.lua, 'heartbeat', 4, 'jid', 'worker', {})
 
     def test_cancel_retries(self):

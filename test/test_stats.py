@@ -21,7 +21,7 @@ class TestStats(TestQless):
 
         # Put in jobs all at the same time, and then pop them at different
         # times to ensure that we know stats about how long they've waited
-        jids = map(str, range(20))
+        jids = list(map(str, range(20)))
         for jid in jids:
             self.lua('put', 0, 'worker', 'queue', jid, 'klass', {}, 0)
         for jid in jids:
@@ -38,7 +38,7 @@ class TestStats(TestQless):
         '''It correctly tracks job run times'''
         # Put in a bunch of jobs and pop them all at the same time, and then
         # we'll complete them at different times and check the computed stats
-        jids = map(str, range(20))
+        jids = list(map(str, range(20)))
         for jid in jids:
             self.lua('put', 0, 'worker', 'queue', jid, 'klass', {}, 0)
             self.lua('pop', 0, 'queue', 'worker', 1)
