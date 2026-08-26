@@ -30,6 +30,8 @@ class QlessRecorder(object):
         for arg in args:
             if isinstance(arg, dict) or isinstance(arg, list):
                 transformed.append(json.dumps(arg))
+            elif arg is None:
+                transformed.append('')
             else:
                 transformed.append(arg)
         result = self._lua([], transformed)
@@ -47,7 +49,7 @@ class QlessRecorder(object):
     def __enter__(self):
         self.log = []
         self._pubsub.psubscribe('*')
-        self._pubsub.listen().next()
+        next(self._pubsub.listen())
         return self
 
     def __exit__(self, typ, val, traceback):

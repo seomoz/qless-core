@@ -59,7 +59,7 @@ class TestFail(TestQless):
     def test_fail_waiting(self):
         '''Only popped jobs can be failed'''
         self.lua('put', 0, 'worker', 'queue', 'jid', 'klass', {}, 0)
-        self.assertRaisesRegexp(redis.ResponseError, r'waiting',
+        self.assertRaisesRegex(redis.ResponseError, r'waiting',
             self.lua, 'fail', 1, 'jid', 'worker', 'group', 'message', {})
         # Pop is and it should work
         self.lua('pop', 2, 'queue', 'worker', 10)
@@ -69,18 +69,18 @@ class TestFail(TestQless):
         '''Cannot fail a dependent job'''
         self.lua('put', 0, 'worker', 'queue', 'a', 'klass', {}, 0)
         self.lua('put', 0, 'worker', 'queue', 'b', 'klass', {}, 0, 'depends', ['a'])
-        self.assertRaisesRegexp(redis.ResponseError, r'depends',
+        self.assertRaisesRegex(redis.ResponseError, r'depends',
             self.lua, 'fail', 1, 'b', 'worker', 'group', 'message', {})
 
     def test_fail_scheduled(self):
         '''Cannot fail a scheduled job'''
         self.lua('put', 0, 'worker', 'queue', 'jid', 'klass', {}, 1)
-        self.assertRaisesRegexp(redis.ResponseError, r'scheduled',
+        self.assertRaisesRegex(redis.ResponseError, r'scheduled',
             self.lua, 'fail', 1, 'jid', 'worker', 'group', 'message', {})
 
     def test_fail_nonexistent(self):
         '''Cannot fail a job that doesn't exist'''
-        self.assertRaisesRegexp(redis.ResponseError, r'does not exist',
+        self.assertRaisesRegex(redis.ResponseError, r'does not exist',
             self.lua, 'fail', 1, 'jid', 'worker', 'group', 'message', {})
         self.lua('put', 0, 'worker', 'queue', 'jid', 'klass', {}, 0)
         self.lua('pop', 0, 'queue', 'worker', 10)
@@ -91,7 +91,7 @@ class TestFail(TestQless):
         self.lua('put', 0, 'worker', 'queue', 'jid', 'klass', {}, 0)
         self.lua('pop', 0, 'queue', 'worker', 10)
         self.lua('complete', 0, 'jid', 'worker', 'queue', {})
-        self.assertRaisesRegexp(redis.ResponseError, r'complete',
+        self.assertRaisesRegex(redis.ResponseError, r'complete',
             self.lua, 'fail', 1, 'jid', 'worker', 'group', 'message', {})
 
     def test_fail_owner(self):
@@ -100,7 +100,7 @@ class TestFail(TestQless):
         self.lua('pop', 1, 'queue', 'worker', 10)
         self.lua('put', 2, 'worker', 'queue', 'jid', 'klass', {}, 0)
         self.lua('pop', 3, 'queue', 'another-worker', 10)
-        self.assertRaisesRegexp(redis.ResponseError, r'another worker',
+        self.assertRaisesRegex(redis.ResponseError, r'another worker',
             self.lua, 'fail', 4, 'jid', 'worker', 'group', 'message', {})
 
 
@@ -142,7 +142,7 @@ class TestFailed(TestQless):
 
     def test_failed_pagination(self):
         '''Failed provides paginated access'''
-        jids = map(str, range(100))
+        jids = list(map(str, range(100)))
         for jid in jids:
             self.lua('put', jid, 'worker', 'queue', jid, 'klass', {}, 0)
             self.lua('pop', jid, 'queue', 'worker', 10)
@@ -159,7 +159,7 @@ class TestUnfailed(TestQless):
     '''Test access to unfailed'''
     def test_basic(self):
         '''We can unfail in a basic way'''
-        jids = map(str, range(10))
+        jids = list(map(str, range(10)))
         for jid in jids:
             self.lua('put', 0, 'worker', 'queue', jid, 'klass', {}, 0)
             self.lua('pop', 0, 'queue', 'worker', 10)

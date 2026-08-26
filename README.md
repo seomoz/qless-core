@@ -48,12 +48,7 @@ Historically, tests have appeared only in the language-specific bindings of
 qless, but that has become a tedious process. Not to mention the fact that
 it's a steep barrier to entry for writing new clients. In light of that, we
 now include tests directly in `qless-core`, written in python. To run these,
-you will need python and the `nose` and `redis` libraries. If you have `pip`
-installed:
-
-```python
-pip install redis nose
-```
+you will need python 3.
 
 To run the tests, there is a directive included in the makefile:
 

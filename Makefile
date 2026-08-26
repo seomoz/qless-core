@@ -22,8 +22,13 @@ REDIS_BIN = $(REDIS_DIR)/src/redis-server
 clean:
 	rm -rf qless.lua qless-lib.lua $(REDIS_TAR) $(REDIS_DIR)
 
-test: qless.lua *.lua
-	nosetests --exe -v
+.venv/bin/activate: requirements.txt
+	python3 -m venv .venv
+	.venv/bin/pip install -q -r requirements.txt
+	touch .venv/bin/activate
+
+test: qless.lua .venv/bin/activate
+	.venv/bin/python -m unittest discover -s test -p 'test_*.py' -v
 
 $(REDIS_TAR):
 	curl -O http://download.redis.io/releases/$(REDIS_TAR)
